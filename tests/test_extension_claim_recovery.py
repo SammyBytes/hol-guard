@@ -256,6 +256,31 @@ def test_bad_introduction_listing_does_not_block_other_invitations(tmp_path, mon
     assert "command.bad: invitation recovery needs review" in capsys.readouterr().err
 
 
+def test_provider_failure_cannot_become_a_successful_empty_plan(tmp_path, monkeypatch):
+    def resolve(*args):
+        raise recovery.GitHubApiError("GitHub API 503")
+
+    monkeypatch.setattr(recovery, "resolve_initial_contribution", resolve)
+    with pytest.raises(recovery.GitHubApiError, match="503"):
+        recovery.invitation_entries(object(), tmp_path, {"command.example": ["source"]}, MERGE_SHA)
+
+
+def test_provider_failure_on_initial_listing_is_not_a_schema_skip(tmp_path, monkeypatch):
+    identity = "command.example"
+    path = tmp_path / "contributions/extension-listings" / f"{identity}.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(listing(identity, ["100"])))
+    history = FakeGitHub()
+    monkeypatch.setattr(recovery, "resolve_initial_contribution", lambda *args: Claimant())
+
+    def file_json(*args, **kwargs):
+        raise recovery.GitHubApiError("GitHub API 403")
+
+    monkeypatch.setattr(history, "file_json", file_json)
+    with pytest.raises(recovery.GitHubApiError, match="403"):
+        recovery.invitation_entries(history, tmp_path, {identity: ["source"]}, MERGE_SHA)
+
+
 def test_recovery_workflow_is_independent_and_shares_delivery_lock():
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/extension-claim-recovery.yml").read_text()
     assert "schedule:" in workflow

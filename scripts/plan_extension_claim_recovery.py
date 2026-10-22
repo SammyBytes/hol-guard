@@ -18,6 +18,7 @@ from extension_claim_provenance import ClaimProvenanceError, resolve_initial_con
 from notify_merged_extension_claimants import (
     ClaimNoticeError,
     GitHubApi,
+    GitHubApiError,
     accepted_github_ids,
     contribution_paths,
     trusted_notice_comment,
@@ -85,6 +86,8 @@ def invitation_entries(history, root: Path, sources: dict[str, list[str]], sha: 
     for identity, paths in sorted(sources.items()):
         try:
             rows.extend(_invitation_entries(history, root, {identity: paths}, sha, revoked=revoked, owners=owners))
+        except GitHubApiError:
+            raise
         except (ClaimProvenanceError, ClaimNoticeError, ValueError, subprocess.CalledProcessError) as error:
             print(f"{identity}: invitation recovery needs review: {error}", file=sys.stderr)
     return rows
@@ -144,6 +147,8 @@ def listing_transitions(root: Path, sources: dict[str, list[str]], sha: str) -> 
     for identity, paths in sorted(sources.items()):
         try:
             rows.extend(_listing_transitions(root, {identity: paths}, sha))
+        except GitHubApiError:
+            raise
         except (ClaimProvenanceError, ClaimNoticeError, ValueError, subprocess.CalledProcessError) as error:
             print(f"{identity}: listing recovery needs review: {error}", file=sys.stderr)
     return rows

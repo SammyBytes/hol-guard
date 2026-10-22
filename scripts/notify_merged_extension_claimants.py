@@ -92,6 +92,10 @@ class ClaimNoticeError(RuntimeError):
     """Raised when claim-notice provenance cannot be established safely."""
 
 
+class GitHubApiError(ClaimNoticeError):
+    """A provider failure must remain retryable rather than look like no work."""
+
+
 @dataclass(frozen=True)
 class NoticeItem:
     extension_id: str
@@ -163,14 +167,14 @@ class GitHubApi:
                 if retryable and error.code in {429, 500, 502, 503, 504} and attempt < 2:
                     time.sleep(2**attempt)
                     continue
-                raise ClaimNoticeError(f"GitHub API {error.code} for {url}: {detail}") from error
+                raise GitHubApiError(f"GitHub API {error.code} for {url}: {detail}") from error
             except OSError as error:
                 if retryable and attempt < 2:
                     time.sleep(2**attempt)
                     continue
-                raise ClaimNoticeError(f"GitHub API request failed for {url}: {error}") from error
+                raise GitHubApiError(f"GitHub API request failed for {url}: {error}") from error
         if len(raw) > MAX_GITHUB_RESPONSE_BYTES:
-            raise ClaimNoticeError("GitHub API response exceeds the byte limit")
+            raise GitHubApiError("GitHub API response exceeds the byte limit")
         if not raw:
             return None
         try:
@@ -179,18 +183,18 @@ class GitHubApi:
                 self._immutable_reads[url] = data
             return data
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ClaimNoticeError(f"GitHub API returned invalid JSON for {url}") from error
+            raise GitHubApiError(f"GitHub API returned invalid JSON for {url}") from error
 
     def repo_metadata(self) -> dict[str, Any]:
         data = self._request(self.base_url)
         if not isinstance(data, dict):
-            raise ClaimNoticeError("repository metadata response is invalid")
+            raise GitHubApiError("repository metadata response is invalid")
         return data
 
     def pull_request(self, number: int) -> dict[str, Any]:
         data = self._request(f"{self.base_url}/pulls/{number}")
         if not isinstance(data, dict):
-            raise ClaimNoticeError("pull request response is invalid")
+            raise GitHubApiError("pull request response is invalid")
         return data
 
     def pull_request_files(self, number: int) -> list[dict[str, Any]]:
@@ -198,7 +202,7 @@ class GitHubApi:
         for page in range(1, 31):
             data = self._request(f"{self.base_url}/pulls/{number}/files?per_page=100&page={page}")
             if not isinstance(data, list):
-                raise ClaimNoticeError("pull request files response is invalid")
+                raise GitHubApiError("pull request files response is invalid")
             files.extend(item for item in data if isinstance(item, dict))
             if len(data) < 100:
                 return files
@@ -207,7 +211,7 @@ class GitHubApi:
     def compare(self, base: str, head: str) -> dict[str, Any]:
         data = self._request(f"{self.base_url}/compare/{base}...{head}")
         if not isinstance(data, dict):
-            raise ClaimNoticeError("compare response is invalid")
+            raise GitHubApiError("compare response is invalid")
         return data
 
     def file_json(self, path: str, ref: str, *, missing_ok: bool = False) -> dict[str, Any] | None:
@@ -220,7 +224,7 @@ class GitHubApi:
                 return None
             raise
         if not isinstance(data, dict) or data.get("encoding") != "base64" or not isinstance(data.get("content"), str):
-            raise ClaimNoticeError(f"repository file response is invalid for {path}@{ref}")
+            raise GitHubApiError(f"repository file response is invalid for {path}@{ref}")
         try:
             decoded = base64.b64decode(data["content"], validate=False).decode("utf-8")
             parsed = json.loads(decoded)
@@ -238,7 +242,7 @@ class GitHubApi:
         for page in range(1, 11):
             data = self._request(f"{self.base_url}/issues/{number}/comments?per_page=100&page={page}")
             if not isinstance(data, list):
-                raise ClaimNoticeError("pull request comments response is invalid")
+                raise GitHubApiError("pull request comments response is invalid")
             comments.extend(item for item in data if isinstance(item, dict))
             if len(data) < 100:
                 return comments
