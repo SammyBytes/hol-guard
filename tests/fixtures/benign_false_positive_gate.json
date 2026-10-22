@@ -14278,6 +14278,21 @@
       "expect": "allow"
     },
     {
+      "id": "docker-context-ls-quiet-head",
+      "fix_area": "shell",
+      "harnesses": [
+        "codex",
+        "claude-code",
+        "omp"
+      ],
+      "tool": "shell",
+      "tool_input": {
+        "command": "docker context ls -q 2>&1 | head -5"
+      },
+      "cwd": "worktree",
+      "expect": "allow"
+    },
+    {
       "id": "docker-context-show",
       "fix_area": "shell",
       "harnesses": [

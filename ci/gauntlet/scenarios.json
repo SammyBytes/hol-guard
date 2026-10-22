@@ -1375,7 +1375,7 @@
       "prompt": "Find out which Docker contexts this client knows about and which one is active: run each listed command once, in order, and report what they print. Do not switch, create, export or remove any context.",
       "commands": [
         "docker context ls",
-        "docker context ls --format '{{.Name}}' 2>&1 | head -5",
+        "docker context ls -q 2>&1 | head -5",
         "docker context show"
       ]
     },
