@@ -238,6 +238,18 @@ container IO that surrounds a download. The dead source-ancestry fetch is
 removed; the same descendant rule runs in `transition` and is covered by its
 tests.
 
+An installed command pack upgrade is judged against the managed policy its
+candidate was prepared against, and the resident decides whether that policy
+moved (`migrate_plan`, `extension_control_authority_op/installed_upgrade.rs`).
+It re-reads the authenticated head, refuses anything but a protected view,
+composes the managed layers from the same snapshot and `sync_state` rows the
+authority serves, and compares that revision and those signed-cloud layers with
+the evidence the migration carries. Python sends the anchor and the manifest the
+head is bound to, and carries the revision and layers the candidate recorded as
+evidence; it no longer recomputes the view or compares verdicts. A head the
+resident cannot read, or one whose managed policy has moved, refuses the
+migration with no Python fallback.
+
 Which bounded read an admitted argv names is decided in the resident
 (`verified-read-plan-v1`, `guard-command/src/verified_read_plan.rs` behind
 `verified_read_plan_op.rs`). It owns the whole grammar: that the executable is a
