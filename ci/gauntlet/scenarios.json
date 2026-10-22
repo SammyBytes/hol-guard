@@ -48,7 +48,7 @@
       "oracle": "commands",
       "commands": [
         "cat 'src/path with spaces.ts'",
-        "cat 'src/caf\u00e9.ts'",
+        "cat 'src/café.ts'",
         "head -1 src/one.ts",
         "tail -1 src/one.ts"
       ],
