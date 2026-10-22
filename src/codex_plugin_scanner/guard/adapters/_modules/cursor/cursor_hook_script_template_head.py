@@ -44,7 +44,10 @@ _HOOK_REMAINING_SECONDS = GUARD_HOOK_TIMEOUT_SECONDS
 # already spent; that time comes out of this client's budget, never added.
 _NATIVE_ELAPSED_MS = os.environ.pop("HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS", "")
 if _NATIVE_ELAPSED_MS.isascii() and _NATIVE_ELAPSED_MS.isdigit():
-    _HOOK_REMAINING_SECONDS -= min(int(_NATIVE_ELAPSED_MS) / 1000.0, float(GUARD_HOOK_TIMEOUT_SECONDS))
+    try:
+        _HOOK_REMAINING_SECONDS -= min(int(_NATIVE_ELAPSED_MS) / 1000.0, float(GUARD_HOOK_TIMEOUT_SECONDS))
+    except (ValueError, OverflowError):
+        _HOOK_REMAINING_SECONDS = 0.0
 _HOOK_DEADLINE_MONOTONIC = _HOOK_STARTED_MONOTONIC + _HOOK_REMAINING_SECONDS
 GUARD_ACTIONS = frozenset({"allow", "warn", "review", "require-reapproval", "sandbox-required", "block"})
 _FALLBACK_LOCK = threading.Lock()

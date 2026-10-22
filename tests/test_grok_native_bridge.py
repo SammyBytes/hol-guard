@@ -147,12 +147,13 @@ def test_client_ignores_a_malformed_elapsed_time(tmp_path: Path, monkeypatch: py
     assert module._HOOK_DEADLINE_MONOTONIC == module._HOOK_STARTED_MONOTONIC + 8
 
 
+@pytest.mark.parametrize("raw", ["99999999", "9" * 5000, "9" * 400], ids=["ordinary", "int_limit", "float_overflow"])
 def test_client_exhausted_native_handoff_deadline_is_exact_start(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, raw: str
 ) -> None:
     started = 122.888386772
     monkeypatch.setattr("time.monotonic", lambda: started)
-    monkeypatch.setenv("HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS", "99999999")
+    monkeypatch.setenv("HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS", raw)
 
     module = _load_script(tmp_path, harness="grok", timeout_seconds=8)
 
