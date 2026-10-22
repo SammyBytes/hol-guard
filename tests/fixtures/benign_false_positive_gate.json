@@ -19018,6 +19018,54 @@
       },
       "cwd": "worktree",
       "expect": "not_allow"
+    },
+    {
+      "id": "source-version-manager-then-use",
+      "fix_area": "shell",
+      "harnesses": [
+        "codex",
+        "zcode",
+        "claude-code",
+        "omp"
+      ],
+      "tool": "shell",
+      "tool_input": {
+        "command": "source ~/.nvm/nvm.sh && nvm use 20"
+      },
+      "cwd": "worktree",
+      "expect": "allow_or_review"
+    },
+    {
+      "id": "dot-version-manager-then-node-version",
+      "fix_area": "shell",
+      "harnesses": [
+        "codex",
+        "zcode",
+        "claude-code",
+        "omp"
+      ],
+      "tool": "shell",
+      "tool_input": {
+        "command": ". ~/.nvm/nvm.sh && node -v"
+      },
+      "cwd": "worktree",
+      "expect": "allow_or_review"
+    },
+    {
+      "id": "source-version-manager-only",
+      "fix_area": "shell",
+      "harnesses": [
+        "codex",
+        "zcode",
+        "claude-code",
+        "omp"
+      ],
+      "tool": "shell",
+      "tool_input": {
+        "command": "source ~/.nvm/nvm.sh"
+      },
+      "cwd": "worktree",
+      "expect": "allow_or_review"
     }
   ],
   "mcp_cases": [
