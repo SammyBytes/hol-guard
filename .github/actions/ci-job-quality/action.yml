@@ -64,6 +64,19 @@ runs:
         tests/test_ci_quality_feedback.py \
         tests/test_native_regression_shard.py \
         tests/test_guard_gauntlet_ci.py \
+        tests/release_workflow_helpers.py \
+        tests/test_alpha_fast_native_release.py \
+        tests/test_ci_speed_contracts.py \
+        tests/test_installed_canary_workflow.py \
+        tests/test_pr_testpypi_canary_workflow.py \
+        tests/test_publish_target_lanes.py \
+        tests/test_release_compiler_cache.py \
+        tests/test_release_critical_path.py \
+        tests/test_release_native_binary_cache.py \
+        tests/test_release_please_workflow.py \
+        tests/test_release_publication_workflow.py \
+        tests/test_release_train_workflow.py \
+        tests/test_unpublished_alpha_reservation.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
@@ -78,19 +91,6 @@ runs:
         tests/test_guard_durable_io.py \
         tests/test_guard_managed_install_context.py \
         tests/test_guard_private_file_io.py \
-        tests/release_workflow_helpers.py \
-        tests/test_alpha_fast_native_release.py \
-        tests/test_ci_speed_contracts.py \
-        tests/test_installed_canary_workflow.py \
-        tests/test_pr_testpypi_canary_workflow.py \
-        tests/test_publish_target_lanes.py \
-        tests/test_release_compiler_cache.py \
-        tests/test_release_critical_path.py \
-        tests/test_release_native_binary_cache.py \
-        tests/test_release_please_workflow.py \
-        tests/test_release_publication_workflow.py \
-        tests/test_release_train_workflow.py \
-        tests/test_unpublished_alpha_reservation.py \
         tests/test_native_offline_cache.py \
         tests/test_native_policy_test_support.py \
         tests/test_ci_native_evaluator_cache.py \
@@ -122,6 +122,19 @@ runs:
         tests/test_ci_quality_feedback.py \
         tests/test_native_regression_shard.py \
         tests/test_guard_gauntlet_ci.py \
+        tests/release_workflow_helpers.py \
+        tests/test_alpha_fast_native_release.py \
+        tests/test_ci_speed_contracts.py \
+        tests/test_installed_canary_workflow.py \
+        tests/test_pr_testpypi_canary_workflow.py \
+        tests/test_publish_target_lanes.py \
+        tests/test_release_compiler_cache.py \
+        tests/test_release_critical_path.py \
+        tests/test_release_native_binary_cache.py \
+        tests/test_release_please_workflow.py \
+        tests/test_release_publication_workflow.py \
+        tests/test_release_train_workflow.py \
+        tests/test_unpublished_alpha_reservation.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
@@ -136,19 +149,6 @@ runs:
         tests/test_guard_durable_io.py \
         tests/test_guard_managed_install_context.py \
         tests/test_guard_private_file_io.py \
-        tests/release_workflow_helpers.py \
-        tests/test_alpha_fast_native_release.py \
-        tests/test_ci_speed_contracts.py \
-        tests/test_installed_canary_workflow.py \
-        tests/test_pr_testpypi_canary_workflow.py \
-        tests/test_publish_target_lanes.py \
-        tests/test_release_compiler_cache.py \
-        tests/test_release_critical_path.py \
-        tests/test_release_native_binary_cache.py \
-        tests/test_release_please_workflow.py \
-        tests/test_release_publication_workflow.py \
-        tests/test_release_train_workflow.py \
-        tests/test_unpublished_alpha_reservation.py \
         tests/test_native_offline_cache.py \
         tests/test_native_policy_test_support.py \
         tests/test_ci_native_evaluator_cache.py \
