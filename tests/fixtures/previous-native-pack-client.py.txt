@@ -156,7 +156,7 @@ def initialize(tmp_path, monkeypatch):
     # been carrying. Any install whose catalog moved on such a client - an
     # ordinary release upgrade - therefore hands the upgrade an unbound head
     # above an activation row that is still bound, so leave one here.
-    store.read_extension_control_authority_for_registry(_upgraded_registry())
+    store.read_extension_control_authority_for_registry(_upgraded_registry(), include_managed_controls=False)
     with store._connect() as connection:
         head = connection.execute(
             "select snapshot_json from extension_control_authority_snapshot where singleton = 1"
