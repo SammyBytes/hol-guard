@@ -73,6 +73,32 @@ pub(in crate::pretool) fn repository_inert(
     }))
 }
 
+/// Whether `git bisect log` prints only the session's own record. Git opens
+/// `BISECT_LOG` in the Git directory and copies it to standard output, and
+/// `open` follows a link, so a link there names a file the log would print. A
+/// missing file is Git's "not bisecting" answer and a plain file is the record
+/// itself. Outside any repository there is no log to print.
+pub(in crate::pretool) fn bisect_log_inert(base: &Command, deadline: Instant) -> Option<bool> {
+    let mut command = super::copy_command(base)?;
+    command.args([
+        "--no-pager",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "BISECT_LOG",
+    ]);
+    let (status, bytes) = super::output(&mut command, deadline, PATH_LIMIT)?;
+    if !status.success() {
+        return super::outside_repository(base, deadline)?.then_some(true);
+    }
+    let path = absolute_lines(&bytes, 1)?.pop()?;
+    match std::fs::symlink_metadata(&path) {
+        Ok(metadata) => Some(metadata.is_file()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(true),
+        Err(_) => None,
+    }
+}
+
 /// Whether Git reaches `directory` through the repository's own relative
 /// `core.hooksPath` with no link on the way (see `git_hook_files`). Asked only
 /// when a hook manager's shim is the file Git would run.

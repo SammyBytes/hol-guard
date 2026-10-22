@@ -132,3 +132,70 @@ fn a_configured_show_pager_keeps_only_the_note_show_reviewed() {
         );
     }
 }
+
+/// A notes tree names whatever object it was built with, so the note `git
+/// notes show` execs `git show` on can be a commit, rendered with the patch,
+/// diff driver and signature settings of `git show`. Each setting keeps the
+/// show form reviewed and leaves the listing, which prints no patch, alone.
+#[test]
+fn a_render_setting_keeps_only_the_note_show_reviewed() {
+    for (index, (key, value)) in [
+        ("diff.synthetic.textconv", "./synthetic-never-execute"),
+        ("diff.external", "./synthetic-never-execute"),
+        ("diff.synthetic.command", "./synthetic-never-execute"),
+        ("log.showSignature", "true"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let session = session(&format!("notes-render-{index}"));
+        annotate(&session.home, &session.primary);
+        git(&session.home, &session.primary, &["config", key, value]);
+        for command in ["git notes show HEAD", "git notes --ref build show HEAD"] {
+            let result = session.evaluate_at(command, &session.primary);
+            assert_ne!(
+                result.minimum_action, "allow",
+                "{key}: {command}: {}",
+                result.reason_code
+            );
+        }
+        for command in ["git notes list", "git notes --ref build list"] {
+            let result = session.evaluate_at(command, &session.primary);
+            assert_eq!(
+                result.minimum_action, "allow",
+                "{key}: {command}: {}",
+                result.reason_code
+            );
+        }
+    }
+}
+
+/// `git bisect log` copies `.git/BISECT_LOG` out through `open`, which follows
+/// a link, so a log that is a link keeps the review while a plain record and
+/// a session with no record stay reads.
+#[test]
+fn a_linked_bisect_log_keeps_the_review() {
+    let session = session("bisect-log-link");
+    let log = session.primary.join(".git").join("BISECT_LOG");
+    let outside = session.home.join("synthetic-outside-record");
+    std::fs::write(&outside, "synthetic\n").unwrap();
+    for (label, linked) in [
+        ("missing", None),
+        ("plain", Some(false)),
+        ("linked", Some(true)),
+    ] {
+        let _ = std::fs::remove_file(&log);
+        match linked {
+            None => {}
+            Some(false) => std::fs::write(&log, "git bisect start\n").unwrap(),
+            Some(true) => std::os::unix::fs::symlink(&outside, &log).unwrap(),
+        }
+        let result = session.evaluate_at("git bisect log", &session.primary);
+        assert_eq!(
+            result.minimum_action == "allow",
+            linked != Some(true),
+            "{label}: {}",
+            result.reason_code
+        );
+    }
+}
