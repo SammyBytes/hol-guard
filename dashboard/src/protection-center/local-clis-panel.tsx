@@ -7,6 +7,7 @@ import {
   previewLocalCliMutation,
   recognizeLocalCli,
   refreshMcpInventory,
+  unreviewedToolChangeCount,
   type LocalCliCommand,
   type LocalCliCommandState,
   type LocalCliItem,
@@ -22,7 +23,7 @@ import { customExtensionContinuityView } from "../managed-controls/custom-extens
 import { commandPermissionChanges, mcpCatalogCopy, mcpToolCanReceiveDirectAllow, rebaseCommandDraft } from "./mcp-catalog-state";
 import { McpProviderActions, type ProviderActionDraft } from "./mcp-provider-actions";
 import { ProviderWorkflows } from "./provider-workflows";
-import { bulkPolicyCopy, connectorGroupOutcomeCopy, continuityCopy, customExtensionStateLabel, detailCatalogHeading, detailCatalogHelper, detailPolicyCopy, FRESH_TOTP_REQUIRED_MESSAGE, isFreshTotpRequired, mcpPermissionStatusLabel, nativePublicationMessage, randomToken, SUGGESTED_RULES_NOTICE } from "./local-cli-panel-copy";
+import { bulkPolicyCopy, connectorGroupOutcomeCopy, continuityCopy, customExtensionStateLabel, detailCatalogHeading, detailCatalogHelper, detailPolicyCopy, FRESH_TOTP_REQUIRED_MESSAGE, isFreshTotpRequired, keepChoicesCopy, mcpPermissionStatusLabel, nativePublicationMessage, randomToken, SUGGESTED_RULES_NOTICE } from "./local-cli-panel-copy";
 import { connectorGroupOutcome, connectorSetupMatch, customExtensionDisplayName, hasSuggestedRules, prefillSuggestedStates, type ConnectorSetupLink } from "./custom-extension-profile";
 import { ConnectorSetupBanner } from "./connector-setup-banner";
 import { CustomExtensionReviewModal } from "./local-cli-review-modal";
@@ -67,6 +68,8 @@ export function LocalCliDetail(props: {
   const added = props.item.state !== "unset";
   const commandChanges = commandPermissionChanges(props.item.commands, commands);
   const commandsDirty = commandChanges.length > 0;
+  // Saving the current choices reviews tools the last listing flagged as new or changed.
+  const unreviewedTools = props.item.surface === "mcp" ? unreviewedToolChangeCount(props.item) : 0;
   const [recommended, setRecommended] = useState(false);
   const [setupOutcome, setSetupOutcome] = useState<string | null>(null);
   useEffect(() => {
@@ -407,6 +410,16 @@ export function LocalCliDetail(props: {
               Bulk choices apply to listed tools with direct permissions.
               Execution wrappers and unlisted tools keep their separate review settings.
             </p>
+          ) : null}
+          {added && !commandsDirty && unreviewedTools > 0 ? (
+            <div className="guard-review-bar" data-testid="custom-extension-keep-choices">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-brand-dark">{keepChoicesCopy(unreviewedTools)}</p>
+                <button type="button" disabled={busy} className="min-h-11 rounded-xl bg-brand-blue px-4 text-sm font-semibold text-white" onClick={requestSaveCommands}>
+                  Keep these choices
+                </button>
+              </div>
+            </div>
           ) : null}
           {commandsDirty ? (
             <div className="guard-review-bar" data-testid="custom-extension-review-bar">

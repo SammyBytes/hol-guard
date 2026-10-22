@@ -135,6 +135,12 @@ export function addedCustomExtensions(items: readonly LocalCliItem[]): LocalCliI
   return items.filter((item) => item.state !== "unset");
 }
 
+/** Tools new or changed since the last listing that no saved choice has reviewed yet. */
+export function unreviewedToolChangeCount(item: LocalCliItem): number {
+  const changes = item.mcp_catalog?.changes;
+  return (changes?.added.length ?? 0) + (changes?.changed.length ?? 0);
+}
+
 /** True when the connector needs a decision: not enrolled yet, stale, or its tool inventory changed. */
 export function customExtensionNeedsReview(item: LocalCliItem): boolean {
   return item.stale || item.state === "unset" || item.mcp_catalog?.stale

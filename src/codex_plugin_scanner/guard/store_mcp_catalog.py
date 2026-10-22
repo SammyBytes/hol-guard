@@ -348,6 +348,45 @@ def review_catalog_changes(
         )
 
 
+def acknowledge_catalog_changes(
+    connection: sqlite3.Connection,
+    cli_id: str,
+    identity_hash: str,
+    reviewed: set[str],
+) -> None:
+    """A saved choice for a new or changed tool reviews that change.
+
+    Without this, ``changes`` keeps flagging every tool from the first listing
+    until the next one, so a reviewed extension stays under Needs review. The
+    catalog revision and tool authority are untouched; the next listing still
+    diffs against the known tools and flags anything new again.
+    """
+
+    row = connection.execute(
+        "select catalog_json from local_mcp_catalog where cli_id = ? and identity_hash = ?",
+        (cli_id, identity_hash),
+    ).fetchone()
+    payload = _decode_snapshot(row[0]) if row is not None else None
+    changes = payload.get("changes") if payload is not None else None
+    if payload is None or not isinstance(changes, dict):
+        return
+    updated = dict(changes)
+    for key in ("added", "changed"):
+        names = changes.get(key)
+        if isinstance(names, list):
+            updated[key] = [
+                name for name in names if not (isinstance(name, str) and slug_local_cli_command_id(name) in reviewed)
+            ]
+    if updated == changes:
+        return
+    payload["changes"] = updated
+    raw = json.dumps(payload, ensure_ascii=True, allow_nan=False, separators=(",", ":"))
+    connection.execute(
+        "update local_mcp_catalog set catalog_json = ? where cli_id = ? and identity_hash = ?",
+        (raw, cli_id, identity_hash),
+    )
+
+
 def _decode_snapshot(raw: object) -> dict[str, object] | None:
     if not isinstance(raw, str) or len(raw.encode("utf-8")) > _MAX_SNAPSHOT_BYTES:
         return None

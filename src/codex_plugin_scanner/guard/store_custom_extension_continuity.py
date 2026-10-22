@@ -24,6 +24,7 @@ from .store_local_cli_capabilities import (
     write_local_cli_capabilities,
 )
 from .store_local_cli_schema import ensure_local_cli_schema
+from .store_mcp_catalog import acknowledge_catalog_changes
 from .store_mcp_provider_permissions import ProviderUpdate, write_provider_choices
 
 
@@ -299,6 +300,8 @@ def _write_local_cli_grant(
             else:
                 _ = connection.execute("delete from local_cli_command_grant where cli_id = ?", (identity.cli_id,))
             _write_command_states(connection, identity.cli_id, command_states)
+            if observation is not None and observation[0] == "mcp":
+                acknowledge_catalog_changes(connection, identity.cli_id, identity.identity_hash, set(command_states))
     _ = connection.execute("update local_cli_authority set revision = ? where singleton = 1", (next_revision,))
     return next_revision
 

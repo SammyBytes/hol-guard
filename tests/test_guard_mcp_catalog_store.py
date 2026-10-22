@@ -290,6 +290,76 @@ def test_saving_current_choices_preserves_retired_mcp_denies(tmp_path: Path) -> 
     assert store.read_local_cli_command_states(identity.cli_id)["delete"] == "block"
 
 
+def _catalog_view(store: GuardStore) -> dict[str, object]:
+    return store.list_local_cli_items()[0]["mcp_catalog"]
+
+
+def test_saving_choices_reviews_the_new_tools_they_cover(tmp_path: Path) -> None:
+    store, identity = _store(tmp_path)
+    _publish(store, identity, "read", "delete")
+    assert _catalog_view(store)["changes"]["added"] == ["delete", "read"]
+    revision = _catalog_view(store)["revision"]
+    authority = _tool_authority(store, identity, "read")
+
+    # A tool whose choice was saved is reviewed; one left out still needs a look.
+    store.upsert_local_cli_grant(
+        identity=identity,
+        state="allowed",
+        expected_revision=store.read_local_cli_revision(),
+        updated_at=_SECOND,
+        command_states={"read": "allow"},
+    )
+    assert _catalog_view(store)["changes"]["added"] == ["delete"]
+    store.upsert_local_cli_grant(
+        identity=identity,
+        state="allowed",
+        expected_revision=store.read_local_cli_revision(),
+        updated_at=_SECOND,
+        command_states={"read": "allow", "delete": "review"},
+    )
+    view = _catalog_view(store)
+    assert view["changes"] == {"added": [], "changed": [], "removed": [], "stale": []}
+    # Reviewing changes nothing the catalog proves about the tools.
+    assert view["revision"] == revision
+    assert _tool_authority(store, identity, "read") == authority
+
+    # A later listing still flags a tool that is new since then.
+    _publish(store, identity, "read", "delete", "write")
+    assert _catalog_view(store)["changes"]["added"] == ["write"]
+
+
+def test_saving_choices_reviews_a_changed_tool(tmp_path: Path) -> None:
+    store, identity = _store(tmp_path)
+    _publish(store, identity, "read")
+    store.upsert_local_cli_grant(
+        identity=identity,
+        state="allowed",
+        expected_revision=store.read_local_cli_revision(),
+        updated_at=_FIRST,
+        command_states={"read": "allow"},
+    )
+    changed = replace(
+        _catalog("read"),
+        tools=({"name": "read", "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}}},),
+    )
+    store.replace_local_cli_commands(
+        identity.cli_id,
+        _commands("read"),
+        mcp_catalog=changed,
+        identity_hash=identity.identity_hash,
+        seen_at=_SECOND,
+    )
+    assert _catalog_view(store)["changes"]["changed"] == ["read"]
+    store.upsert_local_cli_grant(
+        identity=identity,
+        state="allowed",
+        expected_revision=store.read_local_cli_revision(),
+        updated_at=_SECOND,
+        command_states={"read": "allow"},
+    )
+    assert _catalog_view(store)["changes"]["changed"] == []
+
+
 def test_schema_changes_require_review_and_preserve_deny(tmp_path: Path) -> None:
     store, identity = _store(tmp_path)
     _publish(store, identity, "read", "delete")
