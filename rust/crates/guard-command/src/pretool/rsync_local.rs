@@ -343,7 +343,7 @@ mod tests {
             "--archive --verbose src/ build/",
             "-a --exclude node_modules src/ build/",
             "-a --exclude=node_modules --exclude=.git src/ build/",
-            "-a --include '*.ts' src/ build/",
+            "-a --include main.ts src/ build/",
             "-rtv assets/ public/assets/",
             "-a --dry-run src/ build/",
             "-a --max-size 10m src/ build/",
@@ -396,6 +396,7 @@ mod tests {
             "-a src/ ignored/ --exclude *.tmp",
             "-a --exclude=*.log src/ build/",
             "-a --exclude [ab].txt src/ build/",
+            "-a --include '*.ts' src/ build/",
         ] {
             assert!(!local_copy(&words(text)), "{text}");
         }
