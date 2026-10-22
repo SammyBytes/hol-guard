@@ -66,7 +66,8 @@
 #[path = "docker_logs.rs"]
 mod logs;
 
-/// No-value options shared by both listings.
+/// No-value options shared by the container, image, builder and project
+/// listings.
 const LISTING_FLAGS: [&str; 6] = ["-a", "--all", "-q", "--quiet", "--no-trunc", "--help"];
 
 /// Container-listing flags that take no value.
@@ -92,6 +93,9 @@ const BUILDER_VALUES: [&str; 0] = [];
 /// the root `--file` and the value names a compose file to resolve. Only the
 /// long spelling filters.
 const PROJECT_VALUES: [&str; 2] = ["--filter", "--format"];
+/// A context listing takes only `--quiet`, `--format` and `--help`. It has
+/// no `--all` or `--no-trunc` of its own, so the shared flags do not apply.
+const CONTEXT_FLAGS: [&str; 3] = ["-q", "--quiet", "--help"];
 /// A context listing's `--format` reads the same summary the table prints.
 const CONTEXT_VALUES: [&str; 1] = ["--format"];
 /// A registry manifest query prints the manifest as published (`--raw`) or
@@ -179,12 +183,16 @@ pub(super) fn safe_docker_arguments(arguments: &[String]) -> bool {
 }
 
 fn listing_options_safe(listing: Listing, words: &[&str]) -> bool {
+    let shared: &[&str] = match listing {
+        Listing::Contexts => &[],
+        _ => &LISTING_FLAGS[..],
+    };
     let (flags, values, short): (&[&str], &[&str], &str) = match listing {
         Listing::Containers => (&CONTAINER_FLAGS[..], &CONTAINER_VALUES[..], CONTAINER_SHORT),
         Listing::Images => (&IMAGE_FLAGS[..], &IMAGE_VALUES[..], IMAGE_SHORT),
         Listing::Builders => (&NO_FLAGS[..], &BUILDER_VALUES[..], BUILDER_SHORT),
         Listing::Projects => (&NO_FLAGS[..], &PROJECT_VALUES[..], PROJECT_SHORT),
-        Listing::Contexts => (&NO_FLAGS[..], &CONTEXT_VALUES[..], CONTEXT_SHORT),
+        Listing::Contexts => (&CONTEXT_FLAGS[..], &CONTEXT_VALUES[..], CONTEXT_SHORT),
         Listing::Manifest => (&REGISTRY_FLAGS[..], &REGISTRY_VALUES[..], REGISTRY_SHORT),
     };
     let mut positionals = 0usize;
@@ -199,7 +207,7 @@ fn listing_options_safe(listing: Listing, words: &[&str]) -> bool {
             }
             continue;
         }
-        if LISTING_FLAGS.contains(&word) || flags.contains(&word) {
+        if shared.contains(&word) || flags.contains(&word) {
             continue;
         }
         let (name, inline) = match word.split_once('=') {
