@@ -14,6 +14,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+CONFIGURED_SHARDS = str(WORKFLOW["env"]["CI_PYTEST_COVERAGE_SHARDS"])
 ALWAYS_ON = {
     "plan",
     "native-workspace",
@@ -53,7 +55,7 @@ pytestmark = pytest.mark.skipif(os.name == "nt", reason="The aggregate runs on U
 
 @pytest.fixture(scope="module")
 def gate() -> dict:
-    return yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]["required"]
+    return WORKFLOW["jobs"]["required"]
 
 
 def _results(data_only: bool) -> dict:
@@ -70,8 +72,8 @@ def _passes(gate: dict, needs: dict, data_only: bool, **overrides: str) -> bool:
         "EVENT_NAME": "pull_request",
         "PLAN_DATA_ONLY": str(data_only).lower(),
         "PLAN_LANES": "[]",
-        "PLAN_SHARD_COUNT": "256",
-        "EXPECTED_SHARDS": "256",
+        "PLAN_SHARD_COUNT": CONFIGURED_SHARDS,
+        "EXPECTED_SHARDS": CONFIGURED_SHARDS,
         **{name: needs.get(job, {}).get("result", "") for name, job in PYTHON_PROVIDERS.items()},
         **overrides,
     }
@@ -102,7 +104,7 @@ def _former_combined_passes(needs: dict, data_only: bool) -> bool:
 
 
 def test_only_the_duplicate_aggregate_is_retired_and_its_step_is_literal(gate: dict) -> None:
-    jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
+    jobs = WORKFLOW["jobs"]
     assert "ci-python-312" not in jobs
     assert set(gate["needs"]) == ALWAYS_ON | LANE_GATED
     assert gate["name"] == "hol-guard / required" and gate["if"] == "always()"
@@ -158,7 +160,7 @@ def test_native_and_planner_failures_remain_closed(gate: dict, data_only: bool, 
     assert not _passes(gate, needs, data_only)
 
 
-@pytest.mark.parametrize("count", ["", "0", "unknown", "255"])
+@pytest.mark.parametrize("count", ["", "0", "unknown", str(int(CONFIGURED_SHARDS) + 1)])
 def test_full_plan_requires_the_configured_matrix_cardinality(gate: dict, count: str) -> None:
     assert not _passes(gate, _results(False), False, PLAN_SHARD_COUNT=count)
 
