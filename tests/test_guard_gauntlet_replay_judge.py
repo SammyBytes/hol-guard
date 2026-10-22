@@ -140,9 +140,6 @@ def test_only_the_marked_cases_may_pass_on_containment() -> None:
         # A signing program named outside the workspace: a contained run cannot reach that
         # path, so the amend runs no program the sandbox does not hold.
         "neg-git-amend-signed-program-override",
-        # `git bisect run` starts the program the text names; a contained run starts it with
-        # no network and no home access, so it reaches nothing outside the workspace.
-        "neg-git-bisect-run-starts-a-program",
         # A ref write under the worktree's own admin directory, which a contained run
         # keeps inside the sandbox.
         "neg-git-branch-create",
