@@ -55,6 +55,9 @@ runs:
         tests/test_guard_durable_io.py \
         tests/test_guard_managed_install_context.py \
         tests/test_guard_private_file_io.py \
+        tests/test_native_offline_cache.py \
+        tests/test_native_policy_test_support.py \
+        tests/test_ci_native_evaluator_cache.py \
         tests/test_policy_bundle_crate_boundary.py \
         tests/test_ci_command_source_inputs_manifest.py
     shell: bash
@@ -65,6 +68,9 @@ runs:
         tests/test_guard_durable_io.py \
         tests/test_guard_managed_install_context.py \
         tests/test_guard_private_file_io.py \
+        tests/test_native_offline_cache.py \
+        tests/test_native_policy_test_support.py \
+        tests/test_ci_native_evaluator_cache.py \
         tests/test_policy_bundle_crate_boundary.py \
         tests/test_ci_command_source_inputs_manifest.py
     shell: bash
