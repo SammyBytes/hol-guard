@@ -238,6 +238,20 @@ container IO that surrounds a download. The dead source-ancestry fetch is
 removed; the same descendant rule runs in `transition` and is covered by its
 tests.
 
+Which bounded read an admitted argv names is decided in the resident
+(`verified-read-plan-v1`, `guard-command/src/verified_read_plan.rs` behind
+`verified_read_plan_op.rs`). It owns the whole grammar: that the executable is a
+bare name inside the verified-read cohort, which operation each name spells, the
+head and tail line bound and every spelling of it, the quiet-flag and range form
+`sed` is held to, the thousand-line ceiling both carry, and that a target is a
+static relative path with no dynamic shell character in it. The answer is one
+plan — an operation id, an optional target and a selection naming the lines to
+show — so Python reads the argv nowhere. This side opens the target under the
+repository, where the secret-path, symlink and identity checks live, and slices
+the text the plan selected. A refusal names the rule it broke for the
+diagnostics record; the read ends either way. Without a plan there is no read
+and no Python grammar to fall back on: the command returns to ordinary review.
+
 ## Harness route inventory
 
 The v2 contract maps all harnesses in `HARNESS_CONTRACTS`, including harnesses
