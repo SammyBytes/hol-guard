@@ -51,6 +51,8 @@ def test_quality_lints_and_formats_all_changed_contracts_without_dropping_existi
         "tests/test_release_publication_workflow.py",
         "tests/test_release_train_workflow.py",
         "tests/test_unpublished_alpha_reservation.py",
+        "scripts/ci/native_approval_contract_gate.py",
+        "tests/test_ci_native_approval_workflow.py",
     }
     steps = load_workflow(ROOT / ".github/actions/ci-job-quality/action.yml")["runs"]["steps"]
     for name in ("Lint production sources", "Check formatting for production sources"):
