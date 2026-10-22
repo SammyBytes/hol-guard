@@ -25,6 +25,7 @@ from ..runtime.extension_allow_hint import (
 )
 from ..runtime.extension_control_authority import ExtensionControlAuthorityView
 from ..runtime.extension_control_runtime import ExtensionControlRuntimeSnapshot
+from ..runtime.extension_coverage_hint import compute_extension_coverage_hint, with_extension_coverage
 from ..runtime.native_command_evaluation import NativeCommandEvaluation, review_command_native
 from .hook_native_exact_action import launch_cwd as _launch_cwd
 from .hook_request_parsing import pre_tool_command, pre_tool_input
@@ -182,6 +183,12 @@ def native_review_hint(
 
     A setup review waits on a CLI Guard does not know, so no command extension
     permission describes it; the connector hint is the only advice it carries.
+
+    Every other paused review also carries the coverage hint, which names the
+    extension that matched each step. It is read out of the evidence the
+    resident already returned, so it survives the budget, digest and
+    all-or-nothing gates the allow hint has to clear, and most paused commands
+    only ever earn this one.
     """
 
     if connector is not None:
@@ -192,13 +199,16 @@ def native_review_hint(
             surface=connector.surface,
             risk_classes=_observed_risk_classes(native_result),
         )
-    return native_review_extension_allow_hint(
-        store,
-        payload=payload,
-        native_result=native_result,
-        workspace=workspace,
-        home_dir=home_dir,
-        deadline=deadline,
+    return with_extension_coverage(
+        native_review_extension_allow_hint(
+            store,
+            payload=payload,
+            native_result=native_result,
+            workspace=workspace,
+            home_dir=home_dir,
+            deadline=deadline,
+        ),
+        compute_extension_coverage_hint(native_result),
     )
 
 
@@ -328,13 +338,20 @@ def hint_for_reviewed_command(
     )
 
 
-def live_approval_extension_allow_hint(
+def _live_reviewed_command(
     approval: Mapping[str, object],
     *,
     guard_home: Path,
     snapshot: ExtensionControlRuntimeSnapshot,
-) -> dict[str, object] | None:
-    """Derive an advisory extension allow hint on read for a pending command review without a stored hint."""
+) -> tuple[NativeCommandEvaluation, str, Path | None, bool] | None:
+    """Re-review a pending approval's command once, for both read-time hints.
+
+    The fourth element says whether the launch directory is the one the command
+    really ran in. A stored envelope redacts a path outside the home directory
+    to its last segment, so an approval queued from such a directory can only be
+    re-reviewed against the workspace. That is close enough to name which
+    extension matched a step, and not close enough to promise a settlement.
+    """
 
     if approval.get("status") != "pending" or not hint_authority_admitted(snapshot):
         return None
@@ -353,12 +370,13 @@ def live_approval_extension_allow_hint(
     workspace_text = approval.get("workspace")
     workspace_path = Path(workspace_text) if isinstance(workspace_text, str) and workspace_text.strip() else None
     raw_payload = envelope.get("raw_payload_redacted") if isinstance(envelope, Mapping) else None
+    cwd_trusted = True
     if isinstance(raw_payload, Mapping) and pre_tool_input(raw_payload) is not None:
         if not _command_only_payload(raw_payload):
             return None
         cwd = _stored_launch_cwd(raw_payload, workspace_path)
         if cwd is None and _names_launch_directory(raw_payload):
-            return None
+            cwd, cwd_trusted = workspace_path, False
     else:
         cwd = workspace_path
     try:
@@ -375,7 +393,20 @@ def live_approval_extension_allow_hint(
         )
     except Exception:
         return None
-    if reviewed is None or _definite_review_binding(reviewed.payload) is None:
+    if reviewed is None:
+        return None
+    return reviewed, command, cwd, cwd_trusted
+
+
+def _live_allow_hint(
+    reviewed: NativeCommandEvaluation,
+    *,
+    command: str,
+    cwd: Path | None,
+    guard_home: Path,
+    snapshot: ExtensionControlRuntimeSnapshot,
+) -> dict[str, object] | None:
+    if _definite_review_binding(reviewed.payload) is None:
         return None
     return compute_extension_allow_hint(
         reviewed.evaluation,
@@ -389,9 +420,52 @@ def live_approval_extension_allow_hint(
     )
 
 
+def live_approval_extension_allow_hint(
+    approval: Mapping[str, object],
+    *,
+    guard_home: Path,
+    snapshot: ExtensionControlRuntimeSnapshot,
+) -> dict[str, object] | None:
+    """Derive an advisory extension allow hint on read for a pending command review without a stored hint."""
+
+    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot)
+    if live is None:
+        return None
+    reviewed, command, cwd, cwd_trusted = live
+    if not cwd_trusted:
+        return None
+    return _live_allow_hint(reviewed, command=command, cwd=cwd, guard_home=guard_home, snapshot=snapshot)
+
+
+def live_approval_extension_hint(
+    approval: Mapping[str, object],
+    *,
+    guard_home: Path,
+    snapshot: ExtensionControlRuntimeSnapshot,
+) -> dict[str, object] | None:
+    """Both read-time hints from one re-review, for a pending review with nothing stored.
+
+    Rows queued before the hints existed still reach the review screen, so the
+    detail route recovers what it can for them rather than showing a command
+    with no Extensions affordance at all.
+    """
+
+    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot)
+    if live is None:
+        return None
+    reviewed, command, cwd, cwd_trusted = live
+    allow_hint = (
+        _live_allow_hint(reviewed, command=command, cwd=cwd, guard_home=guard_home, snapshot=snapshot)
+        if cwd_trusted
+        else None
+    )
+    return with_extension_coverage(allow_hint, compute_extension_coverage_hint(reviewed.payload))
+
+
 __all__ = [
     "hint_for_reviewed_command",
     "live_approval_extension_allow_hint",
+    "live_approval_extension_hint",
     "native_review_extension_allow_hint",
     "native_review_hint",
 ]

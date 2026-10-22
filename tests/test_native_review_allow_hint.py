@@ -14,6 +14,7 @@ from codex_plugin_scanner.guard.runtime.extension_control_authority import (
     AuthorityHealth,
     ExtensionControlAuthorityView,
 )
+from codex_plugin_scanner.guard.runtime.extension_coverage_hint import validated_extension_coverage_hint
 from tests.native_command_test_support import project_native_review_fixture, real_native_review_fixture
 
 _UNSTAMPED = object()
@@ -449,6 +450,61 @@ def test_live_approval_hint_declines_when_the_stored_launch_directory_is_unrecov
     )
     assert hint is not None
     assert calls[0]["cwd"] == project.resolve()
+
+
+def test_a_redacted_launch_directory_still_names_the_extension_that_matched(monkeypatch, tmp_path: Path) -> None:
+    """Coverage survives a cwd the envelope redacted; a settlement promise does not.
+
+    An approval queued from a directory outside the home directory stores
+    ``.../name``, so the command cannot be re-reviewed where it really ran. The
+    allow hint has to decline that — it would be promising a settlement it
+    measured somewhere else — but which extension matched which step is the
+    same answer in either directory, so the review screen still gets it.
+    """
+
+    from codex_plugin_scanner.guard.daemon import native_review_allow_hint as module
+
+    fixture = real_native_review_fixture("git fetch origin main", cwd=tmp_path, home_dir=tmp_path)
+    reviewed = project_native_review_fixture(fixture, cwd=tmp_path, home_dir=tmp_path)
+    monkeypatch.setattr(module, "review_command_native", lambda _command, **_kwargs: reviewed)
+    home = tmp_path / "home"
+    (home / "project").mkdir(parents=True)
+    monkeypatch.setattr(module.Path, "home", classmethod(lambda _cls: home))
+
+    def approval(cwd: str) -> dict[str, object]:
+        return {
+            "status": "pending",
+            "workspace": str(tmp_path),
+            "raw_command_text": "git fetch origin main",
+            "action_envelope_json": {
+                "action_type": "shell_command",
+                "command": "git fetch origin main",
+                "raw_payload_redacted": {
+                    "cwd": cwd,
+                    "tool_name": "Shell",
+                    "tool_input": {"command": "git fetch origin main", "working_directory": cwd},
+                },
+            },
+        }
+
+    redacted = module.live_approval_extension_hint(
+        approval(".../project"), guard_home=tmp_path, snapshot=fixture.snapshot
+    )
+    assert redacted is not None
+    assert validated_extension_coverage_hint(redacted) is not None
+    assert validated_extension_allow_hint(redacted) is None
+    assert (
+        module.live_approval_extension_allow_hint(
+            approval(".../project"), guard_home=tmp_path, snapshot=fixture.snapshot
+        )
+        is None
+    )
+
+    recovered = module.live_approval_extension_hint(
+        approval("~/project"), guard_home=tmp_path, snapshot=fixture.snapshot
+    )
+    assert recovered is not None
+    assert validated_extension_coverage_hint(recovered) is not None
 
 
 def test_python_and_resident_command_only_keys_stay_identical() -> None:
