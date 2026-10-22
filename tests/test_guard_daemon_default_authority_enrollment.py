@@ -76,3 +76,29 @@ def test_a_bootstrap_that_stops_before_its_anchor_leaves_the_home_unenrolled(
     retried = store.enroll_extension_control_authority_by_default(_DIGEST)
     assert retried.health is AuthorityHealth.PROTECTED
     assert retried.revision == 0
+
+
+def test_a_recovered_startup_migration_enrolls_without_a_restart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A migration fault at startup skips enrollment; the refresh that clears it must enroll."""
+
+    def unavailable(self: GuardStore) -> None:
+        raise RuntimeError("installed authority unreadable")
+
+    monkeypatch.setattr(GuardStore, "migrate_installed_command_pack_authority", unavailable)
+    store = _store(tmp_path, MemorySecretStore(), enroll=False)
+    daemon = GuardDaemonServer(store, host="127.0.0.1", port=0)
+    try:
+        assert store.read_extension_control_authority(catalog_digest=_DIGEST).health is AuthorityHealth.UNENROLLED
+        assert daemon._server._installed_authority_pending is True
+
+        monkeypatch.setattr(GuardStore, "migrate_installed_command_pack_authority", lambda self: None)
+        daemon._server.refresh_extension_control_runtime()
+
+        view = store.read_extension_control_authority(catalog_digest=_DIGEST)
+        assert view.health is AuthorityHealth.PROTECTED
+        assert view.revision == 0
+        assert view.layers == ()
+    finally:
+        daemon.stop()

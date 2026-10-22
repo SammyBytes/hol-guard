@@ -805,6 +805,11 @@ class _GuardDaemonHTTPServer(BoundedThreadingHTTPServer):
             except _InstalledAuthorityMigrationError:
                 # Nothing newer is admitted until the release is migrated.
                 return self.extension_control_runtime.current()
+            # Startup enrolls only after the migration it skipped, so a fresh
+            # home whose migration failed is still unenrolled here. Enroll it
+            # now that the release is admitted, before reading the refreshed
+            # authority, rather than leaving it unprotected until a restart.
+            self._enroll_authority_by_default()
         try:
             try:
                 return read(shared=True)
