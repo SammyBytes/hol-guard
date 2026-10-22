@@ -109,7 +109,9 @@ def test_a_lost_or_damaged_authority_is_not_hinted(tmp_path: Path, health: Autho
 def test_only_the_advisory_hint_reviews_a_never_enrolled_device(monkeypatch, tmp_path: Path) -> None:
     from codex_plugin_scanner.guard.runtime import native_command_evaluation as module
 
-    fixture = real_native_review_fixture("docker context use staging", cwd=tmp_path, home_dir=tmp_path, **_NEVER_ENROLLED)
+    fixture = real_native_review_fixture(
+        "docker context use staging", cwd=tmp_path, home_dir=tmp_path, **_NEVER_ENROLLED
+    )
     reached: list[str] = []
     monkeypatch.setattr(module, "review_pre_tool_native", lambda command, **_kwargs: reached.append(command))
 
