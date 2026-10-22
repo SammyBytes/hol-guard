@@ -22,10 +22,15 @@ from ..runtime.extension_allow_hint import (
     compute_extension_allow_hint,
     connector_setup_hint,
     hint_authority_admitted,
+    validated_extension_allow_hint,
 )
 from ..runtime.extension_control_authority import ExtensionControlAuthorityView
 from ..runtime.extension_control_runtime import ExtensionControlRuntimeSnapshot
-from ..runtime.extension_coverage_hint import compute_extension_coverage_hint, with_extension_coverage
+from ..runtime.extension_coverage_hint import (
+    compute_extension_coverage_hint,
+    validated_extension_coverage_hint,
+    with_extension_coverage,
+)
 from ..runtime.native_command_evaluation import NativeCommandEvaluation, review_command_native
 from .hook_native_exact_action import launch_cwd as _launch_cwd
 from .hook_request_parsing import pre_tool_command, pre_tool_input
@@ -343,17 +348,16 @@ def _live_reviewed_command(
     *,
     guard_home: Path,
     snapshot: ExtensionControlRuntimeSnapshot,
-    untrusted_cwd_ok: bool,
-) -> tuple[NativeCommandEvaluation, str, Path | None, bool] | None:
+) -> tuple[NativeCommandEvaluation, str, Path | None] | None:
     """Re-review a pending approval's command once, for both read-time hints.
 
-    The fourth element says whether the launch directory is the one the command
-    really ran in. A stored envelope redacts a path outside the home directory
-    to its last segment, so an approval queued from such a directory can only be
-    re-reviewed against the workspace. That is close enough to name which
-    extension matched a step, and not close enough to promise a settlement, so
-    a caller that only wants the settlement passes ``untrusted_cwd_ok=False``
-    and no review is spent.
+    A stored envelope redacts a launch directory outside the home directory to
+    its last segment, so an approval queued from one can only be re-reviewed
+    somewhere else. Extension rules read the directory — a Git rule matches
+    differently inside a repository than outside one — so a review run in the
+    workspace can name an extension that never governed the real command. That
+    is wrong for a settlement and equally wrong for a step label pointing at a
+    permission to pre-configure, so nothing is recovered for those rows.
     """
 
     if approval.get("status") != "pending" or not hint_authority_admitted(snapshot):
@@ -373,15 +377,12 @@ def _live_reviewed_command(
     workspace_text = approval.get("workspace")
     workspace_path = Path(workspace_text) if isinstance(workspace_text, str) and workspace_text.strip() else None
     raw_payload = envelope.get("raw_payload_redacted") if isinstance(envelope, Mapping) else None
-    cwd_trusted = True
     if isinstance(raw_payload, Mapping) and pre_tool_input(raw_payload) is not None:
         if not _command_only_payload(raw_payload):
             return None
         cwd = _stored_launch_cwd(raw_payload, workspace_path)
         if cwd is None and _names_launch_directory(raw_payload):
-            if not untrusted_cwd_ok:
-                return None
-            cwd, cwd_trusted = workspace_path, False
+            return None
     else:
         cwd = workspace_path
     try:
@@ -400,7 +401,7 @@ def _live_reviewed_command(
         return None
     if reviewed is None:
         return None
-    return reviewed, command, cwd, cwd_trusted
+    return reviewed, command, cwd
 
 
 def _live_allow_hint(
@@ -433,12 +434,10 @@ def live_approval_extension_allow_hint(
 ) -> dict[str, object] | None:
     """Derive an advisory extension allow hint on read for a pending command review without a stored hint."""
 
-    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot, untrusted_cwd_ok=False)
+    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot)
     if live is None:
         return None
-    reviewed, command, cwd, cwd_trusted = live
-    if not cwd_trusted:
-        return None
+    reviewed, command, cwd = live
     return _live_allow_hint(reviewed, command=command, cwd=cwd, guard_home=guard_home, snapshot=snapshot)
 
 
@@ -455,16 +454,43 @@ def live_approval_extension_hint(
     with no Extensions affordance at all.
     """
 
-    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot, untrusted_cwd_ok=True)
+    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot)
     if live is None:
         return None
-    reviewed, command, cwd, cwd_trusted = live
-    allow_hint = (
-        _live_allow_hint(reviewed, command=command, cwd=cwd, guard_home=guard_home, snapshot=snapshot)
-        if cwd_trusted
-        else None
-    )
+    reviewed, command, cwd = live
+    allow_hint = _live_allow_hint(reviewed, command=command, cwd=cwd, guard_home=guard_home, snapshot=snapshot)
     return with_extension_coverage(allow_hint, compute_extension_coverage_hint(reviewed.payload))
+
+
+def recovered_approval_extension_hint(
+    stored: object,
+    approval: Mapping[str, object],
+    *,
+    guard_home: Path,
+    snapshot: ExtensionControlRuntimeSnapshot,
+) -> object:
+    """The stored hint, plus whatever one read-time review can still recover.
+
+    A queue-time review that ran out of budget, missed the digest or found no
+    all-or-nothing settlement still stores the coverage it read out of the
+    evidence it already had. So a stored hint no longer proves the settlement
+    question was answered, and a row carrying coverage alone has to re-review
+    exactly as a row carrying nothing does, or it silently loses the Always
+    allow offer it used to get back here.
+    """
+
+    if stored is not None and validated_extension_coverage_hint(stored) is None:
+        return stored
+    if stored is not None and validated_extension_allow_hint(stored) is not None:
+        return stored
+    live = live_approval_extension_hint(approval, guard_home=guard_home, snapshot=snapshot)
+    if live is None:
+        return stored
+    # The queue-time coverage saw the directory the command really ran in, so
+    # it outranks anything this review measured.
+    coverage = validated_extension_coverage_hint(stored) or validated_extension_coverage_hint(live)
+    merged = with_extension_coverage(validated_extension_allow_hint(live), coverage)
+    return merged if merged is not None else stored
 
 
 __all__ = [
@@ -473,4 +499,5 @@ __all__ = [
     "live_approval_extension_hint",
     "native_review_extension_allow_hint",
     "native_review_hint",
+    "recovered_approval_extension_hint",
 ]

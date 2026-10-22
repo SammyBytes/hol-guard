@@ -16,6 +16,7 @@ from typing import Any
 
 from codex_plugin_scanner.guard.daemon.approval_extension_coverage import (
     COVERAGE_SCHEMA,
+    MAX_DELIVERED_SEGMENTS,
     build_approval_extension_coverage,
     with_approval_extension_coverage,
 )
@@ -281,6 +282,76 @@ def test_a_single_later_step_still_says_the_rest_comes_back() -> None:
     payload = build_approval_extension_coverage(_pending(coverage), registry=BUILT_IN_COMMAND_EXTENSION_REGISTRY)
 
     assert payload is not None
+    assert payload["compound"] is True
+
+
+def _modelled(evidence: dict[str, Any], steps: int) -> dict[str, Any]:
+    """The evidence a review of a ``steps``-step command returns."""
+
+    return {**evidence, "command_model": {"segments": [{"index": index} for index in range(steps)]}}
+
+
+def test_the_step_count_the_review_measured_rides_along() -> None:
+    coverage = compute_extension_coverage_hint(
+        _modelled(_evidence((_observation("command.git", RESET_RULE, segments=(0,)),)), 3)
+    )
+
+    assert coverage is not None
+    assert coverage["segment_total"] == 3
+    # A hook edge that modelled only the text leaves the count out entirely.
+    assert "segment_total" not in (
+        compute_extension_coverage_hint(_evidence((_observation("command.git", RESET_RULE, segments=(0,)),))) or {}
+    )
+
+
+def test_a_step_count_that_cannot_hold_the_covered_steps_is_refused() -> None:
+    hint: dict[str, Any] = {
+        "schema": EXTENSION_COVERAGE_HINT_SCHEMA,
+        "catalog_digest": DIGEST,
+        "segments": [
+            {
+                "index": 2,
+                "executable": "git",
+                "extension_ids": ["command.git"],
+                "rule_ids": [RESET_RULE],
+                "permission_ids": [],
+            }
+        ],
+    }
+
+    assert validated_extension_coverage_hint({**hint, "segment_total": 3}) is not None
+    assert validated_extension_coverage_hint({**hint, "segment_total": 2}) is None
+    assert validated_extension_coverage_hint({**hint, "segment_total": 0}) is None
+    assert validated_extension_coverage_hint({**hint, "segment_total": "3"}) is None
+
+
+def test_a_covered_first_step_of_a_longer_command_still_says_the_rest_comes_back() -> None:
+    # The hole the covered steps alone cannot see: step 1 matched, steps 2 and
+    # 3 matched nothing, and the card would have read as covering the command.
+    evidence = _evidence((_observation("command.git", RESET_RULE, segments=(0,)),))
+    registry = BUILT_IN_COMMAND_EXTENSION_REGISTRY
+
+    chained = build_approval_extension_coverage(
+        _pending(compute_extension_coverage_hint(_modelled(evidence, 3))), registry=registry
+    )
+    alone = build_approval_extension_coverage(
+        _pending(compute_extension_coverage_hint(_modelled(evidence, 1))), registry=registry
+    )
+
+    assert chained is not None and chained["compound"] is True
+    assert alone is not None and alone["compound"] is False
+
+
+def test_delivery_stops_at_the_steps_the_card_renders() -> None:
+    steps = MAX_DELIVERED_SEGMENTS + 2
+    coverage = compute_extension_coverage_hint(
+        _evidence(tuple(_observation("command.git", RESET_RULE, segments=(index,)) for index in range(steps)))
+    )
+
+    payload = build_approval_extension_coverage(_pending(coverage), registry=BUILT_IN_COMMAND_EXTENSION_REGISTRY)
+
+    assert payload is not None
+    assert [segment["index"] for segment in payload["segments"]] == list(range(MAX_DELIVERED_SEGMENTS))
     assert payload["compound"] is True
 
 

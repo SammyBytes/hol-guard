@@ -25,6 +25,9 @@ from ..runtime.extension_coverage_hint import validated_extension_coverage_hint
 
 _LOGGER = logging.getLogger(__name__)
 COVERAGE_SCHEMA: Final = "guard.approval-extension-coverage.v1"
+# The dashboard renders this many steps; delivering more would store and send a
+# payload whose tail nothing shows.
+MAX_DELIVERED_SEGMENTS: Final = 12
 
 
 def _covered_segment(
@@ -93,12 +96,22 @@ def build_approval_extension_coverage(
     ]
     if not segments:
         return None
+    total = coverage.get("segment_total")
+    covered_indexes = [cast("int", segment["index"]) for segment in segments]
+    if isinstance(total, int):
+        # The review counted the steps, so this is the whole answer: a command
+        # of one step is settled by its one covered step, and any other is not.
+        compound = total > 1
+    else:
+        # Without a count, a later step that no extension matched is invisible,
+        # so only what the covered steps themselves prove can be claimed.
+        compound = len(segments) > 1 or any(index > 0 for index in covered_indexes)
     return {
         "schema": COVERAGE_SCHEMA,
         "catalog_digest": registry.catalog_digest or coverage["catalog_digest"],
-        "segments": segments,
+        "segments": segments[:MAX_DELIVERED_SEGMENTS],
         # A single-step command needs no "the other steps still need review" line.
-        "compound": len(segments) > 1 or any(cast("int", segment["index"]) > 0 for segment in segments),
+        "compound": compound or len(segments) > MAX_DELIVERED_SEGMENTS,
     }
 
 
@@ -125,6 +138,7 @@ def with_approval_extension_coverage(
 
 __all__ = [
     "COVERAGE_SCHEMA",
+    "MAX_DELIVERED_SEGMENTS",
     "build_approval_extension_coverage",
     "with_approval_extension_coverage",
 ]

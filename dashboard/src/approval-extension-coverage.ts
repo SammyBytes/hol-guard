@@ -8,7 +8,9 @@ import {
 } from "./approval-extension-coverage-types";
 
 const MAX_SEGMENTS = 12;
-const MAX_PER_SEGMENT = 4;
+// The stored hint carries up to this many ids per step, so anything less would
+// drop links the daemon meant to deliver.
+const MAX_PER_SEGMENT = 12;
 const MAX_SEGMENT_INDEX = 255;
 const CATALOG_ID = /^command\.[A-Za-z0-9._-]{1,248}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
@@ -86,8 +88,10 @@ export function normalizeApprovalExtensionCoverage(raw: unknown): GuardApprovalE
   if (!isRecord(raw) || raw.schema !== APPROVAL_EXTENSION_COVERAGE_SCHEMA) return null;
   if (typeof raw.catalog_digest !== "string" || !DIGEST.test(raw.catalog_digest)) return null;
   if (typeof raw.compound !== "boolean" || !Array.isArray(raw.segments)) return null;
-  if (raw.segments.length === 0 || raw.segments.length > MAX_SEGMENTS) return null;
-  const segments = raw.segments.map(normalizeSegment);
+  if (raw.segments.length === 0) return null;
+  // A daemon that delivers more steps than this card renders is still telling
+  // the truth about the ones it renders, so show those rather than nothing.
+  const segments = raw.segments.slice(0, MAX_SEGMENTS).map(normalizeSegment);
   if (segments.some((segment) => segment === null)) return null;
   return {
     schema: APPROVAL_EXTENSION_COVERAGE_SCHEMA,

@@ -23,6 +23,7 @@ EXTENSION_COVERAGE_HINT_SCHEMA = "guard.extension-coverage-hint.v1"
 # bounds well below these limits; they only stop a malformed payload growing.
 MAX_COVERED_SEGMENTS = 24
 MAX_SEGMENT_IDS = 12
+MAX_SEGMENT_TOTAL = 256
 _MAX_SEGMENT_INDEX = 255
 _CATALOG_ID = re.compile(r"command\.[A-Za-z0-9._-]{1,248}")
 _EXECUTABLE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}")
@@ -64,6 +65,26 @@ def _evidence_segments(observation: Mapping[str, object]) -> dict[int, str | Non
         else:
             found.setdefault(index, named)
     return found
+
+
+def _segment_total(native_result: Mapping[str, object]) -> int | None:
+    """How many steps the command has, when the review modelled them.
+
+    The hook edge sometimes answers with a command model that carries only the
+    normalized text, so this is absent as often as it is present. Covered steps
+    alone cannot tell a one-step command from the first step of three, which is
+    the difference between "an extension covers this command" and "the rest
+    still comes back for review".
+    """
+
+    model = native_result.get("command_model")
+    if not isinstance(model, Mapping):
+        return None
+    segments = cast("Mapping[str, object]", model).get("segments")
+    if not isinstance(segments, list):
+        return None
+    total = len(cast("list[object]", segments))
+    return total if 0 < total <= MAX_SEGMENT_TOTAL else None
 
 
 def compute_extension_coverage_hint(
@@ -117,13 +138,15 @@ def compute_extension_coverage_hint(
                 record(index, executable, id_key, owned)
     if not segments:
         return None
-    return validated_extension_coverage_hint(
-        {
-            "schema": EXTENSION_COVERAGE_HINT_SCHEMA,
-            "catalog_digest": digest,
-            "segments": [segments[index] for index in sorted(segments)],
-        }
-    )
+    hint: dict[str, object] = {
+        "schema": EXTENSION_COVERAGE_HINT_SCHEMA,
+        "catalog_digest": digest,
+        "segments": [segments[index] for index in sorted(segments)],
+    }
+    total = _segment_total(native_result)
+    if total is not None:
+        hint["segment_total"] = total
+    return validated_extension_coverage_hint(hint)
 
 
 def _validated_segment(value: object) -> dict[str, object] | None:
@@ -172,13 +195,22 @@ def validated_extension_coverage_hint(value: object) -> dict[str, object] | None
     if any(segment is None for segment in segments):
         return None
     checked = cast("list[dict[str, object]]", segments)
-    if len({cast("int", segment["index"]) for segment in checked}) != len(checked):
+    indexes = {cast("int", segment["index"]) for segment in checked}
+    if len(indexes) != len(checked):
         return None
-    return {
+    result: dict[str, object] = {
         "schema": EXTENSION_COVERAGE_HINT_SCHEMA,
         "catalog_digest": digest,
         "segments": sorted(checked, key=lambda segment: cast("int", segment["index"])),
     }
+    total = fields.get("segment_total")
+    if total is not None:
+        # A total that cannot hold every covered step was measured on another
+        # command, so the hint it came with describes nothing this one did.
+        if not isinstance(total, int) or isinstance(total, bool) or not max(indexes) < total <= MAX_SEGMENT_TOTAL:
+            return None
+        result["segment_total"] = total
+    return result
 
 
 def with_extension_coverage(
@@ -201,6 +233,7 @@ __all__ = [
     "EXTENSION_COVERAGE_HINT_SCHEMA",
     "MAX_COVERED_SEGMENTS",
     "MAX_SEGMENT_IDS",
+    "MAX_SEGMENT_TOTAL",
     "compute_extension_coverage_hint",
     "validated_extension_coverage_hint",
     "with_extension_coverage",

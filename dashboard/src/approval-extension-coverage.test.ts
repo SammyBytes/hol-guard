@@ -93,6 +93,35 @@ async function run(): Promise<void> {
     "a step with no executable claims none",
   );
 
+  // A daemon that delivers more than this card renders still told the truth
+  // about the steps it renders, so they show rather than the card vanishing.
+  const long = normalizeApprovalExtensionCoverage(
+    rawCoverage({
+      compound: true,
+      segments: Array.from({ length: 20 }, (_unused, index) => rawSegment({ index })),
+    }),
+  );
+  assert(long !== null, "a payload with more steps than the card renders still normalizes");
+  assert(long!.segments.length === 12, "the card renders the steps it can and drops the tail");
+  assert(long!.segments[0].index === 0, "the steps it keeps start at the first one");
+
+  // The stored hint carries up to twelve ids per step; none of them vanish.
+  const crowded = normalizeApprovalExtensionCoverage(
+    rawCoverage({
+      segments: [
+        rawSegment({
+          extensions: Array.from({ length: 6 }, (_unused, index) => ({
+            extension_id: `command.extension-${index}`,
+            name: `Extension ${index}`,
+            focus_rule_id: null,
+          })),
+        }),
+      ],
+    }),
+  );
+  assert(crowded !== null, "a step covered by several extensions normalizes");
+  assert(crowded!.segments[0].extensions.length === 6, "every extension covering a step keeps its link");
+
   // Anything that is not the payload the daemon builds drops the whole card.
   assert(normalizeApprovalExtensionCoverage(null) === null, "a missing payload is not a card");
   assert(
