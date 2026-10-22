@@ -243,10 +243,11 @@ fn an_unproven_step_before_a_proven_git_read_is_named() {
 
     let command = "corepack pnpm --version && git status --short";
     let ordered = result(&home, &linked, command);
-    // A host with a workspace sandbox runs Git in a linked worktree there, so
-    // the whole chain runs contained and raises no review to word. Elsewhere
-    // the review names the step.
-    if ordered.reason_code == CONTAINED {
+    // macOS has the workspace sandbox, which runs Git in a linked worktree,
+    // so there the whole chain runs contained and raises no review to word.
+    // Elsewhere the review names the step.
+    if cfg!(target_os = "macos") {
+        assert_eq!(ordered.reason_code, CONTAINED, "{}", ordered.reason);
         assert_eq!(ordered.minimum_action, "sandbox-required", "{command}");
     } else {
         assert_eq!(ordered.reason_code, FLOOR, "{}", ordered.reason);
