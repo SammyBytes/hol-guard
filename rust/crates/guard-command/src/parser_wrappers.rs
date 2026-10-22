@@ -2,16 +2,13 @@
 
 use crate::{assignment_name, executable_basename, CommandSegmentV1, RawSegment};
 
-/// Strips `sudo` wrappers and `timeout`/`command`/`time`/`env` prefixes.
+#[path = "parser_launchers.rs"]
+mod launchers;
+
+/// Strips `sudo` wrappers and `timeout`/`command`/`time`/`env` prefixes, and
+/// the scheduling prefixes `launchers` reads.
 ///
 /// `sudo` changes who runs the program, so it stays in the wrapper chain.
-/// A bare `nice -n 10 cargo build`, `nohup npm test` or `stdbuf -oL pytest -q`
-/// runs the program this text already names, as this user and in this
-/// directory, and decides only when that program gets the processor, whether a
-/// hangup reaches it, or how its output is buffered: none of them decides what
-/// it may do, so each leaves no wrapper behind. `scheduling_prefix` reads their
-/// options. `./nice` and `bin/nice` are not those programs and stay in the
-/// wrapper chain.
 /// A bare `timeout 30 pytest -q` runs the program this text already names,
 /// as this user and in this directory, and signals that one child when the
 /// clock runs out: it bounds how long the work may take, not what it may do,
@@ -40,15 +37,12 @@ pub(super) fn unwrap_wrappers(
             index = next;
             continue;
         }
-        if let Some(prefix) = tokens
-            .get(index)
-            .and_then(|token| scheduling_prefix::trusted(token))
-        {
+        if let Some(next) = launchers::launcher_program(tokens, index) {
             if wrappers.len() + prefixes == 4 {
                 return Err("command_wrapper_limit_exceeded");
             }
             prefixes += 1;
-            index = scheduling_prefix::program(prefix, tokens, index + 1)?;
+            index = next;
             continue;
         }
         if !tokens
@@ -289,9 +283,6 @@ fn carries_unquoted_operator(raw: &str) -> bool {
     }
     false
 }
-
-#[path = "parser_scheduling_prefix.rs"]
-mod scheduling_prefix;
 
 #[cfg(test)]
 mod tests {
@@ -573,116 +564,6 @@ mod tests {
                 model.confidence != "exact"
                     || model.segments[0].executable.as_deref() != Some("bun")
                         && model.segments[0].executable.as_deref() != Some("rm"),
-                "{command}: {:?}",
-                model.segments.first().map(|segment| &segment.executable)
-            );
-        }
-    }
-
-    #[test]
-    fn a_scheduling_priority_leaves_the_program_in_place() {
-        for (command, executable, argument) in [
-            ("nice npm test", "npm", "test"),
-            ("nice -n 10 cargo build", "cargo", "build"),
-            ("nice -n -5 cargo build", "cargo", "build"),
-            ("nice --adjustment 10 cargo build", "cargo", "build"),
-            ("nice --adjustment=10 cargo build", "cargo", "build"),
-            ("nice -10 cargo build", "cargo", "build"),
-            ("nice -n10 cargo build", "cargo", "build"),
-            ("nice -- cargo build", "cargo", "build"),
-            ("/usr/bin/nice -n 10 cargo build", "cargo", "build"),
-            ("nohup npm test", "npm", "test"),
-            ("nohup -- npm test", "npm", "test"),
-            ("/usr/bin/nohup npm test", "npm", "test"),
-            ("stdbuf -oL pytest -q", "pytest", "-q"),
-            ("stdbuf -o L pytest -q", "pytest", "-q"),
-            ("stdbuf --output=L pytest -q", "pytest", "-q"),
-            ("stdbuf --error 0 pytest -q", "pytest", "-q"),
-            ("stdbuf -o0 -e0 pytest -q", "pytest", "-q"),
-            ("stdbuf -i 4096 pytest -q", "pytest", "-q"),
-        ] {
-            let model = parse(command);
-            assert_eq!(model.confidence, "exact", "{command}");
-            assert_eq!(model.segments.len(), 1, "{command}");
-            assert!(model.wrapper_chain.is_empty(), "{command}");
-            assert!(model.segments[0].wrapper_chain.is_empty(), "{command}");
-            assert_eq!(
-                model.segments[0].executable.as_deref(),
-                Some(executable),
-                "{command}"
-            );
-            assert_eq!(model.segments[0].arguments, [argument], "{command}");
-        }
-    }
-
-    #[test]
-    fn a_session_of_its_own_is_not_a_scheduling_prefix() {
-        for command in ["setsid pytest -q", "setsid -f npm test"] {
-            let model = parse(command);
-            assert_eq!(model.confidence, "uncertain", "{command}");
-            assert_eq!(
-                model.uncertainty_reason.as_deref(),
-                Some("transparent_wrapper_not_yet_supported"),
-                "{command}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_file_named_for_a_prefix_is_not_that_program() {
-        for command in [
-            "./nice cargo build",
-            "bin/nice cargo build",
-            "./nohup npm test",
-            "bin/stdbuf -oL pytest -q",
-        ] {
-            let model = parse(command);
-            assert_eq!(model.confidence, "uncertain", "{command}");
-            assert_eq!(
-                model.uncertainty_reason.as_deref(),
-                Some("transparent_wrapper_not_yet_supported"),
-                "{command}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_prefix_in_front_of_unread_text_stays_a_wrapper() {
-        for command in [
-            "nohup ./deploy.sh",
-            "nohup release.py",
-            "nice -n 10 sh -c 'npm run build'",
-            "stdbuf -oL python3 deploy.py",
-            "nice -n 10 xargs rm -f",
-            "nice nohup ./deploy.sh",
-        ] {
-            assert_eq!(parse(command).confidence, "uncertain", "{command}");
-        }
-    }
-
-    #[test]
-    fn an_unread_prefix_option_keeps_the_command_uncertain() {
-        for command in [
-            "nice",
-            "nice --help cargo build",
-            "nice -n cargo build",
-            "nice -n ten cargo build",
-            "nice --adjustment=ten cargo build",
-            "nice -n 10",
-            "nice -n 10 CI=1 cargo build",
-            "nice +10 cargo build",
-            "nice ++10 cargo build",
-            "nohup",
-            "nohup -n 10 npm test",
-            "stdbuf pytest -q",
-            "stdbuf -oX pytest -q",
-            "stdbuf --output=X pytest -q",
-            "stdbuf -z L pytest -q",
-        ] {
-            let model = parse(command);
-            assert_ne!(
-                model.confidence,
-                "exact",
                 "{command}: {:?}",
                 model.segments.first().map(|segment| &segment.executable)
             );
