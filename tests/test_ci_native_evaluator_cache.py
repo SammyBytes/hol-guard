@@ -194,6 +194,7 @@ def test_quality_action_lints_and_formats_offline_export_and_ci_cache_contracts(
         "tests/test_guard_managed_install_context.py",
         "tests/test_guard_private_file_io.py",
         "tests/test_native_offline_cache.py",
+        "tests/test_native_policy_test_support.py",
         "tests/test_ci_native_evaluator_cache.py",
     }
     for name, invocation in (
