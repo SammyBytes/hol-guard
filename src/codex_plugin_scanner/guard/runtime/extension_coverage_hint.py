@@ -44,7 +44,8 @@ def _evidence_segments(observation: Mapping[str, object]) -> dict[int, str | Non
     """Segment indexes this observation matched, with the executable each named."""
 
     found: dict[int, str | None] = {}
-    for raw in observation.get("effective_segment_indexes") or ():
+    effective = observation.get("effective_segment_indexes")
+    for raw in effective if isinstance(effective, (list, tuple)) else ():
         index = _segment_index(raw)
         if index is not None:
             found.setdefault(index, None)

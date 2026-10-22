@@ -343,6 +343,7 @@ def _live_reviewed_command(
     *,
     guard_home: Path,
     snapshot: ExtensionControlRuntimeSnapshot,
+    untrusted_cwd_ok: bool,
 ) -> tuple[NativeCommandEvaluation, str, Path | None, bool] | None:
     """Re-review a pending approval's command once, for both read-time hints.
 
@@ -350,7 +351,9 @@ def _live_reviewed_command(
     really ran in. A stored envelope redacts a path outside the home directory
     to its last segment, so an approval queued from such a directory can only be
     re-reviewed against the workspace. That is close enough to name which
-    extension matched a step, and not close enough to promise a settlement.
+    extension matched a step, and not close enough to promise a settlement, so
+    a caller that only wants the settlement passes ``untrusted_cwd_ok=False``
+    and no review is spent.
     """
 
     if approval.get("status") != "pending" or not hint_authority_admitted(snapshot):
@@ -376,6 +379,8 @@ def _live_reviewed_command(
             return None
         cwd = _stored_launch_cwd(raw_payload, workspace_path)
         if cwd is None and _names_launch_directory(raw_payload):
+            if not untrusted_cwd_ok:
+                return None
             cwd, cwd_trusted = workspace_path, False
     else:
         cwd = workspace_path
@@ -428,7 +433,7 @@ def live_approval_extension_allow_hint(
 ) -> dict[str, object] | None:
     """Derive an advisory extension allow hint on read for a pending command review without a stored hint."""
 
-    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot)
+    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot, untrusted_cwd_ok=False)
     if live is None:
         return None
     reviewed, command, cwd, cwd_trusted = live
@@ -450,7 +455,7 @@ def live_approval_extension_hint(
     with no Extensions affordance at all.
     """
 
-    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot)
+    live = _live_reviewed_command(approval, guard_home=guard_home, snapshot=snapshot, untrusted_cwd_ok=True)
     if live is None:
         return None
     reviewed, command, cwd, cwd_trusted = live
