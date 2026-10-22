@@ -238,6 +238,21 @@ container IO that surrounds a download. The dead source-ancestry fetch is
 removed; the same descendant rule runs in `transition` and is covered by its
 tests.
 
+Reading a stored or replayed package evaluation back into the view a harness
+shows is decided in the resident (`package-evaluation-view-v1`, in
+`package_evaluation_view_op.rs`, over the grammar in
+`supply_chain_package_eval/result_models.rs` and `package_copy.rs`). It owns
+every default a written row omits, which policy actions are recognised and what
+an unrecognised one costs, how the user copy reads once the local route has no
+cloud inbox to send anyone to, which evidence and archive hashes survive, and
+the ecosystem support a package row carries. Python sends the payload exactly as
+it holds it together with the four identity fields the stored row does not
+carry, and reads the answer; absent identity travels as an explicit null,
+because the reply is bound by the canonical digest of the request and a key one
+side omits would unbind it. Every outcome other than a well-formed,
+request-bound `ok` reply raises, and both callers already fail closed on that,
+so no view is composed in Python beside the one the resident decided.
+
 ## Harness route inventory
 
 The v2 contract maps all harnesses in `HARNESS_CONTRACTS`, including harnesses
