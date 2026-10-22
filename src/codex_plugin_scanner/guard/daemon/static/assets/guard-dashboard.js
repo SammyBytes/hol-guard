@@ -29187,7 +29187,7 @@ function QueueBulkStickyBar(props) {
             total,
             " ",
             unit,
-            "? Any agent still waiting is told no. Nothing is remembered."
+            " just this once? Any agent still waiting is told no."
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "button",
@@ -29700,8 +29700,8 @@ function buildBulkRiskDisclosure(stats) {
 function isBulkBlockableGroup(group) {
   return group.primary.status === "pending";
 }
-function bulkBlockPrimaries(groups, selectedIds) {
-  return groups.filter((group) => isBulkBlockableGroup(group) && selectedIds.has(group.primary.request_id)).map((group) => group.primary);
+function bulkBlockGroups(groups, selectedIds) {
+  return groups.filter((group) => isBulkBlockableGroup(group) && selectedIds.has(group.primary.request_id));
 }
 function useQueueBulkApprove(props) {
   const [drawerOpen, setDrawerOpen] = reactExports.useState(false);
@@ -29714,6 +29714,7 @@ function useQueueBulkApprove(props) {
   const [bulkCompletedActionCount, setBulkCompletedActionCount] = reactExports.useState(null);
   const [blockStep, setBlockStep] = reactExports.useState("idle");
   const [blockError, setBlockError] = reactExports.useState(null);
+  const blocking = reactExports.useRef(false);
   const groups = reactExports.useMemo(() => groupDuplicates(props.items), [props.items]);
   const bulkEligibleGroups = reactExports.useMemo(
     () => groups.filter((group) => isBulkApprovableGroup(group)),
@@ -29743,8 +29744,8 @@ function useQueueBulkApprove(props) {
     [selectedBulkGroups]
   );
   const selectedGroupCount = selectedBulkGroups.length;
-  const selectedBlockRequests = reactExports.useMemo(
-    () => hasBlockHandler ? bulkBlockPrimaries(groups, selectedBulkIds) : [],
+  const selectedBlockGroups = reactExports.useMemo(
+    () => hasBlockHandler ? bulkBlockGroups(groups, selectedBulkIds) : [],
     [groups, hasBlockHandler, selectedBulkIds]
   );
   const selectedSelectableGroups = reactExports.useMemo(
@@ -29808,6 +29809,7 @@ function useQueueBulkApprove(props) {
     setBlockError(null);
   }, []);
   const handleClearSelection = reactExports.useCallback(() => {
+    if (blocking.current) return;
     setSelectedBulkIds(/* @__PURE__ */ new Set());
     setTypedConfirm("");
     setBulkApproveError(null);
@@ -29815,29 +29817,31 @@ function useQueueBulkApprove(props) {
     setBlockError(null);
   }, []);
   const handleRequestBlock = reactExports.useCallback(() => {
-    if (selectedBlockRequests.length === 0) return;
+    if (selectedBlockGroups.length === 0) return;
     setBlockStep("confirming");
     setBlockError(null);
-  }, [selectedBlockRequests.length]);
+  }, [selectedBlockGroups.length]);
   const handleCancelBlock = reactExports.useCallback(() => {
     if (blockStep === "blocking") return;
     setBlockStep("idle");
   }, [blockStep]);
   const handleConfirmBlock = reactExports.useCallback(async () => {
-    if (blockStep === "blocking" || selectedBlockRequests.length === 0 || !hasBlockHandler || props.onBulkBlock === void 0) {
+    if (blockStep === "blocking" || selectedBlockGroups.length === 0 || !hasBlockHandler || props.onBulkBlock === void 0) {
       return;
     }
+    blocking.current = true;
     setBlockStep("blocking");
     setBlockError(null);
     try {
-      await props.onBulkBlock(selectedBlockRequests);
+      await props.onBulkBlock(selectedBlockGroups);
       setSelectedBulkIds(/* @__PURE__ */ new Set());
     } catch (error) {
       setBlockError(error instanceof Error ? error.message : "Blocking the selected requests failed.");
     } finally {
+      blocking.current = false;
       setBlockStep("idle");
     }
-  }, [blockStep, hasBlockHandler, props.onBulkBlock, selectedBlockRequests]);
+  }, [blockStep, hasBlockHandler, props.onBulkBlock, selectedBlockGroups]);
   const handleStartReview = reactExports.useCallback(() => {
     if (selectedBulkGroups.length === 0) {
       return;
@@ -29860,6 +29864,7 @@ function useQueueBulkApprove(props) {
     setBulkApproveTotpCode("");
   }, [drawerStep, resetBulkFlow]);
   const handleBulkToggleSelect = reactExports.useCallback((requestId) => {
+    if (blocking.current) return;
     setSelectedBulkIds((current) => {
       const next = new Set(current);
       if (next.has(requestId)) {
@@ -29876,6 +29881,7 @@ function useQueueBulkApprove(props) {
   }, []);
   const handleBulkToggleMany = reactExports.useCallback(
     (items, selectAll) => {
+      if (blocking.current) return;
       setSelectedBulkIds(() => {
         if (!selectAll) return /* @__PURE__ */ new Set();
         const eligibleIds = new Set(bulkApprovePrimaryIds(selectableGroups));
@@ -30007,7 +30013,7 @@ function useQueueBulkApprove(props) {
     [groupIdMap, handleBulkToggleMany]
   );
   const canApprove = showBulkApprove && selectedGroupCount > 0;
-  const stickyBarVisible = (canApprove || selectedBlockRequests.length > 0) && drawerStep !== "completed";
+  const stickyBarVisible = (canApprove || selectedBlockGroups.length > 0) && drawerStep !== "completed";
   const gatePromptVisible = hasBulkHandler && hasEligibleGroups && !bulkGateReady;
   const eligibleActionCount = reactExports.useMemo(
     () => bulkApproveActionCount(bulkEligibleGroups),
@@ -30968,7 +30974,7 @@ const EXTENSION_ID$1 = /^command\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const PERMISSION_ID$1 = /^command\.[a-z0-9]+(?:[.-][a-z0-9]+)*\.permission\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const MAX_EXTENSIONS = 512;
 const MAX_PERMISSIONS = 4096;
-const MAX_REASONS = 64;
+const MAX_REASONS$1 = 64;
 function record$3(value, label) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`Invalid ${label}`);
   return value;
@@ -30996,7 +31002,7 @@ function id$1(value, label, pattern) {
   return candidate;
 }
 function reasons(value, label) {
-  if (!Array.isArray(value) || value.length > MAX_REASONS) throw new Error(`Invalid ${label}`);
+  if (!Array.isArray(value) || value.length > MAX_REASONS$1) throw new Error(`Invalid ${label}`);
   return value.map((item, index) => text(item, `${label}[${index}]`, 128));
 }
 function extensionItem(value, label) {
@@ -36805,29 +36811,60 @@ async function runAutomaticProtectionRepair(input) {
     { ...repairCheckReasons, ...gapReasons(remainingHealth.checks) }
   );
 }
-async function blockRequestsOnce(requests, resolve) {
-  let blocked = 0;
-  let failed = 0;
-  for (const item of requests) {
+const MAX_REASONS = 3;
+async function blockRequestsOnce(groups, lookup, resolve) {
+  const outcome = { blocked: 0, failed: 0, reasons: [] };
+  const fail = (count, error) => {
+    outcome.failed += count;
+    const reason = error instanceof Error ? error.message : String(error);
+    if (outcome.reasons.length < MAX_REASONS && !outcome.reasons.includes(reason)) {
+      outcome.reasons.push(reason);
+    }
+  };
+  const blockOnce = async (item) => {
+    const payload = buildDecisionPayload({ item, action: "block", scope: "artifact", reason: "blocked in bulk review" });
+    if (payload.scope !== "artifact") {
+      throw new Error("A request could not be blocked just this once. Open it to choose how to block it.");
+    }
+    return resolve(payload);
+  };
+  for (const group of groups) {
+    let settled;
     try {
-      const payload = buildDecisionPayload({ item, action: "block", scope: "artifact", reason: "blocked in bulk review" });
-      await resolve({ ...payload, persist_policy: false });
-      blocked += 1;
-    } catch {
-      failed += 1;
+      const result = await blockOnce(group.primary);
+      settled = new Set(result.resolved_duplicate_ids);
+      outcome.blocked += 1;
+    } catch (error) {
+      fail(1 + group.duplicateCount, error);
+      continue;
+    }
+    for (const duplicateId of group.duplicateIds) {
+      if (settled.has(duplicateId)) {
+        outcome.blocked += 1;
+        continue;
+      }
+      const duplicate = lookup(duplicateId);
+      try {
+        if (duplicate === void 0) throw new Error("A selected request is no longer in the queue.");
+        await blockOnce(duplicate);
+        outcome.blocked += 1;
+      } catch (error) {
+        fail(1, error);
+      }
     }
   }
-  return { blocked, failed };
+  return outcome;
 }
 function bulkBlockSummary(outcome) {
   const unit = outcome.blocked === 1 ? "request" : "requests";
   return `${outcome.blocked} ${unit} blocked.`;
 }
 function bulkBlockFailureMessage(outcome) {
+  const reason = outcome.reasons.length > 0 ? ` ${outcome.reasons.join(" ")}` : "";
   if (outcome.blocked === 0) {
-    return "Guard could not block the selected requests. Open them to block them one at a time.";
+    return `Guard could not block the selected requests. Open them to block them one at a time.${reason}`;
   }
-  return `${outcome.blocked} blocked, ${outcome.failed} failed. Open the failed requests to block them one at a time.`;
+  return `${outcome.blocked} blocked, ${outcome.failed} failed. Open the failed requests to block them one at a time.${reason}`;
 }
 function useRouteFocus(view, mainSelector = "main#main-content") {
   const prevViewRef = reactExports.useRef(null);
@@ -37523,21 +37560,25 @@ function App() {
     }
   }, [refreshApprovalGate, refreshStateAfterAction, setResolutionMessage]);
   const handleBulkBlock = reactExports.useCallback(async (selected) => {
-    if (bulkApproveInFlight.current) {
-      return;
+    if (bulkApproveInFlight.current || resolutionInFlight.current) {
+      throw new Error("Another decision is still being saved. Try again in a moment.");
     }
     bulkApproveInFlight.current = true;
+    resolutionInFlight.current = true;
+    const queued = new Map((requests.kind === "ready" ? requests.items : []).map((item) => [item.request_id, item]));
     try {
-      const outcome = await blockRequestsOnce(selected, resolveRequestWithQueueResult);
+      const outcome = await blockRequestsOnce(selected, (id2) => queued.get(id2), resolveRequestWithQueueResult);
+      resolutionInFlight.current = false;
       await refreshStateAfterAction();
       if (outcome.failed > 0) {
         throw new Error(bulkBlockFailureMessage(outcome));
       }
       setResolutionMessage(bulkBlockSummary(outcome));
     } finally {
+      resolutionInFlight.current = false;
       bulkApproveInFlight.current = false;
     }
-  }, [refreshStateAfterAction, setResolutionMessage]);
+  }, [refreshStateAfterAction, requests, setResolutionMessage]);
   const handleRetry = reactExports.useCallback(() => {
     setRuntime({ kind: "loading" });
     setRequests({ kind: "loading" });

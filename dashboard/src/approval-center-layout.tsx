@@ -10,6 +10,7 @@ import { QueueConnectionError } from "./queue-connection-error";
 import { ErrorBoundary } from "./error-boundary";
 import { lazyWorkspace } from "./lazy-workspace";
 import type { BulkGateCredentials } from "./approval-gate-utils";
+import type { QueueGroup } from "./queue-state";
 import type {
   GuardApprovalGatePublicConfig,
   GuardApprovalRequest,
@@ -103,7 +104,7 @@ type LayoutProps = {
     scope_contract_digest?: string;
   }) => void;
   onBulkApprove?: (ids: string[], gateCredentials?: BulkGateCredentials) => void | Promise<void>;
-  onBulkBlock?: (requests: GuardApprovalRequest[]) => Promise<void>;
+  onBulkBlock?: (groups: QueueGroup[]) => Promise<void>;
   onRepair?: () => Promise<void>;
   onClearEvidence?: () => void;
   onRetryResume?: () => void;

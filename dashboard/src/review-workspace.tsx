@@ -24,6 +24,7 @@ import {
   REVIEW_SEMANTIC_GROUPS,
   type QueueCategory,
   type QueueCategoryId,
+  type QueueGroup,
   type QueueSortDirection,
   type SemanticGroupId,
 } from "./queue-state";
@@ -77,7 +78,7 @@ export type ReviewWorkspaceProps = {
   }) => Promise<void> | void;
   onGoHome: () => void;
   onBulkApprove?: (ids: string[], gateCredentials?: BulkGateCredentials) => void | Promise<void>;
-  onBulkBlock?: (requests: GuardApprovalRequest[]) => Promise<void>;
+  onBulkBlock?: (groups: QueueGroup[]) => Promise<void>;
 };
 
 const QUEUE_PAGE_SIZE = 10;

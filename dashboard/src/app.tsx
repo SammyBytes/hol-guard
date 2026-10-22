@@ -32,7 +32,7 @@ import { harnessDisplayName, normalizeHarnessSlug } from "./approval-center-util
 import { ErrorBoundary } from "./error-boundary";
 import { lazyWorkspace } from "./lazy-workspace";
 import { runAutomaticProtectionRepair } from "./protection-repair-flow";
-import { selectNextAfterResolution } from "./queue-state";
+import { selectNextAfterResolution, type QueueGroup } from "./queue-state";
 import { blockRequestsOnce, bulkBlockFailureMessage, bulkBlockSummary } from "./bulk-block-requests";
 import { useRouteFocus } from "./use-route-focus";
 import { commitDashboardLocation, useDashboardPathname } from "./dashboard-location";
@@ -869,22 +869,28 @@ export function App() {
     }
   }, [refreshApprovalGate, refreshStateAfterAction, setResolutionMessage]);
 
-  const handleBulkBlock = useCallback(async (selected: GuardApprovalRequest[]) => {
-    if (bulkApproveInFlight.current) {
-      return;
+  const handleBulkBlock = useCallback(async (selected: QueueGroup[]) => {
+    // A decision already being saved could resolve one of these requests
+    // under the batch and make it look like a failure.
+    if (bulkApproveInFlight.current || resolutionInFlight.current) {
+      throw new Error("Another decision is still being saved. Try again in a moment.");
     }
     bulkApproveInFlight.current = true;
+    resolutionInFlight.current = true;
+    const queued = new Map((requests.kind === "ready" ? requests.items : []).map((item) => [item.request_id, item]));
     try {
-      const outcome = await blockRequestsOnce(selected, resolveRequestWithQueueResult);
+      const outcome = await blockRequestsOnce(selected, (id) => queued.get(id), resolveRequestWithQueueResult);
+      resolutionInFlight.current = false;
       await refreshStateAfterAction();
       if (outcome.failed > 0) {
         throw new Error(bulkBlockFailureMessage(outcome));
       }
       setResolutionMessage(bulkBlockSummary(outcome));
     } finally {
+      resolutionInFlight.current = false;
       bulkApproveInFlight.current = false;
     }
-  }, [refreshStateAfterAction, setResolutionMessage]);
+  }, [refreshStateAfterAction, requests, setResolutionMessage]);
 
   const handleRetry = useCallback(() => {
     setRuntime({ kind: "loading" });

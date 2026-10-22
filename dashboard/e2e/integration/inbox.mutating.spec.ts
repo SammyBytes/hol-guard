@@ -134,12 +134,14 @@ test("Block selected refuses the last seeded request once and leaves nothing of 
   const bar = page.getByRole("region", { name: "Bulk selection" });
   await expect(bar.getByRole("button", { name: "Review & approve" })).toHaveCount(0);
   await bar.getByRole("button", { name: "Block selected" }).click();
-  await expect(bar.getByText("Block 1 request? Any agent still waiting is told no. Nothing is remembered.")).toBeVisible();
+  await expect(bar.getByText("Block 1 request just this once? Any agent still waiting is told no.")).toBeVisible();
   await bar.getByRole("button", { name: "Block 1" }).click();
   await expect(queueRow(page, exfil.preview)).toHaveCount(0);
   expect(await requestRecord(state, exfil.id)).toMatchObject({ status: "resolved", resolution_action: "block" });
   expect(await receiptDecision(state, exfil.id)).toBe("block");
-  expect(await savedDecisionArtifacts(state)).not.toContain(`codex:project:tool-action:${exfil.id}`);
+  // A one-time block expires and is not listed; no lasting block rule is saved.
+  const policy = await daemonApi<{ items: Array<{ artifact_id: string | null; action: string }> }>(state, "/v1/policy");
+  expect(policy.items.filter((item) => item.action === "block" && item.artifact_id?.includes(exfil.id))).toEqual([]);
 
   // Every seeded request has left the pending list, whatever else is queued.
   const pending = await daemonApi<{ items: Array<{ request_id: string; display_status: string }> }>(

@@ -71,7 +71,7 @@ export function QueueBulkStickyBar(props: QueueBulkStickyBarProps) {
       {confirmingBlock ? (
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Confirm block">
           <p className="text-sm text-brand-dark">
-            Block {total} {unit}? Any agent still waiting is told no. Nothing is remembered.
+            Block {total} {unit} just this once? Any agent still waiting is told no.
           </p>
           <button
             type="button"

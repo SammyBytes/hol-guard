@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { blockRequestsOnce, bulkBlockFailureMessage, bulkBlockSummary } from "./bulk-block-requests";
-import type { GuardApprovalRequest, GuardApprovalResolutionInput } from "./guard-types";
+import type { GuardApprovalRequest, GuardApprovalResolutionInput, GuardQueueResolutionResult } from "./guard-types";
 import { QueueBulkStickyBar } from "./queue-bulk-approve-flow";
 import type { QueueGroup } from "./queue-state";
 import {
-  bulkBlockPrimaries,
+  bulkBlockGroups,
   isBulkBlockableGroup,
   type QueueBulkStickyBarProps,
 } from "./use-queue-bulk-approve";
@@ -43,31 +43,80 @@ function group(primary: GuardApprovalRequest, duplicateIds: string[] = []): Queu
 assert.equal(isBulkBlockableGroup(group(pending)), true);
 assert.equal(isBulkBlockableGroup(group({ ...pending, status: "resolved" })), false);
 
-// One request per selected group: the server settles a group's duplicates.
+// Only selected, pending groups are blocked.
 const second = { ...pending, request_id: "req-second" };
 const groups = [group(pending, ["req-dup"]), group(second), group({ ...pending, request_id: "req-done", status: "resolved" })];
 assert.deepEqual(
-  bulkBlockPrimaries(groups, new Set(["req-stale", "req-done"])).map((item) => item.request_id),
+  bulkBlockGroups(groups, new Set(["req-stale", "req-done"])).map((selected) => selected.primary.request_id),
   ["req-stale"],
 );
 
-// Each block is one-time, at artifact scope, and never saved as a rule.
+function settled(...ids: string[]): GuardQueueResolutionResult {
+  return {
+    resolved: true,
+    item: null,
+    resolved_request: null,
+    remaining_pending_count: 0,
+    next_selectable_request_id: null,
+    remaining_pending_summaries: [],
+    resolved_duplicate_ids: ids,
+    resolution_summary: "Decision saved.",
+    retry_hint: null,
+    copy: null,
+    codexResume: null,
+  } as GuardQueueResolutionResult;
+}
+
+// Each request is blocked just this once at artifact scope and never
+// remembered. A duplicate the server settles is counted; one it leaves
+// pending is blocked on its own, so totals match the confirmed count.
+const looseDuplicate = { ...pending, request_id: "req-loose" };
+const queued = new Map([looseDuplicate].map((item) => [item.request_id, item]));
 const sent: GuardApprovalResolutionInput[] = [];
-const outcome = await blockRequestsOnce([pending, second], async (input) => {
-  sent.push(input);
-  if (input.requestId === "req-second") throw new Error("gone");
-});
-assert.deepEqual(outcome, { blocked: 1, failed: 1 });
+const outcome = await blockRequestsOnce(
+  [group(pending, ["req-dup", "req-loose"]), group(second)],
+  (id) => queued.get(id),
+  async (input) => {
+    sent.push(input);
+    if (input.requestId === "req-second") throw new Error("This request was already resolved.");
+    return settled(...(input.requestId === "req-stale" ? ["req-dup"] : []));
+  },
+);
+assert.deepEqual(outcome, { blocked: 3, failed: 1, reasons: ["This request was already resolved."] });
 assert.deepEqual(
   sent.map((input) => [input.requestId, input.action, input.scope, input.persist_policy]),
-  [["req-stale", "block", "artifact", false], ["req-second", "block", "artifact", false]],
+  [
+    ["req-stale", "block", "artifact", undefined],
+    ["req-loose", "block", "artifact", undefined],
+    ["req-second", "block", "artifact", undefined],
+  ],
 );
-assert.equal(bulkBlockSummary({ blocked: 2, failed: 0 }), "2 requests blocked.");
+
+// A request whose block cannot be one-time is reported, never blocked wider.
+const projectOnly = {
+  ...pending,
+  request_id: "req-project",
+  workspace: "/home/alice/notes",
+  scope_contract_version: "1",
+  scope_contract_digest: "digest-project",
+  allowed_scopes_by_action: { allow: ["artifact"], block: ["workspace"] },
+  recommended_scope_by_action: { allow: "artifact", block: "workspace" },
+} as GuardApprovalRequest;
+const wider: GuardApprovalResolutionInput[] = [];
+const refused = await blockRequestsOnce([group(projectOnly)], () => undefined, async (input) => {
+  wider.push(input);
+  return settled();
+});
+assert.equal(wider.length, 0);
+assert.equal(refused.failed, 1);
+assert.match(refused.reasons[0] ?? "", /could not be blocked just this once/);
+
+assert.equal(bulkBlockSummary({ blocked: 2, failed: 0, reasons: [] }), "2 requests blocked.");
 assert.equal(
-  bulkBlockFailureMessage({ blocked: 1, failed: 1 }),
-  "1 blocked, 1 failed. Open the failed requests to block them one at a time.",
+  bulkBlockFailureMessage({ blocked: 1, failed: 1, reasons: ["This request was already resolved."] }),
+  "1 blocked, 1 failed. Open the failed requests to block them one at a time. This request was already resolved.",
 );
-assert.match(bulkBlockFailureMessage({ blocked: 0, failed: 3 }), /could not block the selected requests/);
+assert.match(bulkBlockFailureMessage({ blocked: 0, failed: 3, reasons: [] }), /could not block the selected requests/);
 
 const noop = () => undefined;
 const bar: QueueBulkStickyBarProps = {
@@ -96,9 +145,9 @@ assert.match(blockOnly, /Block selected/);
 assert.doesNotMatch(blockOnly, /Review &amp; approve/);
 assert.doesNotMatch(blockOnly, /Low risk/);
 
-// Confirming names the count and says nothing is remembered.
+// Confirming names the count and that the block is just this once.
 const confirming = renderToStaticMarkup(createElement(QueueBulkStickyBar, { ...bar, blockStep: "confirming" }));
-assert.match(confirming, /Block 3 requests\? Any agent still waiting is told no\. Nothing is remembered\./);
+assert.match(confirming, /Block 3 requests just this once\? Any agent still waiting is told no\./);
 assert.match(confirming, />Block 3</);
 assert.doesNotMatch(confirming, /Block selected/);
 

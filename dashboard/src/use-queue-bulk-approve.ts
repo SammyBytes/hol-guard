@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { BulkGateCredentials } from "./approval-gate-utils";
 import { countRetryBlockedActions } from "./approval-retry-guidance";
 import type { GuardApprovalGatePublicConfig, GuardApprovalRequest } from "./guard-types";
@@ -61,14 +61,9 @@ export function isBulkBlockableGroup(group: QueueGroup): boolean {
   return group.primary.status === "pending";
 }
 
-/**
- * The requests a "Block selected" answers: one per selected group, because
- * the server settles a group's duplicates with the request it resolves.
- */
-export function bulkBlockPrimaries(groups: QueueGroup[], selectedIds: ReadonlySet<string>): GuardApprovalRequest[] {
-  return groups
-    .filter((group) => isBulkBlockableGroup(group) && selectedIds.has(group.primary.request_id))
-    .map((group) => group.primary);
+/** The groups a "Block selected" answers. */
+export function bulkBlockGroups(groups: QueueGroup[], selectedIds: ReadonlySet<string>): QueueGroup[] {
+  return groups.filter((group) => isBulkBlockableGroup(group) && selectedIds.has(group.primary.request_id));
 }
 
 export type QueueBulkDrawerStep = "review" | "submitting" | "completed";
@@ -157,7 +152,7 @@ export function useQueueBulkApprove(props: {
   items: GuardApprovalRequest[];
   approvalGate?: GuardApprovalGatePublicConfig | null;
   onBulkApprove?: (ids: string[], gateCredentials?: BulkGateCredentials) => void | Promise<void>;
-  onBulkBlock?: (requests: GuardApprovalRequest[]) => Promise<void>;
+  onBulkBlock?: (groups: QueueGroup[]) => Promise<void>;
   settingsHref: string;
 }): UseQueueBulkApproveResult {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -170,6 +165,8 @@ export function useQueueBulkApprove(props: {
   const [bulkCompletedActionCount, setBulkCompletedActionCount] = useState<number | null>(null);
   const [blockStep, setBlockStep] = useState<QueueBulkBlockStep>("idle");
   const [blockError, setBlockError] = useState<string | null>(null);
+  // The selection is what a running block was confirmed for; hold it still.
+  const blocking = useRef(false);
 
   const groups = useMemo(() => groupDuplicates(props.items), [props.items]);
 
@@ -209,8 +206,8 @@ export function useQueueBulkApprove(props: {
     [selectedBulkGroups],
   );
   const selectedGroupCount = selectedBulkGroups.length;
-  const selectedBlockRequests = useMemo(
-    () => (hasBlockHandler ? bulkBlockPrimaries(groups, selectedBulkIds) : []),
+  const selectedBlockGroups = useMemo(
+    () => (hasBlockHandler ? bulkBlockGroups(groups, selectedBulkIds) : []),
     [groups, hasBlockHandler, selectedBulkIds],
   );
   const selectedSelectableGroups = useMemo(
@@ -285,6 +282,7 @@ export function useQueueBulkApprove(props: {
   }, []);
 
   const handleClearSelection = useCallback(() => {
+    if (blocking.current) return;
     setSelectedBulkIds(new Set());
     setTypedConfirm("");
     setBulkApproveError(null);
@@ -293,10 +291,10 @@ export function useQueueBulkApprove(props: {
   }, []);
 
   const handleRequestBlock = useCallback(() => {
-    if (selectedBlockRequests.length === 0) return;
+    if (selectedBlockGroups.length === 0) return;
     setBlockStep("confirming");
     setBlockError(null);
-  }, [selectedBlockRequests.length]);
+  }, [selectedBlockGroups.length]);
 
   const handleCancelBlock = useCallback(() => {
     if (blockStep === "blocking") return;
@@ -304,21 +302,23 @@ export function useQueueBulkApprove(props: {
   }, [blockStep]);
 
   const handleConfirmBlock = useCallback(async () => {
-    if (blockStep === "blocking" || selectedBlockRequests.length === 0 || !hasBlockHandler || props.onBulkBlock === undefined) {
+    if (blockStep === "blocking" || selectedBlockGroups.length === 0 || !hasBlockHandler || props.onBulkBlock === undefined) {
       return;
     }
+    blocking.current = true;
     setBlockStep("blocking");
     setBlockError(null);
     try {
-      await props.onBulkBlock(selectedBlockRequests);
+      await props.onBulkBlock(selectedBlockGroups);
       setSelectedBulkIds(new Set());
     } catch (error) {
       // Blocked requests leave the queue, so the selection keeps only what failed.
       setBlockError(error instanceof Error ? error.message : "Blocking the selected requests failed.");
     } finally {
+      blocking.current = false;
       setBlockStep("idle");
     }
-  }, [blockStep, hasBlockHandler, props.onBulkBlock, selectedBlockRequests]);
+  }, [blockStep, hasBlockHandler, props.onBulkBlock, selectedBlockGroups]);
 
   const handleStartReview = useCallback(() => {
     if (selectedBulkGroups.length === 0) {
@@ -346,6 +346,7 @@ export function useQueueBulkApprove(props: {
   }, [drawerStep, resetBulkFlow]);
 
   const handleBulkToggleSelect = useCallback((requestId: string) => {
+    if (blocking.current) return;
     setSelectedBulkIds((current) => {
       const next = new Set(current);
       if (next.has(requestId)) {
@@ -363,6 +364,7 @@ export function useQueueBulkApprove(props: {
 
   const handleBulkToggleMany = useCallback(
     (items: GuardApprovalRequest[], selectAll: boolean) => {
+      if (blocking.current) return;
       setSelectedBulkIds(() => {
         if (!selectAll) return new Set();
         const eligibleIds = new Set<string>(bulkApprovePrimaryIds(selectableGroups));
@@ -509,7 +511,7 @@ export function useQueueBulkApprove(props: {
   );
 
   const canApprove = showBulkApprove && selectedGroupCount > 0;
-  const stickyBarVisible = (canApprove || selectedBlockRequests.length > 0) && drawerStep !== "completed";
+  const stickyBarVisible = (canApprove || selectedBlockGroups.length > 0) && drawerStep !== "completed";
 
   // Discovery path: when eligible reads exist but the approval gate is not
   // configured, surface a prompt to set one up. Without this, the ambient
