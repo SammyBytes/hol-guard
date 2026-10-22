@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from hashlib import sha256
 
-from .runtime.local_cli_commands import OTHER_COMMAND_ID, ROOT_COMMAND_ID, slug_local_cli_command_id
+from .runtime.local_cli_commands import slug_local_cli_command_id
 from .runtime.local_mcp_stdio import McpCatalogResult
 from .runtime.mcp_skills import mcp_skills_declared
 
@@ -365,8 +365,8 @@ def acknowledge_catalog_changes(
 
     Only the catalog revision the choices were made against is reviewed, so a
     save from an older view cannot clear a change a later listing recorded.
-    The synthetic root and Other-tools choices never review a real tool that
-    happens to share their id.
+    A tool is matched by its command id, so a saved Other-tools choice reviews
+    the tools folded into it, while a real tool named ``other`` has its own id.
     """
 
     row = connection.execute(
@@ -375,7 +375,6 @@ def acknowledge_catalog_changes(
     ).fetchone()
     if row is None or int(row[1]) != catalog_revision:
         return
-    reviewed = reviewed - {ROOT_COMMAND_ID, OTHER_COMMAND_ID}
     payload = _decode_snapshot(row[0])
     changes = payload.get("changes") if payload is not None else None
     if payload is None or not isinstance(changes, dict):
