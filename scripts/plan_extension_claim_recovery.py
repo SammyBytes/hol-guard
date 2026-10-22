@@ -15,7 +15,13 @@ from pathlib import Path
 from extension_claim_github_comments import batched_pull_comments
 from extension_claim_github_history import SnapshotClaimHistory
 from extension_claim_provenance import ClaimProvenanceError, resolve_initial_contribution
-from notify_merged_extension_claimants import GitHubApi, accepted_github_ids, contribution_paths, trusted_notice_comment
+from notify_merged_extension_claimants import (
+    ClaimNoticeError,
+    GitHubApi,
+    accepted_github_ids,
+    contribution_paths,
+    trusted_notice_comment,
+)
 from reconcile_extension_claim_notices import pending_entries
 
 
@@ -36,7 +42,7 @@ def external_sources(root: Path) -> dict[str, list[str]]:
     return result
 
 
-def invitation_entries(
+def _invitation_entries(
     history,
     root: Path,
     sources: dict[str, list[str]],
@@ -74,7 +80,17 @@ def invitation_entries(
     return rows
 
 
-def listing_transitions(root: Path, sources: dict[str, list[str]], sha: str) -> list[dict]:
+def invitation_entries(history, root: Path, sources: dict[str, list[str]], sha: str, *, revoked=None, owners=None):
+    rows = []
+    for identity, paths in sorted(sources.items()):
+        try:
+            rows.extend(_invitation_entries(history, root, {identity: paths}, sha, revoked=revoked, owners=owners))
+        except (ClaimProvenanceError, ClaimNoticeError, ValueError, subprocess.CalledProcessError) as error:
+            print(f"{identity}: invitation recovery needs review: {error}", file=sys.stderr)
+    return rows
+
+
+def _listing_transitions(root: Path, sources: dict[str, list[str]], sha: str) -> list[dict]:
     """Find explicit ID additions in local history; delivery still verifies the PR."""
     rows = []
     for identity in sorted(sources):
@@ -120,6 +136,16 @@ def listing_transitions(root: Path, sources: dict[str, list[str]], sha: str) -> 
                 )
             previous = ids
             implicit_before = "maintainerGithubIds" not in listing
+    return rows
+
+
+def listing_transitions(root: Path, sources: dict[str, list[str]], sha: str) -> list[dict]:
+    rows = []
+    for identity, paths in sorted(sources.items()):
+        try:
+            rows.extend(_listing_transitions(root, {identity: paths}, sha))
+        except (ClaimProvenanceError, ClaimNoticeError, ValueError, subprocess.CalledProcessError) as error:
+            print(f"{identity}: listing recovery needs review: {error}", file=sys.stderr)
     return rows
 
 

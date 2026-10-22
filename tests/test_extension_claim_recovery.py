@@ -228,6 +228,34 @@ def test_shallow_checkout_cannot_report_an_empty_recovery_plan(tmp_path, monkeyp
         recovery.main()
 
 
+def test_bad_historical_listing_does_not_block_other_identities(tmp_path, monkeypatch, capsys):
+    def transitions(root, sources, sha):
+        if "command.bad" in sources:
+            raise recovery.ClaimNoticeError("historical listing schema differs")
+        return [{"extensionId": "command.good", "githubId": "100", "commit": "a" * 40}]
+
+    monkeypatch.setattr(recovery, "_listing_transitions", transitions)
+    rows = recovery.listing_transitions(tmp_path, {"command.bad": [], "command.good": []}, "a" * 40)
+    assert [row["extensionId"] for row in rows] == ["command.good"]
+    assert "command.bad: listing recovery needs review" in capsys.readouterr().err
+
+
+def test_bad_introduction_listing_does_not_block_other_invitations(tmp_path, monkeypatch, capsys):
+    identity = "command.bad"
+    path = tmp_path / "contributions/extension-listings" / f"{identity}.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(listing(identity, ["100"])))
+    history = FakeGitHub()
+    history.file_payloads[(MERGE_SHA, str(path.relative_to(tmp_path)))] = {
+        "schemaVersion": "obsolete",
+        "maintainerGithubIds": ["100"],
+    }
+    monkeypatch.setattr(recovery, "resolve_initial_contribution", lambda *args: Claimant())
+    rows = recovery.invitation_entries(history, tmp_path, {identity: ["source"], "command.good": ["source"]}, MERGE_SHA)
+    assert [row["extensionId"] for row in rows] == ["command.good"]
+    assert "command.bad: invitation recovery needs review" in capsys.readouterr().err
+
+
 def test_recovery_workflow_is_independent_and_shares_delivery_lock():
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/extension-claim-recovery.yml").read_text()
     assert "schedule:" in workflow
