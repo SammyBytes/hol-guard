@@ -68,28 +68,32 @@ fn a_bare_marker_wildcard_is_refused_as_a_pattern() {
     }
 }
 
-/// The same shape read end to end: a bare credential wildcard in the pattern
-/// position is a sensitive read, while a regex whose literal tail has to match
-/// is the ordinary search the filter proof is for.
+/// The same shape read through the proof the screen feeds: a filter whose
+/// pattern is a bare credential wildcard is not proven to read only its
+/// standard input, so the stage keeps the file it could be handed and the
+/// command falls to review. A regex whose literal tail has to match is the
+/// ordinary search the filter proof exists for, and stays proven.
 #[test]
-fn a_bare_credential_wildcard_pattern_reads_as_a_sensitive_target() {
-    for command in [
-        "cat app.log | grep -i credentials.*",
-        "cat app.log | grep secrets.*",
-        "ls -R . | rg token.*",
+fn a_bare_credential_wildcard_pattern_is_not_a_proven_stdin_filter() {
+    for (command, proven) in [
+        ("cat app.log | grep -i credentials.*", false),
+        ("cat app.log | grep secrets.*", false),
+        ("ls -R . | rg token.*", false),
+        ("cat app.log | grep -i auth.*provider", true),
+        ("cat app.log | grep token.*expired", true),
     ] {
-        assert!(
-            sensitive_command_input(command),
-            "{command} should read as a sensitive target"
-        );
-    }
-    for command in [
-        "cat app.log | grep -i auth.*provider",
-        "cat app.log | grep token.*expired",
-    ] {
-        assert!(
-            !sensitive_command_input(command),
-            "{command} still reads as a sensitive target"
+        let model = crate::parse_command(&crate::CommandModelRequestV1 {
+            command: command.into(),
+            dialect: "posix".into(),
+            transport: "shell_string".into(),
+            extraction_provenance: "guard-shell".into(),
+        })
+        .unwrap();
+        let filter = model.segments.last().expect("the pipeline's filter stage");
+        assert_eq!(
+            crate::pretool::segment_proof::stdin_filter_segment(filter),
+            proven,
+            "{command}"
         );
     }
 }
