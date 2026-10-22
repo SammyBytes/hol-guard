@@ -26,6 +26,7 @@ def inputs(tmp_path, monkeypatch):
     source.write_text('{"source":"original"}')
     trust = tmp_path / "contracts/extensions/trust/command.example.v1.json"
     trust.write_text('{"trustClass":"external"}')
+    (tmp_path / "contracts/extensions/core-defaults.v1.json").write_text('{"entries":[]}')
     compiler = tmp_path / "compiler"
     compiler.write_bytes(b"compiler-original")
     monkeypatch.setattr(inventory_module, "implementation_digest", lambda root: "d" * 64)
@@ -43,11 +44,12 @@ def inputs(tmp_path, monkeypatch):
             return {"sha256": digest, "length": len(data), "expanded_length": len(data), "kind": "data"}
 
         descriptor = {"id": "command.example", "description": "Current compiled metadata"}
+        matcher = obj({"matcher": "original"})
         manifest = obj(
             {
                 "descriptors": obj([descriptor]),
                 "catalog": obj([{"extension_id": "command.example"}]),
-                "program": obj({"rules": [], "nodes": {}}),
+                "program": obj({"rules": [], "nodes": {"matcher-id": matcher}}),
             }
         )
         index = obj(
@@ -59,9 +61,10 @@ def inputs(tmp_path, monkeypatch):
     return tmp_path, compiler, source, trust, stages
 
 
-@pytest.mark.parametrize("failure", [None, "runtime-output", "directory-output", "ownership"])
+@pytest.mark.parametrize("failure", [None, "runtime-output", "directory-output", "ownership", "core-selection"])
+@pytest.mark.parametrize("compiler_alias", [False, True])
 def test_five_real_projection_gates_share_one_stage_and_keep_outputs(
-    inputs, projection_builder, monkeypatch, capsys, failure
+    inputs, projection_builder, monkeypatch, capsys, failure, compiler_alias
 ):
     root, compiler, _, _, stages = inputs
     build, descriptor = projection_builder
@@ -98,6 +101,17 @@ def test_five_real_projection_gates_share_one_stage_and_keep_outputs(
         return execute(command, **kwargs)
 
     monkeypatch.setattr(program.subprocess, "run", run)
+    requested_compiler = compiler
+    if compiler_alias:
+        requested_compiler = root / "compiler-alias"
+        requested_compiler.symlink_to(compiler)
+        source_main = program.main
+
+        def require_pinned_compiler(arguments, **kwargs):
+            assert arguments[:2] == ["--compiler", str(compiler.resolve(strict=True))]
+            return source_main(arguments, **kwargs)
+
+        monkeypatch.setattr(program, "main", require_pinned_compiler)
     if failure == "runtime-output":
         main = program.main
 
@@ -120,10 +134,20 @@ def test_five_real_projection_gates_share_one_stage_and_keep_outputs(
         monkeypatch.setattr(directory, "prepare", corrupt_directory)
     elif failure == "ownership":
         (public.parent / "command.orphan.json").write_text("{}")
+    elif failure == "core-selection":
+        main = program.main
+
+        def change_core_selection(arguments, **kwargs):
+            result = main(arguments, **kwargs)
+            if arguments[-1] == "--check":
+                (root / "contracts/extensions/core-defaults.v1.json").write_text('{"entries":["changed"]}')
+            return result
+
+        monkeypatch.setattr(program, "main", change_core_selection)
     if failure:
         error = SystemExit if failure == "runtime-output" else ValueError
         with pytest.raises(error):
-            verifier._prepare_directory(compiler)
+            verifier._prepare_directory(requested_compiler)
         assert len(stages) == 1 and not stages[0].exists()
         assert public.read_bytes() == program.canonical_bytes(descriptor)
         completed = [
@@ -132,9 +156,12 @@ def test_five_real_projection_gates_share_one_stage_and_keep_outputs(
             if line.startswith("Projection preparation ")
         ]
         expected = ["public-descriptors", "command-build", "command-check", "directory-build", "directory-check"]
-        assert completed == expected[: {"runtime-output": 2, "directory-output": 4, "ownership": 3}[failure]]
+        assert (
+            completed
+            == expected[: {"runtime-output": 2, "directory-output": 4, "ownership": 3, "core-selection": 2}[failure]]
+        )
         return
-    verifier._prepare_directory(compiler)
+    assert verifier._prepare_directory(requested_compiler) == compiler.resolve(strict=True)
     completed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Projection preparation ")]
     assert [line.split()[2] for line in completed] == [
         "public-descriptors",
@@ -155,13 +182,14 @@ def test_five_real_projection_gates_share_one_stage_and_keep_outputs(
     assert catalog.read_text() == "current catalog\n"
     # A second wrapper gets a new private inventory and still runs every gate.
     before = {path: path.read_bytes() for path in (generated, public, markdown, catalog)}
-    verifier._prepare_directory(compiler)
+    assert verifier._prepare_directory(requested_compiler) == compiler.resolve(strict=True)
     assert len(stages) == 2 and stages[0] != stages[1]
     assert all(path.read_bytes() == content for path, content in before.items())
 
 
 @pytest.mark.parametrize(
-    "mutation", ["source", "trust", "compiler", "add-optional", "add-mcp", "delete", "symlink", "implementation"]
+    "mutation",
+    ["source", "trust", "compiler", "core-defaults", "add-optional", "add-mcp", "delete", "symlink", "implementation"],
 )
 def test_changed_inputs_fail_closed_instead_of_reusing(inputs, monkeypatch, mutation):
     root, compiler, source, trust, stages = inputs
@@ -171,6 +199,8 @@ def test_changed_inputs_fail_closed_instead_of_reusing(inputs, monkeypatch, muta
             pass
         if mutation in {"source", "trust", "compiler"}:
             {"source": source, "trust": trust, "compiler": compiler}[mutation].write_bytes(b"changed")
+        elif mutation == "core-defaults":
+            (root / "contracts/extensions/core-defaults.v1.json").write_text('{"entries":["changed"]}')
         elif mutation == "add-optional":
             (source.parent / "command.optional.json").write_text("{}")
         elif mutation == "add-mcp":
@@ -189,7 +219,7 @@ def test_changed_inputs_fail_closed_instead_of_reusing(inputs, monkeypatch, muta
         inventory.validate()
 
 
-@pytest.mark.parametrize("target", ["release", "object"])
+@pytest.mark.parametrize("target", ["release", "object", "matcher"])
 def test_changed_pack_bytes_are_rejected(inputs, target):
     root, compiler, _, _, stages = inputs
     with (
@@ -200,6 +230,13 @@ def test_changed_pack_bytes_are_rejected(inputs, target):
             pass
         if target == "release":
             (stages[0] / "release.json").write_text("{}")
+        elif target == "matcher":
+            matcher = next(
+                path
+                for path in (stages[0] / "objects").glob("*.json")
+                if json.loads(path.read_bytes()) == {"matcher": "original"}
+            )
+            matcher.write_text('{"matcher":"changed"}')
         else:
             for path in (stages[0] / "objects").glob("*.json"):
                 path.write_text("{}")
@@ -224,3 +261,41 @@ def test_failed_public_blob_check_writes_no_projections(inputs, projection_build
     assert not (root / "src").exists()
     assert not (root / "docs").exists()
     assert len(stages) == 1 and not stages[0].exists()
+
+
+def test_compiler_alias_retargeting_is_rejected_between_phases(inputs):
+    root, compiler, _, _, stages = inputs
+    alias = root / "compiler-alias"
+    alias.symlink_to(compiler)
+    replacement = root / "replacement-compiler"
+    replacement.write_bytes(compiler.read_bytes())
+    with (
+        pytest.raises(ValueError, match="compiler binding changed"),
+        inventory_module.ProjectionInventory(root, alias) as inventory,
+    ):
+        with inventory.open(alias, root=root):
+            pass
+        alias.unlink()
+        alias.symlink_to(replacement)
+        inventory.validate()
+    assert len(stages) == 1 and not stages[0].exists()
+
+
+def test_verifier_exports_the_validated_target_after_alias_retargeting(inputs, monkeypatch):
+    root, compiler, _, _, _ = inputs
+    alias = root / "compiler-alias.exe"
+    alias.symlink_to(compiler)
+    replacement = root / "replacement-compiler"
+    replacement.write_bytes(compiler.read_bytes())
+    environment = root / "workflow-environment"
+    monkeypatch.setenv("GITHUB_ENV", str(environment))
+
+    def prepare(original):
+        assert original == alias
+        alias.unlink()
+        alias.symlink_to(replacement)
+        return compiler.resolve(strict=True)
+
+    monkeypatch.setattr(verifier, "_prepare_directory", prepare)
+    assert verifier.main(["--compiler", str(alias), "--prepare-directory"]) == 0
+    assert environment.read_text() == f"HOL_GUARD_BUILD_SOURCE_COMPILER={compiler.resolve(strict=True)}\n"

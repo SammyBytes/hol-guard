@@ -26,7 +26,7 @@ def _run(command: list[str]) -> None:
         raise SystemExit(completed.returncode)
 
 
-def _prepare_directory(compiler: Path) -> None:
+def _prepare_directory(compiler: Path) -> Path:
     """Keep one private inventory alive across all five unchanged checks."""
     scripts = str(ROOT / "scripts")
     sys.path.insert(0, scripts)
@@ -36,7 +36,7 @@ def _prepare_directory(compiler: Path) -> None:
         from native_projection_inventory import ProjectionInventory
 
         with ProjectionInventory(ROOT, compiler) as inventory:
-            arguments = ["--compiler", str(compiler)]
+            arguments = ["--compiler", str(inventory.compiler)]
             for phase, extra in (
                 ("public-descriptors", ["--check-public-descriptors"]),
                 ("command-build", []),
@@ -54,13 +54,15 @@ def _prepare_directory(compiler: Path) -> None:
                 inventory.validate()
                 print(
                     json.dumps(
-                        directory.prepare(compiler, check=check, root=ROOT, inventory=inventory), sort_keys=True
+                        directory.prepare(inventory.compiler, check=check, root=ROOT, inventory=inventory),
+                        sort_keys=True,
                     ),
                     flush=True,
                 )
                 inventory.validate()
                 phase = "directory-check" if check else "directory-build"
                 print(f"Projection preparation {phase} completed in {time.monotonic() - started:.3f}s", flush=True)
+        return inventory.compiler
     finally:
         sys.path.remove(scripts)
 
@@ -79,8 +81,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if sys.platform == "win32" and not Path(args.compiler).suffix:
         args.compiler += ".exe"
+    prepared_compiler = None
     if args.prepare_directory:
-        _prepare_directory(Path(args.compiler))
+        prepared_compiler = _prepare_directory(Path(args.compiler))
     else:
         command = [sys.executable, "scripts/build_native_command_program.py", "--compiler", args.compiler]
         # Check Git blobs first; scratch regeneration cannot repair missing PR inputs.
@@ -91,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     # and Windows paths, rather than performing a second host/debug build.
     environment_file = os.environ.get("GITHUB_ENV")
     if environment_file:
-        compiler = str(Path(args.compiler).resolve(strict=True))
+        compiler = str(prepared_compiler if prepared_compiler is not None else Path(args.compiler).resolve(strict=True))
         if "\n" in compiler or "\r" in compiler:
             raise ValueError("invalid compiler path for workflow environment")
         with Path(environment_file).open("a", encoding="utf-8") as handle:
