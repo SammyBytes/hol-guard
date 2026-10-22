@@ -20,6 +20,11 @@ on:
       version:
         required: true
         type: string
+      target:
+        description: One approved Rust target; empty retains the five-target main warmer.
+        required: false
+        type: string
+        default: ''
       fast_codegen:
         description: Alpha-only per-crate codegen; the version must be a canonical alpha.
         required: false
@@ -31,7 +36,7 @@ permissions:
 # A newer main push replaces a superseded warm run, while publish calls keep
 # their own workflow group and validate the requested source and version.
 concurrency:
-  group: ${{ github.event_name == 'push' && format('release-native-prepare-{0}', github.ref) || format('release-native-prepare-call-{0}', github.run_id) }}
+  group: ${{ github.event_name == 'push' && format('release-native-prepare-{0}', github.ref) || format('release-native-prepare-call-{0}-{1}', github.run_id, inputs.target || 'all') }}
   cancel-in-progress: ${{ github.event_name == 'push' }}
 jobs:
   compile:
@@ -49,30 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            suffix: ''
-          # Intel binaries are cross-compiled on Apple silicon; the native
-          # macos-15-intel wheel job self-tests and verifies them before packaging.
-          - runner: macos-15
-            target: x86_64-apple-darwin
-            suffix: ''
-            cross: true
-          - runner: macos-15
-            target: aarch64-apple-darwin
-            suffix: ''
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
-            suffix: .exe
-            rustflags: -C link-arg=/Brepro
-          # Windows ARM64 binaries are cross-compiled on x64; the native
-          # windows-11-arm wheel job self-tests and verifies them before packaging.
-          - runner: windows-latest
-            target: aarch64-pc-windows-msvc
-            suffix: .exe
-            rustflags: -C link-arg=/Brepro
-            cross: true
+        include: ${{ fromJSON('{"":[{"runner":"ubuntu-latest","target":"x86_64-unknown-linux-musl","suffix":""},{"runner":"macos-15","target":"x86_64-apple-darwin","suffix":"","cross":true},{"runner":"macos-15","target":"aarch64-apple-darwin","suffix":""},{"runner":"windows-latest","target":"x86_64-pc-windows-msvc","suffix":".exe","rustflags":"-C link-arg=/Brepro"},{"runner":"windows-latest","target":"aarch64-pc-windows-msvc","suffix":".exe","rustflags":"-C link-arg=/Brepro","cross":true}],"x86_64-unknown-linux-musl":[{"runner":"ubuntu-latest","target":"x86_64-unknown-linux-musl","suffix":""}],"x86_64-apple-darwin":[{"runner":"macos-15","target":"x86_64-apple-darwin","suffix":"","cross":true}],"aarch64-apple-darwin":[{"runner":"macos-15","target":"aarch64-apple-darwin","suffix":""}],"x86_64-pc-windows-msvc":[{"runner":"windows-latest","target":"x86_64-pc-windows-msvc","suffix":".exe","rustflags":"-C link-arg=/Brepro"}],"aarch64-pc-windows-msvc":[{"runner":"windows-latest","target":"aarch64-pc-windows-msvc","suffix":".exe","rustflags":"-C link-arg=/Brepro","cross":true}]}')[inputs.target || ''] || fromJSON('[]') }}
     env:
       SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
       VERSION: ${{ inputs.version }}
