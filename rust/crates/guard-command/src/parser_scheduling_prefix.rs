@@ -24,6 +24,9 @@ pub(super) struct Prefix {
     short_values: &'static str,
     long_values: &'static [&'static str],
     numeric_flag: bool,
+    /// Whether the prefix refuses to run without one of its own options:
+    /// `stdbuf pytest -q` exits without running `pytest`.
+    requires_option: bool,
     value: fn(&str) -> bool,
 }
 
@@ -34,6 +37,7 @@ const PREFIXES: &[Prefix] = &[
         long_values: &["adjustment"],
         // `nice -10 cargo build` is the adjustment spelled on its own.
         numeric_flag: true,
+        requires_option: false,
         value: adjustment,
     },
     Prefix {
@@ -41,6 +45,7 @@ const PREFIXES: &[Prefix] = &[
         short_values: "",
         long_values: &[],
         numeric_flag: false,
+        requires_option: false,
         value: adjustment,
     },
     Prefix {
@@ -48,6 +53,7 @@ const PREFIXES: &[Prefix] = &[
         short_values: "ioe",
         long_values: &["input", "output", "error"],
         numeric_flag: false,
+        requires_option: true,
         value: buffer_size,
     },
 ];
@@ -77,19 +83,13 @@ pub(super) fn program(
     tokens: &[String],
     mut index: usize,
 ) -> Result<usize, &'static str> {
+    let first = index;
     while let Some(option) = tokens.get(index) {
         if option == "--" {
             index += 1;
             break;
         }
-        if prefix.numeric_flag
-            && option
-                .strip_prefix('+')
-                .is_some_and(|digits| (prefix.value)(digits))
-        {
-            index += 1;
-            continue;
-        }
+        // `nice` reads `-N` as an adjustment, but `+N` is the program it runs.
         let Some(body) = option.strip_prefix('-').filter(|body| !body.is_empty()) else {
             break;
         };
@@ -136,6 +136,9 @@ pub(super) fn program(
             }
             _ => return Err("transparent_wrapper_not_yet_supported"),
         };
+    }
+    if prefix.requires_option && tokens[first..index].iter().all(|word| word == "--") {
+        return Err("transparent_wrapper_not_yet_supported");
     }
     let Some(program) = tokens.get(index) else {
         return Err("transparent_wrapper_not_yet_supported");

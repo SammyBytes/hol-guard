@@ -588,7 +588,6 @@ mod tests {
             ("nice --adjustment 10 cargo build", "cargo", "build"),
             ("nice --adjustment=10 cargo build", "cargo", "build"),
             ("nice -10 cargo build", "cargo", "build"),
-            ("nice +10 cargo build", "cargo", "build"),
             ("nice -n10 cargo build", "cargo", "build"),
             ("nice -- cargo build", "cargo", "build"),
             ("/usr/bin/nice -n 10 cargo build", "cargo", "build"),
@@ -671,6 +670,8 @@ mod tests {
             "nice --adjustment=ten cargo build",
             "nice -n 10",
             "nice -n 10 CI=1 cargo build",
+            "nice +10 cargo build",
+            "nice ++10 cargo build",
             "nohup",
             "nohup -n 10 npm test",
             "stdbuf pytest -q",
@@ -679,9 +680,9 @@ mod tests {
             "stdbuf -z L pytest -q",
         ] {
             let model = parse(command);
-            assert!(
-                model.confidence != "exact"
-                    || model.segments[0].executable.as_deref() != Some("cargo"),
+            assert_ne!(
+                model.confidence,
+                "exact",
                 "{command}: {:?}",
                 model.segments.first().map(|segment| &segment.executable)
             );
