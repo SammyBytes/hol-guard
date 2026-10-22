@@ -33,6 +33,43 @@ def test_dedicated_offline_upgrade_is_excluded_from_ordinary_shards() -> None:
     assert loads == [1.0]
 
 
+@pytest.mark.parametrize("known_durations", [False, True])
+def test_offline_cache_keeps_all_eighteen_cases_in_one_process(known_durations: bool) -> None:
+    module = "tests/test_native_offline_cache.py"
+    cases = [
+        "test_export_adapter_leaves_exclusive_destination_creation_to_native",
+        "test_complete_export_import_and_cached_vs_uncached_enable",
+        "test_import_rejects_corruption_missing_wrong_release_and_traversal[corrupt-object]",
+        "test_import_rejects_corruption_missing_wrong_release_and_traversal[missing-object]",
+        "test_import_rejects_corruption_missing_wrong_release_and_traversal[wrong-root]",
+        "test_import_rejects_corruption_missing_wrong_release_and_traversal[symlink]",
+        "test_native_archive_admissibility_rejects_malicious_zip[traversal]",
+        "test_native_archive_admissibility_rejects_malicious_zip[duplicate]",
+        "test_native_archive_admissibility_rejects_malicious_zip[symlink]",
+        "test_native_archive_admissibility_rejects_malicious_zip[compressed]",
+        "test_native_archive_admissibility_rejects_malicious_zip[digest]",
+        "test_active_pending_and_inflight_pins_and_inactive_eviction",
+        "test_prefetch_rejects_unsigned_authority",
+        "test_native_remote_prefetch_rejects_expiry_freeze_and_engine_substitution[expired]",
+        "test_native_remote_prefetch_rejects_expiry_freeze_and_engine_substitution[future]",
+        "test_native_remote_prefetch_rejects_expiry_freeze_and_engine_substitution[engine]",
+        "test_production_cli_prefetch_and_import",
+        "test_production_cleanup_captures_sql_pins_and_rejects_sql_loss",
+    ]
+    offline_nodes = [f"{module}::{case}" for case in cases]
+    filler = [f"tests/test_filler_{index}.py::test_control" for index in range(128)]
+    durations = _durations(offline_nodes, seconds=60.0) if known_durations else {}
+
+    shards, _loads = build_affinity_node_shards(offline_nodes + filler, 128, durations)
+
+    assert len(offline_nodes) == 18
+    assert len(shards) == 128
+    assert sorted(node for shard in shards for node in shard) == sorted(offline_nodes + filler)
+    owners = [shard for shard in shards if any(node_file(node) == module for node in shard)]
+    assert len(owners) == 1
+    assert sorted(node for node in owners[0] if node_file(node) == module) == sorted(offline_nodes)
+
+
 def test_isolated_function_excludes_all_parameters_without_matching_other_tests(monkeypatch) -> None:
     from scripts.ci import build_pytest_shard_plan as planner
 
