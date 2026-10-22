@@ -143,7 +143,99 @@ pub(super) fn program(
     if program.is_empty() || program.starts_with('-') || crate::assignment_name(program).is_some() {
         return Err("transparent_wrapper_not_yet_supported");
     }
+    // A script, a path or an interpreter behind the prefix runs text nobody
+    // read, so the prefix stays a wrapper and the command stays uncertain.
+    if runs_unread_text(program) {
+        return Err("transparent_wrapper_not_yet_supported");
+    }
     Ok(index)
+}
+
+/// Programs whose own words are not what runs: shells and interpreters that
+/// take a script, and launchers that hand their arguments on to a program of
+/// their own. `nohup sh -c …` and `stdbuf -oL python3 deploy.py` run text this
+/// parser never sees.
+const UNREAD_RUNNERS: &[&str] = &[
+    "timeout",
+    "gtimeout",
+    "nice",
+    "ionice",
+    "nohup",
+    "sudo",
+    "doas",
+    "stdbuf",
+    "chrt",
+    "taskset",
+    "setsid",
+    "flock",
+    "chroot",
+    "strace",
+    "ltrace",
+    "unbuffer",
+    "caffeinate",
+    "time",
+    "command",
+    "builtin",
+    "sh",
+    "bash",
+    "zsh",
+    "dash",
+    "ksh",
+    "csh",
+    "tcsh",
+    "fish",
+    "ash",
+    "busybox",
+    "pwsh",
+    "powershell",
+    "cmd",
+    "eval",
+    "source",
+    "exec",
+    "xargs",
+    "env",
+    "node",
+    "deno",
+    "bun",
+    "perl",
+    "ruby",
+    "php",
+    "lua",
+    "osascript",
+    "awk",
+    "gawk",
+    "watch",
+    "parallel",
+    "su",
+    "script",
+    "tmux",
+    "screen",
+    "expect",
+];
+
+/// A file the shell would run as the program, a script it names, or a runner
+/// whose own words are not what runs. `nice ./deploy.sh`, `nohup release.py`
+/// and `nohup bash -lc …` stay wrappers, so the command keeps the failure it
+/// had before the prefix was read.
+fn runs_unread_text(program: &str) -> bool {
+    if program.contains(['/', '\\']) {
+        return true;
+    }
+    let name = program.to_ascii_lowercase();
+    let name = name.strip_suffix(".exe").unwrap_or(&name);
+    let python = name.strip_prefix("python").is_some_and(|version| {
+        version
+            .split('.')
+            .all(|part| part.is_empty() || part.bytes().all(|byte| byte.is_ascii_digit()))
+    });
+    python
+        || UNREAD_RUNNERS.contains(&name)
+        || [
+            ".sh", ".bash", ".zsh", ".ksh", ".py", ".rb", ".pl", ".js", ".mjs", ".cjs", ".ts",
+            ".ps1", ".bat", ".cmd",
+        ]
+        .iter()
+        .any(|suffix| name.ends_with(suffix))
 }
 
 /// A priority `nice` reads: an optional sign and at most two digits, which is

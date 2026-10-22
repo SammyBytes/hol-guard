@@ -648,6 +648,20 @@ mod tests {
     }
 
     #[test]
+    fn a_prefix_in_front_of_unread_text_stays_a_wrapper() {
+        for command in [
+            "nohup ./deploy.sh",
+            "nohup release.py",
+            "nice -n 10 sh -c 'npm run build'",
+            "stdbuf -oL python3 deploy.py",
+            "nice -n 10 xargs rm -f",
+            "nice nohup ./deploy.sh",
+        ] {
+            assert_eq!(parse(command).confidence, "uncertain", "{command}");
+        }
+    }
+
+    #[test]
     fn an_unread_prefix_option_keeps_the_command_uncertain() {
         for command in [
             "nice",
