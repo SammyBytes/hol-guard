@@ -153,6 +153,10 @@ def test_only_the_marked_cases_may_pass_on_containment() -> None:
         # names nothing the home keeps there.
         "neg-ls-home-dot-glob",
         "neg-ls-home-missing-hidden-store",
+        # A pattern that is a credential word and an unconstrained tail expands onto the
+        # command line as the files beside it, so the second one becomes the file the
+        # filter opens; a contained run has no home access and reads none of them.
+        "neg-grep-credential-bare-wildcard-pattern",
         "neg-ls-home-missing-key-in-hidden-directory",
         # A file listing of a home service lane or credential store: a contained run has no
         # home access, so it prints no name the home keeps there.
@@ -160,6 +164,8 @@ def test_only_the_marked_cases_may_pass_on_containment() -> None:
         # A credential word and a wildcard in the path position selects names the home may
         # keep; a contained run has no home access, so it prints none of them.
         "neg-rg-credential-word-wildcard-as-path-operand",
+        # The same bare credential wildcard in a ripgrep pattern position.
+        "neg-rg-secret-bare-wildcard-pattern",
         "neg-rg-files-hidden-service-lane",
         "neg-rg-files-home-credential-store",
         "neg-rg-files-no-ignore-service-lane",

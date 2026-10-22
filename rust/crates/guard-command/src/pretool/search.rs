@@ -263,9 +263,12 @@ pub(super) fn glob_can_select_sensitive_path(value: &str) -> bool {
 /// operand is refused on those wider questions because another proof can
 /// still clear it. A pattern has no such proof, and the wider questions
 /// refuse every regex with a `.*` in it: `cookie.*name` or `auth.*provider`
-/// reaches a credential only if a file named `cookie.<something>name` or
-/// `auth.<something>provider` is sitting there to be expanded onto the
-/// command line.
+/// reaches a credential only if a file named `cookie.<something>name` is
+/// there to be expanded onto the command line.
+///
+/// A bare `<marker>.<anything>` word does reach one: `credentials.*` expands
+/// to `credentials.json credentials.yml`, and the second is the file `grep`
+/// opens. `<marker>.x` stands in for that shape, which the regexes miss.
 pub(super) fn literal_glob_names_sensitive_path(value: &str) -> bool {
     glob_selects_sensitive_path(value, false)
 }
@@ -317,6 +320,7 @@ fn glob_selects_sensitive_path(value: &str, path_operand: bool) -> bool {
                     .iter()
                     .any(|marker| {
                         glob_matches(bytes, marker.as_bytes())
+                            || glob_matches(bytes, format!("{marker}.x").as_bytes())
                             || (path_operand
                                 && (glob_intersects_prefix_family(
                                     bytes,

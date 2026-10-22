@@ -297,6 +297,42 @@
       "contained_ok": true
     },
     {
+      "id": "neg-grep-credential-bare-wildcard-pattern",
+      "fix_area": "shell",
+      "harnesses": [
+        "codex",
+        "zcode",
+        "claude-code",
+        "omp",
+        "cursor"
+      ],
+      "tool": "shell",
+      "tool_input": {
+        "command": "cat app.log | grep -i credentials.*"
+      },
+      "cwd": "worktree",
+      "expect": "not_allow",
+      "contained_ok": true
+    },
+    {
+      "id": "neg-rg-secret-bare-wildcard-pattern",
+      "fix_area": "shell",
+      "harnesses": [
+        "codex",
+        "zcode",
+        "claude-code",
+        "omp",
+        "cursor"
+      ],
+      "tool": "shell",
+      "tool_input": {
+        "command": "rg -n secrets.* src"
+      },
+      "cwd": "worktree",
+      "expect": "not_allow",
+      "contained_ok": true
+    },
+    {
       "id": "neg-rg-credential-word-wildcard-as-path-operand",
       "fix_area": "shell",
       "harnesses": [
