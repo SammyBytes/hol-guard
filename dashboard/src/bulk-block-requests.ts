@@ -38,10 +38,11 @@ export async function blockRequestsOnce(
     return resolve(payload);
   };
   for (const group of groups) {
-    let settled: ReadonlySet<string>;
+    // Every request the server reports settled, whichever block settled it.
+    const settled = new Set<string>();
     try {
       const result = await blockOnce(group.primary);
-      settled = new Set(result.resolved_duplicate_ids);
+      for (const id of result.resolved_duplicate_ids) settled.add(id);
       outcome.blocked += 1;
     } catch (error) {
       fail(1 + group.duplicateCount, error);
@@ -55,7 +56,8 @@ export async function blockRequestsOnce(
       const duplicate = lookup(duplicateId);
       try {
         if (duplicate === undefined) throw new Error("A selected request is no longer in the queue.");
-        await blockOnce(duplicate);
+        const result = await blockOnce(duplicate);
+        for (const id of result.resolved_duplicate_ids) settled.add(id);
         outcome.blocked += 1;
       } catch (error) {
         fail(1, error);

@@ -36829,10 +36829,10 @@ async function blockRequestsOnce(groups, lookup, resolve) {
     return resolve(payload);
   };
   for (const group of groups) {
-    let settled;
+    const settled = /* @__PURE__ */ new Set();
     try {
       const result = await blockOnce(group.primary);
-      settled = new Set(result.resolved_duplicate_ids);
+      for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
       outcome.blocked += 1;
     } catch (error) {
       fail(1 + group.duplicateCount, error);
@@ -36846,7 +36846,8 @@ async function blockRequestsOnce(groups, lookup, resolve) {
       const duplicate = lookup(duplicateId);
       try {
         if (duplicate === void 0) throw new Error("A selected request is no longer in the queue.");
-        await blockOnce(duplicate);
+        const result = await blockOnce(duplicate);
+        for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
         outcome.blocked += 1;
       } catch (error) {
         fail(1, error);

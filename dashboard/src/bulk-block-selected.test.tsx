@@ -92,6 +92,21 @@ assert.deepEqual(
   ],
 );
 
+// A loose duplicate's own block can settle the rest of the group.
+const looseB = { ...pending, request_id: "req-loose-b" };
+const looseQueue = new Map([looseDuplicate, looseB].map((item) => [item.request_id, item]));
+const looseSent: string[] = [];
+const looseOutcome = await blockRequestsOnce(
+  [group(pending, ["req-loose", "req-loose-b"])],
+  (id) => looseQueue.get(id),
+  async (input) => {
+    looseSent.push(input.requestId);
+    return settled(...(input.requestId === "req-loose" ? ["req-loose-b"] : []));
+  },
+);
+assert.deepEqual(looseOutcome, { blocked: 3, failed: 0, reasons: [] });
+assert.deepEqual(looseSent, ["req-stale", "req-loose"]);
+
 // A request whose block cannot be one-time is reported, never blocked wider.
 const projectOnly = {
   ...pending,
