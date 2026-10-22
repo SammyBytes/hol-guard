@@ -117,6 +117,8 @@ export type LocalCliMutationPayload = {
   previous_revision: number;
   session_nonce: string;
   commands?: Array<{ command_id: string; state: LocalCliCommandState }>;
+  /** The MCP catalog revision these choices were made against; saving reviews its new and changed tools. */
+  mcp_catalog_revision?: number;
   provider_actions?: Array<{ tool_slug: string; state: "review" | "block"; revision: number }>;
   approval_password?: string;
   approval_totp_code?: string;

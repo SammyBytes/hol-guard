@@ -4810,6 +4810,8 @@ function LocalCliDetail(props) {
         previous_revision: props.revision,
         session_nonce: randomToken$2(),
         commands: commandStatesPayload(recommended ? prefillSuggestedStates(props.item) : commands),
+        // These choices were made against this catalog; saving them reviews its new and changed tools.
+        ...pending !== "unset" && typeof props.item.mcp_catalog?.revision === "number" ? { mcp_catalog_revision: props.item.mcp_catalog.revision } : {},
         ...pending !== "unset" && Object.keys(providerDrafts).length > 0 ? { provider_actions: Object.values(providerDrafts) } : {},
         // Same endpoint and proof as any other change; the daemon re-checks the request belongs to this connector.
         ...recommended && pending === "allowed" && props.setupLink && setupMatch === "ready" ? { connector_group_request_id: props.setupLink.requestId } : {},

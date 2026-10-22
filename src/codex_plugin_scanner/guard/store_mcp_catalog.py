@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from hashlib import sha256
 
-from .runtime.local_cli_commands import slug_local_cli_command_id
+from .runtime.local_cli_commands import OTHER_COMMAND_ID, ROOT_COMMAND_ID, slug_local_cli_command_id
 from .runtime.local_mcp_stdio import McpCatalogResult
 from .runtime.mcp_skills import mcp_skills_declared
 
@@ -353,6 +353,8 @@ def acknowledge_catalog_changes(
     cli_id: str,
     identity_hash: str,
     reviewed: set[str],
+    *,
+    catalog_revision: int,
 ) -> None:
     """A saved choice for a new or changed tool reviews that change.
 
@@ -360,13 +362,21 @@ def acknowledge_catalog_changes(
     until the next one, so a reviewed extension stays under Needs review. The
     catalog revision and tool authority are untouched; the next listing still
     diffs against the known tools and flags anything new again.
+
+    Only the catalog revision the choices were made against is reviewed, so a
+    save from an older view cannot clear a change a later listing recorded.
+    The synthetic root and Other-tools choices never review a real tool that
+    happens to share their id.
     """
 
     row = connection.execute(
-        "select catalog_json from local_mcp_catalog where cli_id = ? and identity_hash = ?",
+        "select catalog_json, revision from local_mcp_catalog where cli_id = ? and identity_hash = ?",
         (cli_id, identity_hash),
     ).fetchone()
-    payload = _decode_snapshot(row[0]) if row is not None else None
+    if row is None or int(row[1]) != catalog_revision:
+        return
+    reviewed = reviewed - {ROOT_COMMAND_ID, OTHER_COMMAND_ID}
+    payload = _decode_snapshot(row[0])
     changes = payload.get("changes") if payload is not None else None
     if payload is None or not isinstance(changes, dict):
         return
