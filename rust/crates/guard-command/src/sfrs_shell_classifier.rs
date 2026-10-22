@@ -193,9 +193,8 @@ fn native_verdict(
     // verified-read proof requirement. The legacy checks below classify those
     // exactly as on a device without an enrolled authority; naming the rule's
     // action class would turn every default-disabled match into an approval.
-    let disabled_rules_review = allow_floor_only
-        && !enabled
-        && native.minimum_action != CommandDecisionFloor::Block;
+    let disabled_rules_review =
+        allow_floor_only && !enabled && native.minimum_action != CommandDecisionFloor::Block;
     let interaction = match (&native.controlling_action_class, &native.controlling_reason) {
         (Some(action_class), Some(reason))
             if !native.match_default_modes.is_empty()
