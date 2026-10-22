@@ -45,7 +45,7 @@ def test_readiness_failure_reports_only_bounded_known_worker_locations(
             pytest.fail("an unready snapshot must not be yielded")
         message = str(failure.value)
         assert calls == ["start", 103.0, "close"]
-        assert "wait_seconds=3.000 worker_alive=true" in message
+        assert "wait_seconds=3.000 last_error=unavailable worker_alive=true" in message
         assert message.count("publish_") == 6
         assert ":11 <- " in message
         assert len(message.encode("ascii")) <= 1070
@@ -70,7 +70,7 @@ def test_startup_diagnostics_unavailable_does_not_expose_errors(
     publisher = SimpleNamespace(_thread=None if missing_worker else threading.Thread())
     monkeypatch.setattr(support.threading.Thread, "is_alive", unavailable)
     assert support._publisher_startup_diagnostics(publisher, 3.0) == (
-        "wait_seconds=3.000 worker_alive=unavailable worker_stack=unavailable"
+        "wait_seconds=3.000 last_error=unavailable worker_alive=unavailable worker_stack=unavailable"
     )
 
 
@@ -96,7 +96,7 @@ def test_startup_diagnostics_handles_worker_attribute_errors() -> None:
             raise RuntimeError("private attribute payload")
 
     assert support._publisher_startup_diagnostics(UnavailablePublisher(), 3.0) == (
-        "wait_seconds=3.000 worker_alive=unavailable worker_stack=unavailable"
+        "wait_seconds=3.000 last_error=unavailable worker_alive=unavailable worker_stack=unavailable"
     )
 
 
@@ -115,5 +115,33 @@ def test_startup_diagnostics_discards_stopped_worker_identity(
     else:
         monkeypatch.setattr(support.sys, "_current_frames", lambda: pytest.fail("stopped worker stack read"))
     assert support._publisher_startup_diagnostics(SimpleNamespace(_thread=worker), 3.0) == (
-        f"wait_seconds=3.000 worker_alive={str(stopped_during_snapshot).lower()} worker_stack=unavailable"
+        f"wait_seconds=3.000 last_error=unavailable "
+        f"worker_alive={str(stopped_during_snapshot).lower()} worker_stack=unavailable"
     )
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (None, "none"),
+        ("native_policy_snapshot_expired", "native_policy_snapshot_expired"),
+        ("native_command_program_binding_mismatch", "native_command_program_binding_mismatch"),
+        ("native_policy_snapshot_resident_changed", "native_policy_snapshot_resident_changed"),
+        ("private_payload_with_only_allowed_characters", "unavailable"),
+        ("native_policy_snapshot_expired_private_payload", "unavailable"),
+        ("private exception payload", "unavailable"),
+    ],
+)
+def test_startup_error_reports_only_exact_known_codes(error: object, expected: str) -> None:
+    publisher = SimpleNamespace(last_error=error)
+    assert support._publisher_startup_error(publisher) == expected
+    assert f"last_error={expected} " in support._publisher_startup_diagnostics(publisher, 3.0)
+
+
+def test_startup_error_getter_failure_is_unavailable() -> None:
+    class UnavailablePublisher:
+        @property
+        def last_error(self) -> object:
+            raise RuntimeError("private getter payload")
+
+    assert support._publisher_startup_error(UnavailablePublisher()) == "unavailable"

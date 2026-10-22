@@ -10,13 +10,37 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .native_policy_snapshot import get_native_policy_snapshot_publisher
+from .native_policy_snapshot_constants import POLICY_SNAPSHOT_UNRECOVERABLE_ERRORS, TRANSIENT_PUBLICATION_ERRORS
 from .store import GuardStore
+
+_STARTUP_ERROR_CODES = (
+    POLICY_SNAPSHOT_UNRECOVERABLE_ERRORS
+    | TRANSIENT_PUBLICATION_ERRORS
+    | {
+        "native_policy_snapshot_expired",
+        "native_policy_snapshot_publish_failed",
+    }
+)
+
+
+def _publisher_startup_error(publisher: object) -> str:
+    try:
+        error = getattr(publisher, "last_error", object())
+        if error is None:
+            return "none"
+        if type(error) is str:
+            for code in _STARTUP_ERROR_CODES:
+                if error == code:
+                    return code
+    except Exception:
+        pass
+    return "unavailable"
 
 
 def _publisher_startup_diagnostics(publisher: object, elapsed: float) -> str:
     """Describe only the known test publisher worker, without payloads or paths."""
 
-    prefix = f"wait_seconds={elapsed:.3f}"
+    prefix = f"wait_seconds={elapsed:.3f} last_error={_publisher_startup_error(publisher)}"
     try:
         worker = getattr(publisher, "_thread", None)
         if not isinstance(worker, threading.Thread):
