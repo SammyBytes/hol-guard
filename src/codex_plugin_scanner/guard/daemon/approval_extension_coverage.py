@@ -77,6 +77,18 @@ def _covered_segment(
     }
 
 
+def _is_compound(total: object, segments: list[dict[str, object]]) -> bool:
+    """Whether steps other than the covered ones are still waiting on review."""
+
+    if isinstance(total, int):
+        # The review counted the steps, so this is the whole answer: a command
+        # of one step is settled by its one covered step, and any other is not.
+        return total > 1
+    # Without a count, a later step that no extension matched is invisible, so
+    # only what the covered steps themselves prove can be claimed.
+    return len(segments) > 1 or any(cast("int", segment["index"]) > 0 for segment in segments)
+
+
 def build_approval_extension_coverage(
     approval: Mapping[str, object],
     *,
@@ -96,16 +108,7 @@ def build_approval_extension_coverage(
     ]
     if not segments:
         return None
-    total = coverage.get("segment_total")
-    covered_indexes = [cast("int", segment["index"]) for segment in segments]
-    if isinstance(total, int):
-        # The review counted the steps, so this is the whole answer: a command
-        # of one step is settled by its one covered step, and any other is not.
-        compound = total > 1
-    else:
-        # Without a count, a later step that no extension matched is invisible,
-        # so only what the covered steps themselves prove can be claimed.
-        compound = len(segments) > 1 or any(index > 0 for index in covered_indexes)
+    compound = _is_compound(coverage.get("segment_total"), segments)
     return {
         "schema": COVERAGE_SCHEMA,
         "catalog_digest": registry.catalog_digest or coverage["catalog_digest"],

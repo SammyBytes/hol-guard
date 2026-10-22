@@ -479,16 +479,18 @@ def recovered_approval_extension_hint(
     allow offer it used to get back here.
     """
 
-    if stored is not None and validated_extension_coverage_hint(stored) is None:
-        return stored
-    if stored is not None and validated_extension_allow_hint(stored) is not None:
+    coverage = validated_extension_coverage_hint(stored)
+    if stored is not None and (coverage is None or validated_extension_allow_hint(stored) is not None):
         return stored
     live = live_approval_extension_hint(approval, guard_home=guard_home, snapshot=snapshot)
+    if coverage is None:
+        # Nothing stored, so the read-time review is the whole answer and is
+        # handed on exactly as it was before a row could store coverage alone.
+        return live if live is not None else stored
     if live is None:
         return stored
     # The queue-time coverage saw the directory the command really ran in, so
     # it outranks anything this review measured.
-    coverage = validated_extension_coverage_hint(stored) or validated_extension_coverage_hint(live)
     merged = with_extension_coverage(validated_extension_allow_hint(live), coverage)
     return merged if merged is not None else stored
 
