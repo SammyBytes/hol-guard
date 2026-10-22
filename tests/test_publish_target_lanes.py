@@ -84,7 +84,8 @@ def _assert_graph(jobs: dict) -> None:
             "precompiled": f"${{{{ needs.{prepare_id}.result == 'success' }}}}",
             "release_repair": "${{ needs.build.outputs.release_repair == 'true' }}",
         }
-        assert prepare["permissions"] == wheel["permissions"] == {"contents": "read"}
+        assert prepare["permissions"] == {"contents": "read", "actions": "read"}
+        assert wheel["permissions"] == {"contents": "read"}
         assert "secrets" not in prepare and "secrets" not in wheel
         condition = " ".join(wheel["if"].split())
         assert condition.startswith("always() && !cancelled() && needs.build.result == 'success' &&")
@@ -108,6 +109,14 @@ def _assert_graph(jobs: dict) -> None:
 
 def test_each_wheel_waits_only_for_build_and_its_own_preparation() -> None:
     _assert_graph(load_workflow(PUBLISH_WORKFLOW)["jobs"])
+
+
+@pytest.mark.parametrize("lane", NATIVE_WHEEL_LANES)
+def test_every_preparation_caller_must_authorize_artifact_reads(lane):
+    jobs = copy.deepcopy(load_workflow(PUBLISH_WORKFLOW)["jobs"])
+    del jobs[f"precompile-native-{lane}"]["permissions"]["actions"]
+    with pytest.raises(AssertionError):
+        _assert_graph(jobs)
 
 
 @pytest.mark.parametrize(
@@ -154,6 +163,7 @@ def test_graph_contract_rejects_missing_or_mismatched_target_edges(broken: str) 
 
 def test_prepare_default_is_five_targets_and_each_selector_is_exactly_one() -> None:
     workflow = load_workflow(PREPARE)
+    assert workflow["permissions"] == {"contents": "read", "actions": "read"}
     assert workflow[True]["workflow_call"]["inputs"]["target"] == {
         "description": "One approved Rust target; empty retains the five-target main warmer.",
         "required": False,

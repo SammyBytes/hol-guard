@@ -297,6 +297,7 @@ jobs:
       fast_codegen: ${{ inputs.release_channel == 'alpha' }}
     permissions:
       contents: read
+      actions: read
 
   precompile-native-macos-x64:
     name: Prepare native release binaries (x86_64-apple-darwin)
@@ -343,6 +344,7 @@ jobs:
       fast_codegen: ${{ inputs.release_channel == 'alpha' }}
     permissions:
       contents: read
+      actions: read
 
   precompile-native-macos-arm64:
     name: Prepare native release binaries (aarch64-apple-darwin)
@@ -389,6 +391,7 @@ jobs:
       fast_codegen: ${{ inputs.release_channel == 'alpha' }}
     permissions:
       contents: read
+      actions: read
 
   precompile-native-windows-x64:
     name: Prepare native release binaries (x86_64-pc-windows-msvc)
@@ -435,6 +438,7 @@ jobs:
       fast_codegen: ${{ inputs.release_channel == 'alpha' }}
     permissions:
       contents: read
+      actions: read
 
   precompile-native-windows-arm64:
     name: Prepare native release binaries (aarch64-pc-windows-msvc)
@@ -481,6 +485,7 @@ jobs:
       fast_codegen: ${{ inputs.release_channel == 'alpha' }}
     permissions:
       contents: read
+      actions: read
 
   build:
     name: Build + Verify

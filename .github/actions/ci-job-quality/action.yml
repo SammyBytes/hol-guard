@@ -72,7 +72,17 @@ runs:
         tests/test_native_policy_test_support.py \
         tests/test_ci_native_evaluator_cache.py \
         scripts/ci/native_approval_contract_gate.py \
-        tests/test_ci_native_approval_workflow.py
+        tests/test_ci_native_approval_workflow.py \
+        tests/test_cursor_native_bridge.py \
+        tests/test_grok_native_bridge.py \
+        tests/test_frozen_windows_daemon_bootstrap.py \
+        tests/test_frozen_windows_daemon_cleanup_diagnostics.py \
+        tests/test_native_approval_gate_bridge.py \
+        tests/test_ci_quality_marker_scan.py
+      uv run --no-sync python -m ruff check \
+        scripts/release/native_artifact.py \
+        scripts/release/prepared_native.py \
+        tests/test_release_native_artifact.py
     shell: bash
   - name: Check formatting for production sources
     run: |
@@ -98,7 +108,23 @@ runs:
         tests/test_native_policy_test_support.py \
         tests/test_ci_native_evaluator_cache.py \
         scripts/ci/native_approval_contract_gate.py \
-        tests/test_ci_native_approval_workflow.py
+        tests/test_ci_native_approval_workflow.py \
+        tests/test_cursor_native_bridge.py \
+        tests/test_grok_native_bridge.py \
+        tests/test_frozen_windows_daemon_bootstrap.py \
+        tests/test_frozen_windows_daemon_cleanup_diagnostics.py \
+        tests/test_native_approval_gate_bridge.py \
+        tests/test_ci_quality_marker_scan.py
+      if ! uv run --no-sync python -m ruff format --check \
+        scripts/release/native_artifact.py \
+        scripts/release/prepared_native.py \
+        tests/test_release_native_artifact.py; then
+        uv run --no-sync python -m ruff format --diff \
+          scripts/release/native_artifact.py \
+          scripts/release/prepared_native.py \
+          tests/test_release_native_artifact.py || true
+        exit 1
+      fi
     shell: bash
   - run: uv run --no-sync basedpyright --level error
     shell: bash
