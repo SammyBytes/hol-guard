@@ -322,10 +322,12 @@ pub(super) fn redirect_targets(text: &str) -> impl Iterator<Item = &str> {
     let mut words = text.split_whitespace().peekable();
     std::iter::from_fn(move || {
         while let Some(word) = words.next() {
-            let operator = word.trim_start_matches(|c: char| c.is_ascii_digit() || c == '&');
-            if !operator.starts_with(['>', '<']) {
+            // A redirect glued to an operand, as in `out/>/dev/tcp/host/443`,
+            // still opens its target, so the operator need not start the word.
+            let Some(at) = word.find(['>', '<']) else {
                 continue;
-            }
+            };
+            let operator = &word[at..];
             let target = operator.trim_start_matches(['>', '<', '|', '&']);
             let target = if target.is_empty() {
                 words.next().unwrap_or_default()
