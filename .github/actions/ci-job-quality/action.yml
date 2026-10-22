@@ -57,6 +57,13 @@ runs:
         tests/test_ci_command_source_inputs_manifest.py \
         tests/test_ci_macos_gate_shards.py \
         tests/test_ci_windows_sccache_readiness.py \
+        tests/test_ci_required_aggregate.py \
+        tests/test_ci_rust_preflight.py \
+        tests/test_ci_pytest_shard.py \
+        tests/test_ci_pytest_shard_plan.py \
+        tests/test_ci_quality_feedback.py \
+        tests/test_native_regression_shard.py \
+        tests/test_guard_gauntlet_ci.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
@@ -108,6 +115,13 @@ runs:
         tests/test_ci_command_source_inputs_manifest.py \
         tests/test_ci_macos_gate_shards.py \
         tests/test_ci_windows_sccache_readiness.py \
+        tests/test_ci_required_aggregate.py \
+        tests/test_ci_rust_preflight.py \
+        tests/test_ci_pytest_shard.py \
+        tests/test_ci_pytest_shard_plan.py \
+        tests/test_ci_quality_feedback.py \
+        tests/test_native_regression_shard.py \
+        tests/test_guard_gauntlet_ci.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
