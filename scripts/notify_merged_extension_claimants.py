@@ -145,12 +145,12 @@ class GitHubApi:
             except urllib.error.HTTPError as error:
                 detail = error.read(300).decode("utf-8", errors="replace")
                 if method == "GET" and error.code in {429, 500, 502, 503, 504} and attempt < 2:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 raise ClaimNoticeError(f"GitHub API {error.code} for {url}: {detail}") from error
             except OSError as error:
                 if method == "GET" and attempt < 2:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 raise ClaimNoticeError(f"GitHub API request failed for {url}: {error}") from error
         if len(raw) > MAX_GITHUB_RESPONSE_BYTES:

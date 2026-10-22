@@ -47,7 +47,8 @@ def test_transient_read_is_retried(monkeypatch, failure):
 
 
 @pytest.mark.parametrize(
-    "method,status,expected_calls", [("GET", 503, 3), ("GET", 403, 1), ("POST", 503, 1), ("PATCH", 503, 1)],
+    "method,status,expected_calls",
+    [("GET", 503, 3), ("GET", 403, 1), ("POST", 503, 1), ("PATCH", 503, 1)],
 )
 def test_retries_are_bounded_and_never_repeat_writes(monkeypatch, method, status, expected_calls):
     calls = []
@@ -65,22 +66,35 @@ def test_retries_are_bounded_and_never_repeat_writes(monkeypatch, method, status
 
 
 def test_inventory_groups_authored_and_descriptor_paths_and_excludes_first_party(tmp_path):
-    for folder, identity in [("command-sources", "command.example"), ("extensions", "command.example"),
-                             ("mcp-servers", "mcp.example"), ("extensions", "command.core")]:
+    for folder, identity in [
+        ("command-sources", "command.example"),
+        ("extensions", "command.example"),
+        ("mcp-servers", "mcp.example"),
+        ("extensions", "command.core"),
+    ]:
         path = tmp_path / "contributions" / folder / f"{identity}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}")
     for identity, trust in [
-        ("command.example", "external"), ("command.mcp-example", "external"), ("command.core", "first-party"),
+        ("command.example", "external"),
+        ("command.mcp-example", "external"),
+        ("command.core", "first-party"),
     ]:
         path = tmp_path / "contracts/extensions/trust" / f"{identity}.v1.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "schemaVersion": "guard.extension-trust-binding.v1", "extension": identity, "trustClass": trust,
-        }))
+        path.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": "guard.extension-trust-binding.v1",
+                    "extension": identity,
+                    "trustClass": trust,
+                }
+            )
+        )
     assert recovery.external_sources(tmp_path) == {
         "command.example": [
-            "contributions/extensions/command.example.json", "contributions/command-sources/command.example.json",
+            "contributions/extensions/command.example.json",
+            "contributions/command-sources/command.example.json",
         ],
         "mcp.example": ["contributions/mcp-servers/mcp.example.json"],
     }
@@ -93,7 +107,9 @@ def test_plan_uses_original_owner_and_respects_explicit_revocation(tmp_path, mon
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(listing(identity, ids)))
     monkeypatch.setattr(
-        recovery, "resolve_initial_contribution", lambda *args: Claimant(),
+        recovery,
+        "resolve_initial_contribution",
+        lambda *args: Claimant(),
     )
     assert recovery.invitation_entries(object(), tmp_path, sources, "a" * 40) == [
         {"extensionId": "command.original", "githubId": "100", "pullRequest": 7}
@@ -108,7 +124,10 @@ def test_ambiguous_history_does_not_block_unrelated_recovery(tmp_path, monkeypat
 
     monkeypatch.setattr(recovery, "resolve_initial_contribution", resolve)
     rows = recovery.invitation_entries(
-        object(), tmp_path, {"command.bad": ["ambiguous"], "command.good": ["source"]}, "a" * 40,
+        object(),
+        tmp_path,
+        {"command.bad": ["ambiguous"], "command.good": ["source"]},
+        "a" * 40,
     )
     assert [row["extensionId"] for row in rows] == ["command.good"]
     assert "recovery needs provenance review" in capsys.readouterr().err

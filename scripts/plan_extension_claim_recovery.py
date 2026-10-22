@@ -58,7 +58,8 @@ def main() -> None:
     args = parser.parse_args()
     root = args.source_root.resolve()
     shallow = subprocess.check_output(
-        ["git", "-C", str(root), "rev-parse", "--is-shallow-repository"], text=True,
+        ["git", "-C", str(root), "rev-parse", "--is-shallow-repository"],
+        text=True,
     ).strip()
     if shallow != "false":
         raise ClaimProvenanceError("Claim recovery requires complete source history")
