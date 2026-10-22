@@ -86,33 +86,8 @@ def _safe_hook_response_summary(value: str) -> str:
             }
             if isinstance(post_claim, dict)
             else None,
-            "diag": {
-                "decision": payload.get("decision"),
-                "artifact_type": payload.get("artifact_type"),
-                "artifact_name": payload.get("artifact_name"),
-                "operation": payload.get("operation"),
-                "native_edge_decision": payload.get("native_edge_decision"),
-                "native_edge_reason_code": payload.get("native_edge_reason_code"),
-                "risk_signals": payload.get("risk_signals"),
-                "policy_composition": composition,
-                "scanner_evidence": [
-                    {k: v for k, v in item.items() if isinstance(v, (str, int, bool)) or v is None}
-                    for item in scanner_evidence
-                    if isinstance(item, dict)
-                ]
-                if isinstance(scanner_evidence, list)
-                else None,
-                "approval_requests": [
-                    {k: item.get(k) for k in ("artifact_type", "artifact_name", "policy_action", "reason_code", "source")}
-                    for item in payload.get("approval_requests") or []
-                    if isinstance(item, dict)
-                ],
-                "trigger_summary": payload.get("trigger_summary"),
-                "why_now": payload.get("why_now"),
-            },
         },
         sort_keys=True,
-        default=str,
     )
 
 
