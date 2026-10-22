@@ -86,7 +86,7 @@ const outcome = await blockRequestsOnce(
     return settled(...(input.requestId === "req-stale" ? ["req-dup"] : []));
   },
 );
-assert.deepEqual(outcome, { blocked: 3, failed: 1, reasons: ["This request was already resolved."] });
+assert.deepEqual(outcome, { blocked: 3, failed: 1, reasons: ["This request was already resolved."], failedIds: ["req-second"] });
 assert.deepEqual(
   sent.map((input) => [input.requestId, input.action, input.scope, input.persist_policy]),
   [
@@ -108,7 +108,7 @@ const looseOutcome = await blockRequestsOnce(
     return settled(...(input.requestId === "req-loose" ? ["req-loose-b"] : []));
   },
 );
-assert.deepEqual(looseOutcome, { blocked: 3, failed: 0, reasons: [] });
+assert.deepEqual(looseOutcome, { blocked: 3, failed: 0, reasons: [], failedIds: [] });
 assert.deepEqual(looseSent, ["req-stale", "req-loose"]);
 
 // A request resolved elsewhere still lets its pending duplicates be blocked.
@@ -122,7 +122,7 @@ const orphanOutcome = await blockRequestsOnce(
     return settled();
   },
 );
-assert.deepEqual(orphanOutcome, { blocked: 1, failed: 1, reasons: ["This request was already resolved."] });
+assert.deepEqual(orphanOutcome, { blocked: 1, failed: 1, reasons: ["This request was already resolved."], failedIds: ["req-stale"] });
 assert.deepEqual(orphanSent, ["req-stale", "req-loose"]);
 
 // A request whose block cannot be one-time is reported, never blocked wider.
@@ -144,12 +144,12 @@ assert.equal(wider.length, 0);
 assert.equal(refused.failed, 1);
 assert.match(refused.reasons[0] ?? "", /could not be blocked just this once/);
 
-assert.equal(bulkBlockSummary({ blocked: 2, failed: 0, reasons: [] }), "2 requests blocked.");
+assert.equal(bulkBlockSummary({ blocked: 2, failed: 0, reasons: [], failedIds: [] }), "2 requests blocked.");
 assert.equal(
-  bulkBlockFailureMessage({ blocked: 1, failed: 1, reasons: ["This request was already resolved."] }),
+  bulkBlockFailureMessage({ blocked: 1, failed: 1, reasons: ["This request was already resolved."], failedIds: ["req-second"] }),
   "1 blocked, 1 failed. Open the failed requests to block them one at a time. This request was already resolved.",
 );
-assert.match(bulkBlockFailureMessage({ blocked: 0, failed: 3, reasons: [] }), /could not block the selected requests/);
+assert.match(bulkBlockFailureMessage({ blocked: 0, failed: 3, reasons: [], failedIds: [] }), /could not block the selected requests/);
 
 const noop = () => undefined;
 const bar: QueueBulkStickyBarProps = {

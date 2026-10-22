@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { BulkGateCredentials } from "./approval-gate-utils";
 import { requestResolutionBlockReason } from "./approval-center-utils";
+import { BulkBlockError } from "./bulk-block-requests";
 import { countRetryBlockedActions } from "./approval-retry-guidance";
 import type { GuardApprovalGatePublicConfig, GuardApprovalRequest } from "./guard-types";
 import {
@@ -317,7 +318,9 @@ export function useQueueBulkApprove(props: {
       await props.onBulkBlock(selectedBlockGroups);
       setSelectedBulkIds(new Set());
     } catch (error) {
-      // Blocked requests leave the queue, so the selection keeps only what failed.
+      // Blocked requests leave the queue. A failed duplicate can become its
+      // group's new primary, so select exactly the requests that failed.
+      if (error instanceof BulkBlockError) setSelectedBulkIds(new Set(error.failedIds));
       setBlockError(error instanceof Error ? error.message : "Blocking the selected requests failed.");
     } finally {
       blocking.current = false;

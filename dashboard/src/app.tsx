@@ -33,7 +33,7 @@ import { ErrorBoundary } from "./error-boundary";
 import { lazyWorkspace } from "./lazy-workspace";
 import { runAutomaticProtectionRepair } from "./protection-repair-flow";
 import { selectNextAfterResolution, type QueueGroup } from "./queue-state";
-import { blockRequestsOnce, bulkBlockFailureMessage, bulkBlockSummary } from "./bulk-block-requests";
+import { BulkBlockError, blockRequestsOnce, bulkBlockFailureMessage, bulkBlockSummary } from "./bulk-block-requests";
 import { useRouteFocus } from "./use-route-focus";
 import { commitDashboardLocation, useDashboardPathname } from "./dashboard-location";
 
@@ -883,7 +883,7 @@ export function App() {
       resolutionInFlight.current = false;
       await refreshStateAfterAction();
       if (outcome.failed > 0) {
-        throw new Error(bulkBlockFailureMessage(outcome));
+        throw new BulkBlockError(bulkBlockFailureMessage(outcome), outcome.failedIds);
       }
       setResolutionMessage(bulkBlockSummary(outcome));
     } finally {

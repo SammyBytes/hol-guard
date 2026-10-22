@@ -3,7 +3,18 @@ import type { GuardApprovalRequest, GuardApprovalResolutionInput, GuardQueueReso
 import type { QueueGroup } from "./queue-state";
 
 /** Requests, counting each group's duplicates, so totals match what was confirmed. */
-export type BulkBlockOutcome = { blocked: number; failed: number; reasons: string[] };
+export type BulkBlockOutcome = { blocked: number; failed: number; reasons: string[]; failedIds: string[] };
+
+/** A partial bulk block; `failedIds` are the requests to keep selected for a retry. */
+export class BulkBlockError extends Error {
+  readonly failedIds: readonly string[];
+
+  constructor(message: string, failedIds: readonly string[]) {
+    super(message);
+    this.name = "BulkBlockError";
+    this.failedIds = failedIds;
+  }
+}
 
 const MAX_REASONS = 3;
 
@@ -22,9 +33,10 @@ export async function blockRequestsOnce(
   lookup: (requestId: string) => GuardApprovalRequest | undefined,
   resolve: (input: GuardApprovalResolutionInput) => Promise<GuardQueueResolutionResult>,
 ): Promise<BulkBlockOutcome> {
-  const outcome: BulkBlockOutcome = { blocked: 0, failed: 0, reasons: [] };
-  const fail = (count: number, error: unknown) => {
-    outcome.failed += count;
+  const outcome: BulkBlockOutcome = { blocked: 0, failed: 0, reasons: [], failedIds: [] };
+  const fail = (requestId: string, error: unknown) => {
+    outcome.failed += 1;
+    outcome.failedIds.push(requestId);
     const reason = error instanceof Error ? error.message : String(error);
     if (outcome.reasons.length < MAX_REASONS && !outcome.reasons.includes(reason)) {
       outcome.reasons.push(reason);
@@ -46,7 +58,7 @@ export async function blockRequestsOnce(
       outcome.blocked += 1;
     } catch (error) {
       // A request resolved elsewhere can leave its duplicates pending.
-      fail(1, error);
+      fail(group.primary.request_id, error);
     }
     for (const duplicateId of group.duplicateIds) {
       if (settled.has(duplicateId)) {
@@ -60,7 +72,7 @@ export async function blockRequestsOnce(
         for (const id of result.resolved_duplicate_ids) settled.add(id);
         outcome.blocked += 1;
       } catch (error) {
-        fail(1, error);
+        fail(duplicateId, error);
       }
     }
   }

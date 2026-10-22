@@ -29568,6 +29568,70 @@ function QueueBulkDrawer(props) {
     }
   );
 }
+class BulkBlockError extends Error {
+  failedIds;
+  constructor(message, failedIds) {
+    super(message);
+    this.name = "BulkBlockError";
+    this.failedIds = failedIds;
+  }
+}
+const MAX_REASONS$1 = 3;
+async function blockRequestsOnce(groups, lookup, resolve) {
+  const outcome = { blocked: 0, failed: 0, reasons: [], failedIds: [] };
+  const fail = (requestId, error) => {
+    outcome.failed += 1;
+    outcome.failedIds.push(requestId);
+    const reason = error instanceof Error ? error.message : String(error);
+    if (outcome.reasons.length < MAX_REASONS$1 && !outcome.reasons.includes(reason)) {
+      outcome.reasons.push(reason);
+    }
+  };
+  const blockOnce = async (item) => {
+    const payload = buildDecisionPayload({ item, action: "block", scope: "artifact", reason: "blocked in bulk review" });
+    if (payload.scope !== "artifact") {
+      throw new Error("A request could not be blocked just this once. Open it to choose how to block it.");
+    }
+    return resolve(payload);
+  };
+  for (const group of groups) {
+    const settled = /* @__PURE__ */ new Set();
+    try {
+      const result = await blockOnce(group.primary);
+      for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
+      outcome.blocked += 1;
+    } catch (error) {
+      fail(group.primary.request_id, error);
+    }
+    for (const duplicateId of group.duplicateIds) {
+      if (settled.has(duplicateId)) {
+        outcome.blocked += 1;
+        continue;
+      }
+      const duplicate = lookup(duplicateId);
+      try {
+        if (duplicate === void 0) throw new Error("A selected request is no longer in the queue.");
+        const result = await blockOnce(duplicate);
+        for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
+        outcome.blocked += 1;
+      } catch (error) {
+        fail(duplicateId, error);
+      }
+    }
+  }
+  return outcome;
+}
+function bulkBlockSummary(outcome) {
+  const unit = outcome.blocked === 1 ? "request" : "requests";
+  return `${outcome.blocked} ${unit} blocked.`;
+}
+function bulkBlockFailureMessage(outcome) {
+  const reason = outcome.reasons.length > 0 ? ` ${outcome.reasons.join(" ")}` : "";
+  if (outcome.blocked === 0) {
+    return `Guard could not block the selected requests. Open them to block them one at a time.${reason}`;
+  }
+  return `${outcome.blocked} blocked, ${outcome.failed} failed. Open the failed requests to block them one at a time.${reason}`;
+}
 const BULK_LOW_TIER_THRESHOLD = 5;
 const BULK_HIGH_TIER_THRESHOLD = 10;
 function resolveBulkRiskTier(stats) {
@@ -29844,6 +29908,7 @@ function useQueueBulkApprove(props) {
       await props.onBulkBlock(selectedBlockGroups);
       setSelectedBulkIds(/* @__PURE__ */ new Set());
     } catch (error) {
+      if (error instanceof BulkBlockError) setSelectedBulkIds(new Set(error.failedIds));
       setBlockError(error instanceof Error ? error.message : "Blocking the selected requests failed.");
     } finally {
       blocking.current = false;
@@ -30982,7 +31047,7 @@ const EXTENSION_ID$1 = /^command\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const PERMISSION_ID$1 = /^command\.[a-z0-9]+(?:[.-][a-z0-9]+)*\.permission\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const MAX_EXTENSIONS = 512;
 const MAX_PERMISSIONS = 4096;
-const MAX_REASONS$1 = 64;
+const MAX_REASONS = 64;
 function record$3(value, label) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`Invalid ${label}`);
   return value;
@@ -31010,7 +31075,7 @@ function id$1(value, label, pattern) {
   return candidate;
 }
 function reasons(value, label) {
-  if (!Array.isArray(value) || value.length > MAX_REASONS$1) throw new Error(`Invalid ${label}`);
+  if (!Array.isArray(value) || value.length > MAX_REASONS) throw new Error(`Invalid ${label}`);
   return value.map((item, index) => text(item, `${label}[${index}]`, 128));
 }
 function extensionItem(value, label) {
@@ -36819,61 +36884,6 @@ async function runAutomaticProtectionRepair(input) {
     { ...repairCheckReasons, ...gapReasons(remainingHealth.checks) }
   );
 }
-const MAX_REASONS = 3;
-async function blockRequestsOnce(groups, lookup, resolve) {
-  const outcome = { blocked: 0, failed: 0, reasons: [] };
-  const fail = (count, error) => {
-    outcome.failed += count;
-    const reason = error instanceof Error ? error.message : String(error);
-    if (outcome.reasons.length < MAX_REASONS && !outcome.reasons.includes(reason)) {
-      outcome.reasons.push(reason);
-    }
-  };
-  const blockOnce = async (item) => {
-    const payload = buildDecisionPayload({ item, action: "block", scope: "artifact", reason: "blocked in bulk review" });
-    if (payload.scope !== "artifact") {
-      throw new Error("A request could not be blocked just this once. Open it to choose how to block it.");
-    }
-    return resolve(payload);
-  };
-  for (const group of groups) {
-    const settled = /* @__PURE__ */ new Set();
-    try {
-      const result = await blockOnce(group.primary);
-      for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
-      outcome.blocked += 1;
-    } catch (error) {
-      fail(1, error);
-    }
-    for (const duplicateId of group.duplicateIds) {
-      if (settled.has(duplicateId)) {
-        outcome.blocked += 1;
-        continue;
-      }
-      const duplicate = lookup(duplicateId);
-      try {
-        if (duplicate === void 0) throw new Error("A selected request is no longer in the queue.");
-        const result = await blockOnce(duplicate);
-        for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
-        outcome.blocked += 1;
-      } catch (error) {
-        fail(1, error);
-      }
-    }
-  }
-  return outcome;
-}
-function bulkBlockSummary(outcome) {
-  const unit = outcome.blocked === 1 ? "request" : "requests";
-  return `${outcome.blocked} ${unit} blocked.`;
-}
-function bulkBlockFailureMessage(outcome) {
-  const reason = outcome.reasons.length > 0 ? ` ${outcome.reasons.join(" ")}` : "";
-  if (outcome.blocked === 0) {
-    return `Guard could not block the selected requests. Open them to block them one at a time.${reason}`;
-  }
-  return `${outcome.blocked} blocked, ${outcome.failed} failed. Open the failed requests to block them one at a time.${reason}`;
-}
 function useRouteFocus(view, mainSelector = "main#main-content") {
   const prevViewRef = reactExports.useRef(null);
   reactExports.useEffect(() => {
@@ -37579,7 +37589,7 @@ function App() {
       resolutionInFlight.current = false;
       await refreshStateAfterAction();
       if (outcome.failed > 0) {
-        throw new Error(bulkBlockFailureMessage(outcome));
+        throw new BulkBlockError(bulkBlockFailureMessage(outcome), outcome.failedIds);
       }
       setResolutionMessage(bulkBlockSummary(outcome));
     } finally {
