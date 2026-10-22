@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -36,13 +37,20 @@ def _prepare_directory(compiler: Path) -> None:
 
         with ProjectionInventory(ROOT, compiler) as inventory:
             arguments = ["--compiler", str(compiler)]
-            for extra in (["--check-public-descriptors"], [], ["--check"]):
+            for phase, extra in (
+                ("public-descriptors", ["--check-public-descriptors"]),
+                ("command-build", []),
+                ("command-check", ["--check"]),
+            ):
+                started = time.monotonic()
                 inventory.validate()
                 result = program.main([*arguments, *extra], inventory=inventory)
                 if result:
                     raise SystemExit(result)
                 inventory.validate()
+                print(f"Projection preparation {phase} completed in {time.monotonic() - started:.3f}s", flush=True)
             for check in (False, True):
+                started = time.monotonic()
                 inventory.validate()
                 print(
                     json.dumps(
@@ -51,6 +59,8 @@ def _prepare_directory(compiler: Path) -> None:
                     flush=True,
                 )
                 inventory.validate()
+                phase = "directory-check" if check else "directory-build"
+                print(f"Projection preparation {phase} completed in {time.monotonic() - started:.3f}s", flush=True)
     finally:
         sys.path.remove(scripts)
 

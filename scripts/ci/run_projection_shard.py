@@ -52,6 +52,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     pytest_args = args.pytest_args
     if pytest_args[:1] == ["--"]:
         pytest_args = pytest_args[1:]
+    print("Starting pytest", flush=True)
     return subprocess.run([sys.executable, "-m", "pytest", *pytest_args], cwd=ROOT, check=False).returncode
 
 

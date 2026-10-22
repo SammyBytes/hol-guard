@@ -60,7 +60,9 @@ def inputs(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("failure", [None, "runtime-output", "directory-output", "ownership"])
-def test_five_real_projection_gates_share_one_stage_and_keep_outputs(inputs, projection_builder, monkeypatch, failure):
+def test_five_real_projection_gates_share_one_stage_and_keep_outputs(
+    inputs, projection_builder, monkeypatch, capsys, failure
+):
     root, compiler, _, _, stages = inputs
     build, descriptor = projection_builder
     program = build.module
@@ -124,8 +126,24 @@ def test_five_real_projection_gates_share_one_stage_and_keep_outputs(inputs, pro
             verifier._prepare_directory(compiler)
         assert len(stages) == 1 and not stages[0].exists()
         assert public.read_bytes() == program.canonical_bytes(descriptor)
+        completed = [
+            line.split()[2]
+            for line in capsys.readouterr().out.splitlines()
+            if line.startswith("Projection preparation ")
+        ]
+        expected = ["public-descriptors", "command-build", "command-check", "directory-build", "directory-check"]
+        assert completed == expected[: {"runtime-output": 2, "directory-output": 4, "ownership": 3}[failure]]
         return
     verifier._prepare_directory(compiler)
+    completed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Projection preparation ")]
+    assert [line.split()[2] for line in completed] == [
+        "public-descriptors",
+        "command-build",
+        "command-check",
+        "directory-build",
+        "directory-check",
+    ]
+    assert all(float(line.removesuffix("s").split()[-1]) >= 0 for line in completed)
     assert len(stages) == 1
     assert not stages[0].exists()
     assert commands.count("compile-stream") == 3
@@ -188,7 +206,7 @@ def test_changed_pack_bytes_are_rejected(inputs, target):
         core.pack_descriptors(root, compiler, inventory_module.packs.legacy.read_object, inventory=inventory)
 
 
-def test_failed_public_blob_check_writes_no_projections(inputs, projection_builder, monkeypatch):
+def test_failed_public_blob_check_writes_no_projections(inputs, projection_builder, monkeypatch, capsys):
     root, compiler, _, _, stages = inputs
     build, _ = projection_builder
     monkeypatch.setitem(sys.modules, "build_native_command_program", build.module)
@@ -201,6 +219,7 @@ def test_failed_public_blob_check_writes_no_projections(inputs, projection_build
     with pytest.raises(SystemExit) as failure:
         verifier._prepare_directory(compiler)
     assert failure.value.code == 1
+    assert "Projection preparation " not in capsys.readouterr().out
     assert not (root / "contracts/extensions/build-descriptors").exists()
     assert not (root / "src").exists()
     assert not (root / "docs").exists()
