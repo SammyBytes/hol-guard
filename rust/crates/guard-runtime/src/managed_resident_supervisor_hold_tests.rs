@@ -24,6 +24,7 @@ fn test_scope(label: &str) -> (PathBuf, PathBuf) {
     (root, scope)
 }
 
+#[cfg(windows)]
 #[test]
 fn a_scope_no_supervisor_holds_is_already_quiesced() {
     let (root, scope) = test_scope("free");
@@ -33,6 +34,7 @@ fn a_scope_no_supervisor_holds_is_already_quiesced() {
     fs::remove_dir_all(root).expect("test directory should be removable");
 }
 
+#[cfg(windows)]
 #[test]
 fn a_stop_waits_for_the_supervisor_to_release_its_hold() {
     let (root, scope) = test_scope("waits");
@@ -68,6 +70,7 @@ fn a_stop_reports_a_supervisor_that_never_finishes() {
 }
 
 /// Two supervisors can share a scope, and the stop waits for the last one.
+#[cfg(windows)]
 #[test]
 fn the_hold_is_shared_between_supervisors() {
     let (root, scope) = test_scope("shared");
@@ -89,7 +92,41 @@ fn the_hold_is_shared_between_supervisors() {
 /// `MANAGED_STOP_TIMEOUT`, so the stop's own bound has to outlast that wait
 /// and the budget lock that follows it, or an ordinary exit reads as a stop
 /// failure.
+#[cfg(windows)]
 #[test]
 fn the_stop_outwaits_the_supervisors_longest_ordinary_tail() {
     assert!(SUPERVISOR_QUIESCE_TIMEOUT > crate::managed_resident::MANAGED_STOP_TIMEOUT * 2);
+}
+
+/// A Unix stop waits for the supervisor's writes as far as its own deadline,
+/// then leaves a supervisor that is still busy to finish on its own instead of
+/// failing the stop.
+#[cfg(not(windows))]
+#[test]
+fn a_unix_stop_waits_for_the_hold_only_within_its_deadline() {
+    let (root, scope) = test_scope("unix-deadline");
+    let hold = hold_scope(&scope).expect("a private scope should be holdable");
+    let (released, release_seen) = mpsc::channel();
+    let releaser = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        released.send(()).expect("the test should still be waiting");
+        drop(hold);
+    });
+
+    wait_for_scope_quiesce(&scope, Instant::now() + Duration::from_secs(5))
+        .expect("a released hold should let the stop through");
+
+    release_seen
+        .try_recv()
+        .expect("the stop must not return before the hold is released");
+    releaser.join().expect("the releasing thread should finish");
+
+    let busy = hold_scope(&scope).expect("the scope should be holdable again");
+    let started = Instant::now();
+    wait_for_scope_quiesce(&scope, started + TEST_QUIESCE_TIMEOUT)
+        .expect("a busy supervisor must not fail a Unix stop");
+    assert!(started.elapsed() >= TEST_QUIESCE_TIMEOUT);
+
+    drop(busy);
+    fs::remove_dir_all(root).expect("test directory should be removable");
 }
