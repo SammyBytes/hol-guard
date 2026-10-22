@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.extension_claim_notice_harness import MODULE, listing
+from tests.extension_claim_notice_harness import MERGE_SHA, MODULE, FakeGitHub, listing
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 try:
@@ -24,10 +24,12 @@ finally:
 class Claimant:
     github_id: str = "100"
     pull_request: int = 7
+    merge_sha: str = MERGE_SHA
 
 
 @pytest.mark.parametrize("failure", [500, 502, 503, 504, 429, "connection"])
-def test_transient_read_is_retried(monkeypatch, failure):
+@pytest.mark.parametrize("graphql", [False, True])
+def test_transient_read_is_retried(monkeypatch, failure, graphql):
     calls, waits = [], []
 
     def request(*args, **kwargs):
@@ -41,8 +43,17 @@ def test_transient_read_is_retried(monkeypatch, failure):
     monkeypatch.setattr(MODULE.urllib.request, "urlopen", request)
     monkeypatch.setattr(MODULE.time, "sleep", waits.append)
     client = MODULE.GitHubApi("test-token", "example/repo")
-    assert client.repo_metadata() == {"default_branch": "main"}
-    assert calls == ["GET", "GET"]
+    if graphql:
+        result = client._request(
+            "https://api.github.com/graphql",
+            method="POST",
+            payload={"query": "query { viewer { login } }"},
+            read_only=True,
+        )
+    else:
+        result = client.repo_metadata()
+    assert result == {"default_branch": "main"}
+    assert calls == (["POST", "POST"] if graphql else ["GET", "GET"])
     assert waits == [1]
 
 
@@ -111,9 +122,11 @@ def test_plan_uses_original_owner_and_respects_explicit_revocation(tmp_path, mon
         "resolve_initial_contribution",
         lambda *args: Claimant(),
     )
-    assert recovery.invitation_entries(object(), tmp_path, sources, "a" * 40) == [
+    revoked = []
+    assert recovery.invitation_entries(object(), tmp_path, sources, "a" * 40, revoked=revoked) == [
         {"extensionId": "command.original", "githubId": "100", "pullRequest": 7}
     ]
+    assert {row["extensionId"] for row in revoked} == {"command.revoked", "command.reassigned"}
 
 
 def test_ambiguous_history_does_not_block_unrelated_recovery(tmp_path, monkeypatch, capsys):
@@ -131,6 +144,88 @@ def test_ambiguous_history_does_not_block_unrelated_recovery(tmp_path, monkeypat
     )
     assert [row["extensionId"] for row in rows] == ["command.good"]
     assert "recovery needs provenance review" in capsys.readouterr().err
+
+
+def test_later_listing_reassignment_uses_listing_pr_not_old_introduction(tmp_path, monkeypatch):
+    identity = "command.example"
+    path = tmp_path / "contributions/extension-listings" / f"{identity}.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(listing(identity, ["100"])))
+    history = FakeGitHub()
+    history.file_payloads[(MERGE_SHA, str(path.relative_to(tmp_path)))] = listing(identity, ["200"])
+    monkeypatch.setattr(recovery, "resolve_initial_contribution", lambda *args: Claimant())
+    assert recovery.invitation_entries(history, tmp_path, {identity: ["source"]}, MERGE_SHA) == []
+    monkeypatch.setattr(history, "_request", lambda url: [{"number": 9}])
+    monkeypatch.setattr(
+        history,
+        "pull_request",
+        lambda number: {
+            "merged": True,
+            "base": {"ref": "main"},
+            "merge_commit_sha": MERGE_SHA,
+        },
+    )
+    monkeypatch.setattr(history, "compare", lambda *args: {"status": "ahead"})
+    active, revoked = recovery.transition_entries(
+        history,
+        tmp_path,
+        [
+            {"extensionId": identity, "githubId": "100", "commit": MERGE_SHA},
+        ],
+    )
+    assert active == [{"extensionId": identity, "githubId": "100", "pullRequest": 9}]
+    assert revoked == []
+
+
+def test_revoked_notice_is_scheduled_once_for_withdrawal(monkeypatch):
+    client = FakeGitHub()
+    client.logins = {"100": "old-owner"}
+    client.comment_rows = [
+        {
+            "body": MODULE.build_comment(
+                [MODULE.NoticeItem("command.example", (("100", "old-owner"),))], MODULE.DEFAULT_STUDIO_URL
+            ),
+            "user": {"id": MODULE.TRUSTED_NOTICE_ACTOR_ID, "type": "Bot"},
+        }
+    ]
+    rows = [{"extensionId": "command.example", "githubId": "100", "pullRequest": 7}]
+    monkeypatch.setattr(recovery, "batched_pull_comments", lambda *args: {})
+    assert recovery.pending_revocations(client, rows) == [7]
+    client.comment_rows[0]["body"] = MODULE.build_withdrawn_comment()
+    assert recovery.pending_revocations(client, rows) == []
+
+
+def test_read_only_retry_flag_cannot_enable_a_comment_write():
+    client = MODULE.GitHubApi("test-token", "example/repo")
+    with pytest.raises(MODULE.ClaimNoticeError, match="GraphQL query"):
+        client._request(
+            client.base_url + "/issues/7/comments", method="POST", payload={"body": "notice"}, read_only=True
+        )
+
+
+def test_listing_history_tracks_explicit_additions_not_unchanged_ids(tmp_path, monkeypatch):
+    import subprocess
+
+    old, new = "a" * 40, "b" * 40
+    monkeypatch.setattr(recovery.subprocess, "check_output", lambda *args, **kwargs: f"{new}\n{old}\n")
+
+    def run(command, **kwargs):
+        ids = ["200"] if command[-1].startswith(old) else ["100", "200"]
+        return subprocess.CompletedProcess(command, 0, json.dumps(listing("command.example", ids)), "")
+
+    monkeypatch.setattr(recovery.subprocess, "run", run)
+    transitions = recovery.listing_transitions(tmp_path, {"command.example": ["source"]}, new)
+    assert transitions == [
+        {"extensionId": "command.example", "githubId": "200", "commit": old, "implicit_before": True},
+        {"extensionId": "command.example", "githubId": "100", "commit": new, "implicit_before": False},
+    ]
+
+
+def test_shallow_checkout_cannot_report_an_empty_recovery_plan(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["planner", "--source-root", str(tmp_path)])
+    monkeypatch.setattr(recovery.subprocess, "check_output", lambda *args, **kwargs: "true\n")
+    with pytest.raises(recovery.ClaimProvenanceError, match="complete source history"):
+        recovery.main()
 
 
 def test_recovery_workflow_is_independent_and_shares_delivery_lock():

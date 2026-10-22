@@ -122,7 +122,23 @@ class GitHubApi:
         self.source_root = source_root
         self._immutable_reads: dict[str, Any] = {}
 
-    def _request(self, url: str, *, method: str = "GET", payload: Any | None = None) -> Any:
+    def _request(
+        self,
+        url: str,
+        *,
+        method: str = "GET",
+        payload: Any | None = None,
+        read_only: bool = False,
+    ) -> Any:
+        if read_only and not (
+            method == "POST"
+            and url == "https://api.github.com/graphql"
+            and isinstance(payload, dict)
+            and isinstance(payload.get("query"), str)
+            and re.match(r"^\s*query\b", payload["query"])
+        ):
+            raise ClaimNoticeError("Read-only retries require a GraphQL query")
+        retryable = method == "GET" or read_only
         immutable = method == "GET" and bool(re.search(r"/commits/[a-f0-9]{40}(?:[?]|$)", url))
         if immutable and url in self._immutable_reads:
             return self._immutable_reads[url]
@@ -144,12 +160,12 @@ class GitHubApi:
                 break
             except urllib.error.HTTPError as error:
                 detail = error.read(300).decode("utf-8", errors="replace")
-                if method == "GET" and error.code in {429, 500, 502, 503, 504} and attempt < 2:
+                if retryable and error.code in {429, 500, 502, 503, 504} and attempt < 2:
                     time.sleep(2**attempt)
                     continue
                 raise ClaimNoticeError(f"GitHub API {error.code} for {url}: {detail}") from error
             except OSError as error:
-                if method == "GET" and attempt < 2:
+                if retryable and attempt < 2:
                     time.sleep(2**attempt)
                     continue
                 raise ClaimNoticeError(f"GitHub API request failed for {url}: {error}") from error
