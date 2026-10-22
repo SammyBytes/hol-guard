@@ -133,8 +133,9 @@ fn a_terminal_action_keeps_no_approval_route_in_the_copy() {
             "title": "Blocked",
             "summary": "Blocked.",
             "dashboard_url": "https://cloud.example.test/requests/42",
-            "harness_message": "Blocked. Open HOL Guard to approve or keep this blocked: \
-                 https://cloud.example.test/requests/42 Review this request in HOL Guard, then retry.",
+            "harness_message": "Blocked. Approve this request in HOL Guard, then retry. \
+                 https://cloud.example.test/requests/42 \
+                 Review this request in HOL Guard, then retry.",
         },
     }));
     assert_eq!(payload["user_copy"]["dashboard_url"], Value::Null);

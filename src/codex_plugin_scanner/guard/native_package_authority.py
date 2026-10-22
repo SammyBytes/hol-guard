@@ -13,9 +13,9 @@ import time
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast, get_args
 
-from .models import GuardArtifact
+from .models import GuardAction, GuardArtifact
 from .native_context import _canonical_request_sha256, _resolve_digest_home, ensure_resident_prerequisite
 from .native_resident_client import native_resident_client_request
 from .native_runtime import _isolated_environment, native_runtime_status
@@ -404,9 +404,14 @@ def _evaluation_from_view(payload: object) -> Any:
         raise _view_malformed()
     if any(not isinstance(user_copy[key], str) for key in ("title", "summary", "harness_message")):
         raise _view_malformed()
+    policy_action = payload["policy_action"]
+    # The resident already settled the action; a value outside the lattice means
+    # this is not the view it decided, so the reply is refused rather than read.
+    if policy_action not in get_args(GuardAction):
+        raise _view_malformed()
     return PackageRequestEvaluation(
         decision=str(payload["decision"]),
-        policy_action=str(payload["policy_action"]),  # type: ignore[arg-type]
+        policy_action=cast(GuardAction, policy_action),
         enforcement=str(payload["enforcement"]),
         entitlement_state=str(payload["entitlement_state"]),
         cache_status=str(payload["cache_status"]),
