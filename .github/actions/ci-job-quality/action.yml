@@ -55,6 +55,7 @@ runs:
         tests/test_ci_native_approval_workflow.py \
         tests/test_policy_bundle_crate_boundary.py \
         tests/test_ci_command_source_inputs_manifest.py \
+        tests/test_ci_macos_gate_shards.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
@@ -104,6 +105,7 @@ runs:
         tests/test_ci_native_approval_workflow.py \
         tests/test_policy_bundle_crate_boundary.py \
         tests/test_ci_command_source_inputs_manifest.py \
+        tests/test_ci_macos_gate_shards.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
