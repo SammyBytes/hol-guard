@@ -9,6 +9,7 @@ an instruction to skip tests or rebuild Rust after generating test fixtures.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -24,22 +25,58 @@ def _run(command: list[str]) -> None:
         raise SystemExit(completed.returncode)
 
 
-def main() -> int:
+def _prepare_directory(compiler: Path) -> None:
+    """Keep one private inventory alive across all five unchanged checks."""
+    scripts = str(ROOT / "scripts")
+    sys.path.insert(0, scripts)
+    try:
+        import build_native_command_program as program
+        import prepare_extension_directory as directory
+        from native_projection_inventory import ProjectionInventory
+
+        with ProjectionInventory(ROOT, compiler) as inventory:
+            arguments = ["--compiler", str(compiler)]
+            for extra in (["--check-public-descriptors"], [], ["--check"]):
+                inventory.validate()
+                result = program.main([*arguments, *extra], inventory=inventory)
+                if result:
+                    raise SystemExit(result)
+                inventory.validate()
+            for check in (False, True):
+                inventory.validate()
+                print(
+                    json.dumps(
+                        directory.prepare(compiler, check=check, root=ROOT, inventory=inventory), sort_keys=True
+                    ),
+                    flush=True,
+                )
+                inventory.validate()
+    finally:
+        sys.path.remove(scripts)
+
+
+def main(argv: list[str] | None = None) -> int:
     """Stage current projections, then reject any source, compiler or embedded-program mismatch."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", required=True)
     parser.add_argument(
+        "--prepare-directory", action="store_true", help="Prepare and check directory outputs in this invocation."
+    )
+    parser.add_argument(
         "--changed-from",
         help="Accepted for existing callers; validation always covers the complete current source tree.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if sys.platform == "win32" and not Path(args.compiler).suffix:
         args.compiler += ".exe"
-    command = [sys.executable, "scripts/build_native_command_program.py", "--compiler", args.compiler]
-    # Check Git blobs first; scratch regeneration cannot repair missing PR inputs.
-    _run([*command, "--check-public-descriptors"])
-    _run(command)
-    _run([*command, "--check"])
+    if args.prepare_directory:
+        _prepare_directory(Path(args.compiler))
+    else:
+        command = [sys.executable, "scripts/build_native_command_program.py", "--compiler", args.compiler]
+        # Check Git blobs first; scratch regeneration cannot repair missing PR inputs.
+        _run([*command, "--check-public-descriptors"])
+        _run(command)
+        _run([*command, "--check"])
     # Packaging uses the exact compiler just validated, including cross-target
     # and Windows paths, rather than performing a second host/debug build.
     environment_file = os.environ.get("GITHUB_ENV")

@@ -30,3 +30,19 @@ def test_missing_shard_is_not_treated_as_success(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: pytest.fail("missing plan must not execute"))
     with pytest.raises(FileNotFoundError):
         runner.main([str(tmp_path / "missing.txt")])
+
+
+def test_combined_preparation_timeout_stops_shard(tmp_path, monkeypatch, capsys):
+    shard = tmp_path / "shard.txt"
+    shard.write_text("tests/test_other.py::test_case\n")
+    monkeypatch.setenv("HOL_GUARD_NATIVE_SOURCE_COMPILER", "/native/guard-command-source")
+
+    def execute(command, **kwargs):
+        assert "-m" not in command, "pytest must not execute after preparation times out"
+        assert command[-1] == "--prepare-directory"
+        assert kwargs["timeout"] == 300
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(runner.subprocess, "run", execute)
+    assert runner.main([str(shard)]) == 124
+    assert "Projection preparation timed out after 300s" in capsys.readouterr().err
