@@ -29770,7 +29770,8 @@ function buildBulkRiskDisclosure(stats) {
   };
 }
 function isBulkBlockableGroup(group) {
-  return group.primary.status === "pending" && requestResolutionBlockReason(group.primary) === null;
+  const status = group.primary.status;
+  return (status === void 0 || status === "pending") && requestResolutionBlockReason(group.primary) === null;
 }
 function bulkBlockGroups(groups, selectedIds) {
   return groups.filter((group) => isBulkBlockableGroup(group) && selectedIds.has(group.primary.request_id));

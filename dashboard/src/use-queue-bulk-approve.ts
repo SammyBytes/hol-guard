@@ -61,10 +61,12 @@ export function isBulkSelectableRequest(
 /**
  * Any pending request Guard can resolve can be refused, the same rule that
  * shows Keep blocked on a single request; only eligible reads can be approved
- * at once.
+ * at once. Queue pages hold only pending requests and leave `status` out, so
+ * only a request that says it is no longer pending is excluded.
  */
 export function isBulkBlockableGroup(group: QueueGroup): boolean {
-  return group.primary.status === "pending" && requestResolutionBlockReason(group.primary) === null;
+  const status = group.primary.status as string | undefined;
+  return (status === undefined || status === "pending") && requestResolutionBlockReason(group.primary) === null;
 }
 
 /** The groups a "Block selected" answers. */

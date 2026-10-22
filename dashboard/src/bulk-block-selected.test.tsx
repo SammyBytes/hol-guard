@@ -39,8 +39,11 @@ function group(primary: GuardApprovalRequest, duplicateIds: string[] = []): Queu
   return { primary, duplicateCount: duplicateIds.length, duplicateIds };
 }
 
-// Any pending request can be refused; a resolved one cannot.
+// Any pending request can be refused; a resolved one cannot. Queue pages
+// leave `status` out, and those requests are pending.
 assert.equal(isBulkBlockableGroup(group(pending)), true);
+const { status: _omitted, ...fromQueuePage } = pending;
+assert.equal(isBulkBlockableGroup(group(fromQueuePage as GuardApprovalRequest)), true);
 assert.equal(isBulkBlockableGroup(group({ ...pending, status: "resolved" })), false);
 // Requests a single review cannot block are not selectable for bulk either.
 assert.equal(isBulkBlockableGroup(group({ ...pending, policy_action: "block" })), false);
