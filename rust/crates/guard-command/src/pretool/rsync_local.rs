@@ -258,13 +258,17 @@ fn redirects_beyond_null(text: &str) -> bool {
     false
 }
 
+/// Characters the shell expands into words the text never showed: a
+/// substitution, or a glob or brace that can name an existing file, an
+/// option such as `--remove-source-files`, or another destination. The
+/// parser drops quotes before this check, so a quoted pattern keeps its
+/// review too.
+const EXPANDING: [char; 7] = ['$', '`', '\n', '*', '?', '[', '{'];
+
 /// A pattern or number written out in full. An expansion could hold an
 /// option or an operand this text never showed.
 fn inert_value(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 128
-        && !value.starts_with('-')
-        && !value.contains(['$', '`', '\n'])
+    !value.is_empty() && value.len() <= 128 && !value.starts_with('-') && !value.contains(EXPANDING)
 }
 
 /// An operand that names a path on this host. `rsync` reads a word as a
@@ -273,7 +277,7 @@ fn inert_value(value: &str) -> bool {
 /// it is a `rsync://` URL, so each of those keeps its review. An expansion
 /// could spell any of them, so it does too.
 fn local_operand(word: &str) -> bool {
-    if word.is_empty() || word.starts_with('-') || word.contains(['$', '`', '\n']) {
+    if word.is_empty() || word.starts_with('-') || word.contains(EXPANDING) {
         return false;
     }
     if word.contains("::") {
@@ -383,6 +387,15 @@ mod tests {
             "-a",
             "-a --archive=yes src/ build/",
             "-a -- -rf build/",
+            // The shell expands a glob or brace into names Guard never read.
+            "-a src/ dist*",
+            "-a src/ [d]ist/",
+            "-a src/ d?st/",
+            "-a src/ {dist,build}/",
+            "-a src/* build/",
+            "-a src/ ignored/ --exclude *.tmp",
+            "-a --exclude=*.log src/ build/",
+            "-a --exclude [ab].txt src/ build/",
         ] {
             assert!(!local_copy(&words(text)), "{text}");
         }
