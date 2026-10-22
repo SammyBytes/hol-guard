@@ -243,10 +243,12 @@ fn an_unproven_step_before_a_proven_git_read_is_named() {
 
     let command = "corepack pnpm --version && git status --short";
     let ordered = result(&home, &linked, command);
-    // macOS has the workspace sandbox, which runs Git in a linked worktree,
-    // so there the whole chain runs contained and raises no review to word.
-    // Elsewhere the review names the step.
-    if cfg!(target_os = "macos") {
+    // macOS always has the workspace sandbox; Linux has it when the bwrap
+    // overlay probe succeeds. With it, Git in a linked worktree runs there,
+    // so the whole chain runs contained and raises no review to word.
+    // Elsewhere, Windows included, the review names the step.
+    let sandboxed_linux = cfg!(target_os = "linux") && ordered.reason_code == CONTAINED;
+    if cfg!(target_os = "macos") || sandboxed_linux {
         assert_eq!(ordered.reason_code, CONTAINED, "{}", ordered.reason);
         assert_eq!(ordered.minimum_action, "sandbox-required", "{command}");
     } else {
