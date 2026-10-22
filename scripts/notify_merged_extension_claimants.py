@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -136,14 +137,22 @@ class GitHubApi:
             body = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
         request = urllib.request.Request(url, headers=headers, method=method, data=body)
-        try:
-            with urllib.request.urlopen(request, timeout=20) as response:
-                raw = response.read(MAX_GITHUB_RESPONSE_BYTES + 1)
-        except urllib.error.HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise ClaimNoticeError(f"GitHub API {error.code} for {url}: {detail[:300]}") from error
-        except OSError as error:
-            raise ClaimNoticeError(f"GitHub API request failed for {url}: {error}") from error
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(request, timeout=20) as response:
+                    raw = response.read(MAX_GITHUB_RESPONSE_BYTES + 1)
+                break
+            except urllib.error.HTTPError as error:
+                detail = error.read(300).decode("utf-8", errors="replace")
+                if method == "GET" and error.code in {429, 500, 502, 503, 504} and attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise ClaimNoticeError(f"GitHub API {error.code} for {url}: {detail}") from error
+            except OSError as error:
+                if method == "GET" and attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise ClaimNoticeError(f"GitHub API request failed for {url}: {error}") from error
         if len(raw) > MAX_GITHUB_RESPONSE_BYTES:
             raise ClaimNoticeError("GitHub API response exceeds the byte limit")
         if not raw:
