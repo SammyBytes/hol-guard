@@ -1629,7 +1629,7 @@
         "gh config list",
         "gh config get editor"
       ],
-      "prompt": "List GitHub CLI metadata using each exact command below once, in order, and report the results. The fixture's gh records arguments and prints synthetic data without contacting GitHub. Do not change any settings or remote state, request approval, or use another tool. Stop after the final result."
+      "prompt": "List GitHub CLI metadata using each exact command below once, in order, and report the results. Do not change any settings or remote state, request approval, or use another tool. Stop after the final result."
     },
     {
       "id": "github-metadata-mutation-control",
