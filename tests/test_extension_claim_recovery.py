@@ -6,8 +6,8 @@ import io
 import json
 import sys
 import urllib.error
+from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -18,6 +18,12 @@ try:
     import plan_extension_claim_recovery as recovery
 finally:
     sys.path.pop(0)
+
+
+@dataclass(frozen=True)
+class Claimant:
+    github_id: str = "100"
+    pull_request: int = 7
 
 
 @pytest.mark.parametrize("failure", [500, 502, 503, 504, 429, "connection"])
@@ -87,7 +93,7 @@ def test_plan_uses_original_owner_and_respects_explicit_revocation(tmp_path, mon
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(listing(identity, ids)))
     monkeypatch.setattr(
-        recovery, "resolve_initial_contribution", lambda *args: SimpleNamespace(github_id="100", pull_request=7),
+        recovery, "resolve_initial_contribution", lambda *args: Claimant(),
     )
     assert recovery.invitation_entries(object(), tmp_path, sources, "a" * 40) == [
         {"extensionId": "command.original", "githubId": "100", "pullRequest": 7}
@@ -98,7 +104,7 @@ def test_ambiguous_history_does_not_block_unrelated_recovery(tmp_path, monkeypat
     def resolve(history, paths, sha):
         if paths == ["ambiguous"]:
             raise recovery.ClaimProvenanceError("reused path")
-        return SimpleNamespace(github_id="100", pull_request=7)
+        return Claimant()
 
     monkeypatch.setattr(recovery, "resolve_initial_contribution", resolve)
     rows = recovery.invitation_entries(
