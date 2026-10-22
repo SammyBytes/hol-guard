@@ -168,7 +168,7 @@ pub(crate) fn stop_managed(state_base: &Path, retire_clients: bool) -> Result<()
         if retire_clients {
             lease::retire_clients_for_update(state_base, &digest, deadline)?;
         }
-        exit_record::wait_for_scope_quiesce(&runtime_scope, deadline)?;
+        exit_record::wait_for_scope_quiesce(&runtime_scope, deadline);
         return Err("native_resident_stop_unavailable".to_owned());
     };
     if retire_clients {
@@ -206,7 +206,7 @@ pub(crate) fn stop_managed(state_base: &Path, retire_clients: bool) -> Result<()
     containment::retire_exited_states(&scope, &digest)?;
     // A resident that already exited on its own can leave its supervisor
     // still writing in the scope; "nothing to stop" must not race it.
-    exit_record::wait_for_scope_quiesce(&scope, deadline)?;
+    exit_record::wait_for_scope_quiesce(&scope, deadline);
     Err("native_resident_stop_unavailable".to_owned())
 }
 

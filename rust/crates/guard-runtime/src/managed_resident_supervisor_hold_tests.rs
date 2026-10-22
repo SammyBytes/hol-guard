@@ -98,13 +98,12 @@ fn the_stop_outwaits_the_supervisors_longest_ordinary_tail() {
     assert!(SUPERVISOR_QUIESCE_TIMEOUT > crate::managed_resident::MANAGED_STOP_TIMEOUT * 2);
 }
 
-/// A Unix stop waits for the supervisor's writes as far as its own deadline,
-/// then leaves a supervisor that is still busy to finish on its own instead of
-/// failing the stop.
-#[cfg(not(windows))]
+/// A stop that found no resident waits for the supervisor's writes as far as
+/// its own deadline, then leaves a supervisor that is still busy to finish on
+/// its own instead of failing the stop.
 #[test]
-fn a_unix_stop_waits_for_the_hold_only_within_its_deadline() {
-    let (root, scope) = test_scope("unix-deadline");
+fn a_stop_without_a_resident_waits_for_the_hold_only_within_its_deadline() {
+    let (root, scope) = test_scope("deadline");
     let hold = hold_scope(&scope).expect("a private scope should be holdable");
     let (released, release_seen) = mpsc::channel();
     let releaser = thread::spawn(move || {
@@ -113,8 +112,7 @@ fn a_unix_stop_waits_for_the_hold_only_within_its_deadline() {
         drop(hold);
     });
 
-    wait_for_scope_quiesce(&scope, Instant::now() + Duration::from_secs(5))
-        .expect("a released hold should let the stop through");
+    wait_for_scope_quiesce(&scope, Instant::now() + Duration::from_secs(5));
 
     release_seen
         .try_recv()
@@ -123,10 +121,32 @@ fn a_unix_stop_waits_for_the_hold_only_within_its_deadline() {
 
     let busy = hold_scope(&scope).expect("the scope should be holdable again");
     let started = Instant::now();
-    wait_for_scope_quiesce(&scope, started + TEST_QUIESCE_TIMEOUT)
-        .expect("a busy supervisor must not fail a Unix stop");
+    wait_for_scope_quiesce(&scope, started + TEST_QUIESCE_TIMEOUT);
     assert!(started.elapsed() >= TEST_QUIESCE_TIMEOUT);
 
     drop(busy);
+    fs::remove_dir_all(root).expect("test directory should be removable");
+}
+
+/// A stop's exclusive probe lasts only an instant, so a supervisor that meets
+/// one still takes its hold instead of running its child without it.
+#[test]
+fn a_supervisor_claims_its_hold_after_a_stops_probe() {
+    let (root, scope) = test_scope("probe");
+    let probe = open_hold_file(&scope).expect("the hold file should open");
+    fs2::FileExt::try_lock_exclusive(&probe).expect("an idle scope should be probed");
+    let releaser = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(50));
+        let _ = fs2::FileExt::unlock(&probe);
+    });
+
+    let hold = hold_scope(&scope);
+
+    releaser.join().expect("the probing thread should finish");
+    assert!(
+        hold.is_some(),
+        "a supervisor must not run unheld after a probe"
+    );
+    drop(hold);
     fs::remove_dir_all(root).expect("test directory should be removable");
 }

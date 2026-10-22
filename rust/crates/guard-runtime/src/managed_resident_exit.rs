@@ -33,6 +33,10 @@ const SUPERVISOR_HOLD_FILE: &str = "supervisor-exit.v1.lock";
 /// write and the budget lock left to do, so a stop polls for the hold rather
 /// than sleeping out its whole bound.
 const SUPERVISOR_QUIESCE_RETRY_DELAY: Duration = Duration::from_millis(10);
+/// A stop holds the lock exclusively only for the instant of its probe, so a
+/// supervisor that meets one retries for this long rather than running its
+/// whole child without a hold.
+const SUPERVISOR_HOLD_CLAIM_TIMEOUT: Duration = Duration::from_millis(250);
 /// How long a stop waits for the supervisors inside the scope to finish.
 ///
 /// This must outlast everything a supervisor still does while holding the
@@ -84,7 +88,13 @@ pub(super) fn supervised_scope(state_base: &Path, digest: &str) -> Result<Superv
 /// stop path exactly as it was before, and a resident must still start.
 fn hold_scope(scope: &Path) -> Option<SupervisorHold> {
     let file = open_hold_file(scope).ok()?;
-    fs2::FileExt::try_lock_shared(&file).ok()?;
+    let deadline = Instant::now() + SUPERVISOR_HOLD_CLAIM_TIMEOUT;
+    while fs2::FileExt::try_lock_shared(&file).is_err() {
+        if Instant::now() >= deadline {
+            return None;
+        }
+        std::thread::sleep(SUPERVISOR_QUIESCE_RETRY_DELAY);
+    }
     Some(SupervisorHold { file })
 }
 
@@ -208,22 +218,19 @@ fn wait_for_supervisor_quiesce_within(scope: &Path, timeout: Duration) -> Result
 /// restart budget. A stop that reported "nothing to stop" while those writes
 /// were open would hand back a scope that Windows still cannot remove, and
 /// one that a Unix caller's recursive removal can find refilled.
-#[cfg(windows)]
-pub(super) fn wait_for_scope_quiesce(scope: &Path, _deadline: Instant) -> Result<(), String> {
-    wait_for_supervisor_quiesce(scope)
-}
-
-#[cfg(not(windows))]
-pub(super) fn wait_for_scope_quiesce(scope: &Path, deadline: Instant) -> Result<(), String> {
+///
+/// The wait ends at the stop's own deadline and never changes its answer: a
+/// supervisor still holding the scope then may belong to a resident that is
+/// starting or wedged rather than one that is finishing, and callers bound
+/// the whole stop by that deadline.
+pub(super) fn wait_for_scope_quiesce(scope: &Path, deadline: Instant) {
     settle_supervisor_writes(scope, deadline);
-    Ok(())
 }
 
-/// Wait for the supervisors in a Unix scope to finish writing, up to the
-/// stop's own deadline. An open file does not stop a Unix scope from being
+/// Wait for the supervisors in a scope to finish writing, up to the stop's
+/// own deadline. On Unix an open file does not stop the scope from being
 /// removed, so a supervisor still waiting on a stderr pipe that a grandchild
 /// holds is left to finish on its own rather than reported as a failed stop.
-#[cfg(not(windows))]
 fn settle_supervisor_writes(scope: &Path, deadline: Instant) {
     let timeout = deadline.saturating_duration_since(Instant::now());
     let _ = wait_for_supervisor_quiesce_within(scope, timeout);
