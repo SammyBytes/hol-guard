@@ -53,6 +53,8 @@ runs:
       uv run --no-sync python -m ruff check \
         scripts/ci/native_approval_contract_gate.py \
         tests/test_ci_native_approval_workflow.py \
+        tests/test_policy_bundle_crate_boundary.py \
+        tests/test_ci_command_source_inputs_manifest.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
@@ -100,6 +102,8 @@ runs:
       uv run --no-sync python -m ruff format --check \
         scripts/ci/native_approval_contract_gate.py \
         tests/test_ci_native_approval_workflow.py \
+        tests/test_policy_bundle_crate_boundary.py \
+        tests/test_ci_command_source_inputs_manifest.py \
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
