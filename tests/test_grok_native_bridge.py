@@ -147,6 +147,21 @@ def test_client_ignores_a_malformed_elapsed_time(tmp_path: Path, monkeypatch: py
     assert module._HOOK_DEADLINE_MONOTONIC == module._HOOK_STARTED_MONOTONIC + 8
 
 
+def test_client_exhausted_native_handoff_deadline_is_exact_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started = 122.888386772
+    monkeypatch.setattr("time.monotonic", lambda: started)
+    monkeypatch.setenv("HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS", "99999999")
+
+    module = _load_script(tmp_path, harness="grok", timeout_seconds=8)
+
+    assert module.TIMEOUT_SECONDS == 8
+    assert module._HOOK_STARTED_MONOTONIC == started
+    assert module._HOOK_DEADLINE_MONOTONIC == started
+    assert "HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS" not in module.os.environ
+
+
 def test_client_never_asks_the_daemon_twice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HOL_GUARD_BOUNDED_NATIVE_DAEMON_TRIED", "1")
     module = _load_script(tmp_path, harness="grok")
