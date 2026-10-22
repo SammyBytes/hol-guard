@@ -8,6 +8,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 
 import pytest
 
@@ -234,7 +235,7 @@ def test_actual_selection_script_keeps_same_canary_and_old_source_omissions(tmp_
     assert (TARGETS[-1] in json.loads(values["targets"])) is (count == 5)
 
 
-def _assembly_allowed(selected: tuple[str, ...], outcomes: dict[str, str]) -> bool:
+def _assembly_condition_allows(selected: tuple[str, ...], outcomes: dict[str, str]) -> bool:
     expression = load_workflow(PUBLISH_WORKFLOW)["jobs"]["assemble-native-guard-distributions"]["if"]
     expression = expression.replace("always()", "True").replace("cancelled()", "False")
     for lane, target in zip(NATIVE_WHEEL_LANES, TARGETS, strict=True):
@@ -249,6 +250,14 @@ def _assembly_allowed(selected: tuple[str, ...], outcomes: dict[str, str]) -> bo
     return eval(" ".join(expression.split()), {"__builtins__": {}})
 
 
+def _assembly_allowed(selected: tuple[str, ...], outcomes: dict[str, str]) -> bool:
+    condition = _assembly_condition_allows(selected, outcomes)
+    rows = _matrix_rows()
+    matrix = [row for row in rows if row["target"] in selected]
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    return condition and _inventory_result(json.dumps(selected), json.dumps(matrix), ROOT, source).returncode == 0
+
+
 @pytest.mark.parametrize("missing_lane", NATIVE_WHEEL_LANES)
 @pytest.mark.parametrize("result", ["skipped", "failure", "cancelled"])
 def test_assembly_rejects_every_selected_target_that_did_not_succeed(missing_lane, result):
@@ -261,7 +270,169 @@ def test_assembly_rejects_every_selected_target_that_did_not_succeed(missing_lan
 def test_assembly_allows_only_intentionally_unselected_target_to_skip() -> None:
     outcomes = dict.fromkeys(NATIVE_WHEEL_LANES, "success")
     outcomes["windows-arm64"] = "skipped"
-    assert _assembly_allowed(TARGETS[:-1], outcomes)
+    assert _assembly_condition_allows(TARGETS[:-1], outcomes)
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    assert (
+        _inventory_result(json.dumps(TARGETS[:-1]), json.dumps(_matrix_rows()[:-1]), ROOT, source, "canary").returncode
+        == 0
+    )
     for result in ("failure", "cancelled", "success"):
         outcomes["windows-arm64"] = result
-        assert not _assembly_allowed(TARGETS[:-1], outcomes)
+        assert not _assembly_condition_allows(TARGETS[:-1], outcomes)
+
+
+def _matrix_rows():
+    selector = next(
+        step
+        for step in load_workflow(PUBLISH_WORKFLOW)["jobs"]["build"]["steps"]
+        if step.get("id") == "native_wheel_matrix"
+    )
+    return json.loads(selector["env"]["NATIVE_WHEEL_MATRIX"])
+
+
+def _inventory_step():
+    steps = load_workflow(PUBLISH_WORKFLOW)["jobs"]["assemble-native-guard-distributions"]["steps"]
+    return next(step for step in steps if step.get("name") == "Validate source-bound native wheel inventory")
+
+
+def _inventory_result(selected, matrix, root, source, channel="stable"):
+    env = {**os.environ, "SOURCE_SHA": source, "CHANNEL": channel}
+    for key, value in [("NATIVE_WHEEL_TARGETS", selected), ("NATIVE_WHEEL_MATRIX", matrix)]:
+        env.pop(key, None)
+        if value is not None:
+            env[key] = value
+    return subprocess.run(
+        [sys.executable, "-c", _inventory_step()["run"]], cwd=root, env=env, text=True, capture_output=True, check=False
+    )
+
+
+@pytest.fixture(scope="module")
+def qualified_sources(tmp_path_factory):
+    sources = {}
+    for capable in (False, True):
+        root = tmp_path_factory.mktemp("source-capable" if capable else "source-historical")
+        (root / "marker").write_text("qualified source\n")
+        if capable:
+            manifest = root / "scripts/embed_native_wheel_manifest.py"
+            manifest.parent.mkdir()
+            manifest.write_text("# source capability fixture\n")
+        env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+        subprocess.run(["git", "init", "--quiet"], cwd=root, env=env, check=True)
+        subprocess.run(["git", "add", "."], cwd=root, env=env, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "--quiet",
+                "-m",
+                "qualified source fixture",
+            ],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+        sources[capable] = (
+            root,
+            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, env=env, text=True).strip(),
+        )
+    return sources
+
+
+@pytest.mark.parametrize("channel", ["stable", "alpha", "canary"])
+@pytest.mark.parametrize("capable", [False, True])
+def test_inventory_gate_preserves_original_source_capability_and_channel_routes(qualified_sources, capable, channel):
+    root, source = qualified_sources[capable]
+    rows = _matrix_rows()
+    if channel == "canary" or not capable:
+        rows = rows[:-1]
+    targets = [row["target"] for row in rows]
+    result = _inventory_result(json.dumps(targets), json.dumps(rows), root, source, channel)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "missing-targets",
+        "missing-matrix",
+        "malformed-targets",
+        "malformed-matrix",
+        "empty-targets",
+        "empty-matrix",
+        "object-targets",
+        "object-matrix",
+        "duplicate-target",
+        "duplicate-row",
+        "unknown-target",
+        "unknown-row",
+        "mismatch",
+        "supported-stable-missing-one",
+        "wrong-source",
+        "unknown-channel",
+        "canary-extra-target",
+    ],
+)
+def test_inventory_gate_rejects_missing_or_corrupt_outputs_without_publish_escape(qualified_sources, invalid):
+    root, source = qualified_sources[True]
+    rows, targets = _matrix_rows(), list(TARGETS)
+    channel = "canary" if invalid == "canary-extra-target" else "stable"
+    if invalid == "duplicate-target":
+        targets.append(targets[0])
+    elif invalid == "duplicate-row":
+        rows.append(copy.deepcopy(rows[0]))
+    elif invalid == "unknown-target":
+        targets[0] = "unapproved-target"
+    elif invalid == "unknown-row":
+        rows[0]["target"] = "unapproved-target"
+    elif invalid == "mismatch":
+        targets.pop()
+    elif invalid == "supported-stable-missing-one":
+        targets.pop()
+        rows.pop()
+    elif invalid == "wrong-source":
+        source = "0" * 40
+    elif invalid == "unknown-channel":
+        channel = "unknown"
+    selected, matrix = json.dumps(targets), json.dumps(rows)
+    if invalid == "missing-targets":
+        selected = None
+    elif invalid == "missing-matrix":
+        matrix = None
+    if invalid.endswith("targets"):
+        selected = {"malformed-targets": "[", "empty-targets": "[]", "object-targets": "{}"}.get(invalid, selected)
+    if invalid.endswith("matrix"):
+        matrix = {"malformed-matrix": "[", "empty-matrix": "[]", "object-matrix": "{}"}.get(invalid, matrix)
+    result = _inventory_result(selected, matrix, root, source, channel)
+    assert result.returncode != 0, (invalid, result.stdout)
+    assert all(
+        "needs.assemble-native-guard-distributions.result == 'success'" in job["if"]
+        for job in load_workflow(PUBLISH_WORKFLOW)["jobs"].values()
+        if "assemble-native-guard-distributions" in job.get("needs", [])
+    )
+
+
+@pytest.mark.parametrize("field", ["runner", "platform_tag", "runtime", "source_compiler", "rustflags", "extra"])
+def test_inventory_gate_rejects_changed_target_tuple(qualified_sources, field):
+    root, source = qualified_sources[True]
+    rows = _matrix_rows()
+    rows[0][field] = "unapproved-value"
+    result = _inventory_result(json.dumps(TARGETS), json.dumps(rows), root, source)
+    assert result.returncode != 0, result.stdout
+
+
+def test_inventory_gate_is_mandatory_before_artifacts_and_empty_selection_cannot_assemble():
+    job = load_workflow(PUBLISH_WORKFLOW)["jobs"]["assemble-native-guard-distributions"]
+    step = _inventory_step()
+    assert "if" not in step and "continue-on-error" not in step and "continue-on-error" not in job
+    assert all(
+        job["steps"].index(step) < index
+        for index, item in enumerate(job["steps"])
+        if "actions/download-artifact@" in item.get("uses", "")
+    )
+    assert not _assembly_allowed((), dict.fromkeys(NATIVE_WHEEL_LANES, "skipped"))

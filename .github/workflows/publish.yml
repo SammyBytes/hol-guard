@@ -1365,6 +1365,67 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: "3.12"
+      - name: Validate source-bound native wheel inventory
+        shell: python
+        env:
+          SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+          CHANNEL: ${{ needs.build.outputs.channel }}
+          NATIVE_WHEEL_TARGETS: ${{ needs.build.outputs.native_wheel_targets }}
+          NATIVE_WHEEL_MATRIX: ${{ needs.build.outputs.native_wheel_matrix }}
+        run: |
+          import json
+          import os
+          import subprocess
+
+          try:
+              selected = json.loads(os.environ.get("NATIVE_WHEEL_TARGETS", ""))
+              matrix = json.loads(os.environ.get("NATIVE_WHEEL_MATRIX", ""))
+          except ValueError:
+              raise SystemExit("Native wheel inventory outputs must be valid JSON")
+          if not isinstance(selected, list) or not selected or any(not isinstance(item, str) for item in selected):
+              raise SystemExit("Native wheel targets must be a nonempty list of strings")
+          if len(selected) != len(set(selected)) or not isinstance(matrix, list) or not matrix:
+              raise SystemExit("Native wheel inventory must be nonempty and unique")
+          metadata = {
+              "x86_64-unknown-linux-musl": ("ubuntu-latest", "manylinux_2_17_x86_64"),
+              "x86_64-apple-darwin": ("macos-15-intel", "macosx_13_0_x86_64"),
+              "aarch64-apple-darwin": ("macos-15", "macosx_11_0_arm64"),
+              "x86_64-pc-windows-msvc": ("windows-latest", "win_amd64"),
+              "aarch64-pc-windows-msvc": ("windows-11-arm", "win_arm64"),
+          }
+          matrix_targets = []
+          for row in matrix:
+              target = row.get("target") if isinstance(row, dict) else None
+              if not isinstance(target, str) or target not in metadata:
+                  raise SystemExit("Native wheel matrix contains an unapproved target")
+              runner, platform = metadata[target]
+              suffix = ".exe" if target.endswith("-pc-windows-msvc") else ""
+              expected = {
+                  "runner": runner, "platform_tag": platform, "target": target,
+                  "runtime": f"rust/target/{target}/release/hol-guard-runtime{suffix}",
+                  "source_compiler": f"rust/target/{target}/release/guard-command-source{suffix}",
+              }
+              if suffix:
+                  expected["rustflags"] = "-C link-arg=/Brepro"
+              if row != expected:
+                  raise SystemExit("Native wheel matrix tuple does not match its approved target")
+              matrix_targets.append(target)
+          if len(matrix_targets) != len(set(matrix_targets)) or set(selected) != set(matrix_targets):
+              raise SystemExit("Native wheel target and matrix inventories do not match uniquely")
+          source = os.environ.get("SOURCE_SHA", "")
+          if subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() != source:
+              raise SystemExit("Native wheel inventory checkout is not the qualified source")
+          channel = os.environ.get("CHANNEL", "")
+          if channel not in {"stable", "alpha", "canary"}:
+              raise SystemExit("Native wheel inventory has no supported release channel")
+          manifest = subprocess.check_output(
+              ["git", "ls-tree", "--name-only", source, "--", "scripts/embed_native_wheel_manifest.py"], text=True,
+          ).strip()
+          required = set(metadata)
+          if channel == "canary" or not manifest:
+              required.remove("aarch64-pc-windows-msvc")
+          if set(selected) != required:
+              raise SystemExit("Native wheel inventory does not match the qualified source and channel")
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           version: "0.9.26"
