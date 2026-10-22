@@ -157,8 +157,8 @@ def test_client_exhausted_native_handoff_deadline_is_exact_start(
     module = _load_script(tmp_path, harness="grok", timeout_seconds=8)
 
     assert module.TIMEOUT_SECONDS == 8
-    assert module._HOOK_STARTED_MONOTONIC == started
-    assert module._HOOK_DEADLINE_MONOTONIC == started
+    assert started == module._HOOK_STARTED_MONOTONIC
+    assert started == module._HOOK_DEADLINE_MONOTONIC
     assert "HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS" not in module.os.environ
 
 
