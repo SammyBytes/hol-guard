@@ -45,9 +45,7 @@ def test_changed_path_gate_maps_policy_bundle(monkeypatch: pytest.MonkeyPatch, s
     path = f"rust/crates/guard-policy-bundle/{suffix}"
     monkeypatch.setattr(MODULE, "_changed_files", lambda _base_ref: (path,))
     manifest = MODULE._manifest()
-    owners = [
-        node for node in manifest["nodes"] if any(MODULE._matches(path, pattern) for pattern in node["paths"])
-    ]
+    owners = [node for node in manifest["nodes"] if any(MODULE._matches(path, pattern) for pattern in node["paths"])]
     assert [(owner["id"], owner["class"]) for owner in owners] == [("native_semantics", "rust_semantic")]
     assert MODULE._changed_path_gate(manifest, "base") == (path,)
 
