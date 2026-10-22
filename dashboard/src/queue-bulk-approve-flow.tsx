@@ -1,4 +1,4 @@
-import { useMemo, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { bulkApproveConsequenceCopyForSelection } from "./approval-retry-guidance";
 import { BulkDrawerShell } from "./queue-bulk-drawer-shell";
 import { toneRing, toneChip, toneIcon } from "./queue-bulk-risk-presentation";
@@ -40,6 +40,13 @@ const TIER_LABEL: Record<BulkRiskTier, string> = {
 export type { QueueBulkStickyBarProps } from "./use-queue-bulk-approve";
 
 export function QueueBulkStickyBar(props: QueueBulkStickyBarProps) {
+  const blockButton = useRef<HTMLButtonElement | null>(null);
+  const previousStep = useRef(props.blockStep);
+  useEffect(() => {
+    // Cancelling the confirmation returns focus to the button that opened it.
+    if (previousStep.current === "confirming" && props.blockStep === "idle") blockButton.current?.focus();
+    previousStep.current = props.blockStep;
+  }, [props.blockStep]);
   if (!props.visible) return null;
   const total = props.selectedRequestCount;
   const unit = total === 1 ? "request" : "requests";
@@ -86,6 +93,7 @@ export function QueueBulkStickyBar(props: QueueBulkStickyBarProps) {
             type="button"
             onClick={props.onCancelBlock}
             disabled={blocking}
+            autoFocus
             className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-50 hover:text-brand-dark disabled:opacity-60"
           >
             Cancel
@@ -104,6 +112,7 @@ export function QueueBulkStickyBar(props: QueueBulkStickyBarProps) {
           ) : null}
           {props.blockAvailable ? (
             <button
+              ref={blockButton}
               type="button"
               onClick={props.onRequestBlock}
               className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 py-1.5 text-sm font-semibold text-brand-dark transition-colors hover:bg-slate-50"

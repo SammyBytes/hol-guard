@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { BulkGateCredentials } from "./approval-gate-utils";
+import { requestResolutionBlockReason } from "./approval-center-utils";
 import { countRetryBlockedActions } from "./approval-retry-guidance";
 import type { GuardApprovalGatePublicConfig, GuardApprovalRequest } from "./guard-types";
 import {
@@ -56,9 +57,13 @@ export function isBulkSelectableRequest(
   return isBulkApprovableGroup({ primary: item, duplicateCount: 0, duplicateIds: [] });
 }
 
-/** Any pending request can be refused; only eligible reads can be approved at once. */
+/**
+ * Any pending request Guard can resolve can be refused, the same rule that
+ * shows Keep blocked on a single request; only eligible reads can be approved
+ * at once.
+ */
 export function isBulkBlockableGroup(group: QueueGroup): boolean {
-  return group.primary.status === "pending";
+  return group.primary.status === "pending" && requestResolutionBlockReason(group.primary) === null;
 }
 
 /** The groups a "Block selected" answers. */
@@ -482,7 +487,9 @@ export function useQueueBulkApprove(props: {
   const isSelectable = useCallback(
     (item: GuardApprovalRequest) =>
       bulkSelectableMap.get(item.request_id) ??
-      (hasBlockHandler ? item.status === "pending" : isBulkApprovableGroup({ primary: item, duplicateCount: 0, duplicateIds: [] })),
+      (hasBlockHandler
+        ? isBulkBlockableGroup({ primary: item, duplicateCount: 0, duplicateIds: [] })
+        : isBulkApprovableGroup({ primary: item, duplicateCount: 0, duplicateIds: [] })),
     [bulkSelectableMap, hasBlockHandler],
   );
 

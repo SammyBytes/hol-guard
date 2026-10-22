@@ -42,6 +42,10 @@ function group(primary: GuardApprovalRequest, duplicateIds: string[] = []): Queu
 // Any pending request can be refused; a resolved one cannot.
 assert.equal(isBulkBlockableGroup(group(pending)), true);
 assert.equal(isBulkBlockableGroup(group({ ...pending, status: "resolved" })), false);
+// Requests a single review cannot block are not selectable for bulk either.
+assert.equal(isBulkBlockableGroup(group({ ...pending, policy_action: "block" })), false);
+assert.equal(isBulkBlockableGroup(group({ ...pending, policy_action: "sandbox-required" })), false);
+assert.equal(isBulkBlockableGroup(group({ ...pending, native_business_review_display_only: true } as GuardApprovalRequest)), false);
 
 // Only selected, pending groups are blocked.
 const second = { ...pending, request_id: "req-second" };
@@ -106,6 +110,20 @@ const looseOutcome = await blockRequestsOnce(
 );
 assert.deepEqual(looseOutcome, { blocked: 3, failed: 0, reasons: [] });
 assert.deepEqual(looseSent, ["req-stale", "req-loose"]);
+
+// A request resolved elsewhere still lets its pending duplicates be blocked.
+const orphanSent: string[] = [];
+const orphanOutcome = await blockRequestsOnce(
+  [group(pending, ["req-loose"])],
+  (id) => looseQueue.get(id),
+  async (input) => {
+    orphanSent.push(input.requestId);
+    if (input.requestId === "req-stale") throw new Error("This request was already resolved.");
+    return settled();
+  },
+);
+assert.deepEqual(orphanOutcome, { blocked: 1, failed: 1, reasons: ["This request was already resolved."] });
+assert.deepEqual(orphanSent, ["req-stale", "req-loose"]);
 
 // A request whose block cannot be one-time is reported, never blocked wider.
 const projectOnly = {

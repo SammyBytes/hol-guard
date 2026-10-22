@@ -29150,6 +29150,12 @@ const TIER_LABEL = {
   high: "High risk"
 };
 function QueueBulkStickyBar(props) {
+  const blockButton = reactExports.useRef(null);
+  const previousStep = reactExports.useRef(props.blockStep);
+  reactExports.useEffect(() => {
+    if (previousStep.current === "confirming" && props.blockStep === "idle") blockButton.current?.focus();
+    previousStep.current = props.blockStep;
+  }, [props.blockStep]);
   if (!props.visible) return null;
   const total = props.selectedRequestCount;
   const unit = total === 1 ? "request" : "requests";
@@ -29208,6 +29214,7 @@ function QueueBulkStickyBar(props) {
               type: "button",
               onClick: props.onCancelBlock,
               disabled: blocking,
+              autoFocus: true,
               className: "inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-50 hover:text-brand-dark disabled:opacity-60",
               children: "Cancel"
             }
@@ -29225,6 +29232,7 @@ function QueueBulkStickyBar(props) {
           props.blockAvailable ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "button",
             {
+              ref: blockButton,
               type: "button",
               onClick: props.onRequestBlock,
               className: "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 py-1.5 text-sm font-semibold text-brand-dark transition-colors hover:bg-slate-50",
@@ -29698,7 +29706,7 @@ function buildBulkRiskDisclosure(stats) {
   };
 }
 function isBulkBlockableGroup(group) {
-  return group.primary.status === "pending";
+  return group.primary.status === "pending" && requestResolutionBlockReason(group.primary) === null;
 }
 function bulkBlockGroups(groups, selectedIds) {
   return groups.filter((group) => isBulkBlockableGroup(group) && selectedIds.has(group.primary.request_id));
@@ -29989,7 +29997,7 @@ function useQueueBulkApprove(props) {
     return map;
   }, [groups]);
   const isSelectable = reactExports.useCallback(
-    (item) => bulkSelectableMap.get(item.request_id) ?? (hasBlockHandler ? item.status === "pending" : isBulkApprovableGroup({ primary: item })),
+    (item) => bulkSelectableMap.get(item.request_id) ?? (hasBlockHandler ? isBulkBlockableGroup({ primary: item }) : isBulkApprovableGroup({ primary: item })),
     [bulkSelectableMap, hasBlockHandler]
   );
   const isSelected = reactExports.useCallback(
@@ -36835,8 +36843,7 @@ async function blockRequestsOnce(groups, lookup, resolve) {
       for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
       outcome.blocked += 1;
     } catch (error) {
-      fail(1 + group.duplicateCount, error);
-      continue;
+      fail(1, error);
     }
     for (const duplicateId of group.duplicateIds) {
       if (settled.has(duplicateId)) {

@@ -45,8 +45,8 @@ export async function blockRequestsOnce(
       for (const id of result.resolved_duplicate_ids) settled.add(id);
       outcome.blocked += 1;
     } catch (error) {
-      fail(1 + group.duplicateCount, error);
-      continue;
+      // A request resolved elsewhere can leave its duplicates pending.
+      fail(1, error);
     }
     for (const duplicateId of group.duplicateIds) {
       if (settled.has(duplicateId)) {
