@@ -325,6 +325,21 @@ def test_client_never_gains_time_from_the_handoff(tmp_path: Path, monkeypatch: p
     assert started <= deadline <= started + timeout
 
 
+def test_client_exhausted_native_handoff_deadline_is_exact_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started = 122.888386772
+    monkeypatch.setattr("time.monotonic", lambda: started)
+    monkeypatch.setenv("HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS", "99999999")
+
+    client = _client(tmp_path)
+
+    assert client["GUARD_HOOK_TIMEOUT_SECONDS"] == 8
+    assert client["_HOOK_STARTED_MONOTONIC"] == started
+    assert client["_HOOK_DEADLINE_MONOTONIC"] == started
+    assert "HOL_GUARD_BOUNDED_NATIVE_ELAPSED_MS" not in client["os"].environ
+
+
 @pytest.mark.parametrize(
     ("body", "taken"),
     [

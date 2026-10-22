@@ -25,7 +25,7 @@ use crate::pyjson::{self, PyVal};
 /// SHA-256 of the current template with its placeholders in place.
 #[allow(dead_code)] // Read by `tests/test_grok_native_bridge.py`.
 pub(crate) const GROK_SCRIPT_SHA256: &str =
-    "df6150723b44637eb1397dc696133b11c0622a9816716a49db0f17edddece82b";
+    "4fa0e19a390c94fa4495582a5ca9032dca8e10791d452d261f3e0176b0bbb46f";
 
 const MAX_SCRIPT_BYTES: u64 = 256 * 1024;
 const GUARD_HOME_LINE: &str = "GUARD_HOME = ";
