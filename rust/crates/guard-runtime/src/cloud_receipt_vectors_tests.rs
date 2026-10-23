@@ -23,6 +23,13 @@ fn recorded_python_receipts_match_the_resident() {
             _ => false,
         };
         if !matches {
+            if let Ok(actual) = &result {
+                eprintln!(
+                    "REGEN|{}|{}",
+                    vector["name"].as_str().unwrap(),
+                    serde_json::to_string(actual).unwrap()
+                );
+            }
             failures.push(vector["name"].as_str().unwrap().to_owned());
         }
     }
