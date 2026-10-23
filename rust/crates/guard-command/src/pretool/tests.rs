@@ -487,6 +487,9 @@ fn allows_bounded_pipeline_consumers() {
         "git status --short | tail -n 2",
         "cat README.md | head -2 | tail -n 1",
         "git status --short | head",
+        // `|&` is the same pipe with stderr merged into it, so the bounded
+        // consumer on its right keeps the allow the plain `|` form gets.
+        "git status --short |& head -2",
     ] {
         let decision = evaluate_pre_tool(&request(command)).unwrap();
         assert_eq!(decision.minimum_action, "allow", "{command}");
@@ -499,7 +502,6 @@ fn allows_bounded_pipeline_consumers() {
     for command in [
         "head -2",
         "git status --short && head -2",
-        "git status --short |& head -2",
         "git status --short | head -2; tail -n 1",
         "git status --short | head -2 || tail -n 1",
         "cat ~/.ssh/id_ed25519 | head -2",
