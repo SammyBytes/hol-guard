@@ -8,6 +8,9 @@ mod artifact_hash_url;
 #[cfg(test)]
 mod artifact_hash_url_tests;
 pub mod artifact_risk;
+pub mod attestation_payload;
+#[cfg(test)]
+mod attestation_payload_tests;
 pub mod attestation_timestamp;
 #[cfg(test)]
 mod attestation_timestamp_tests;
