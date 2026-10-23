@@ -6,8 +6,11 @@ import re
 
 from .path_security import path_has_symlink_component
 
+# ``evidenceAuthority`` names who vouches for trust evidence (``device_claim``
+# from a local install). It is not a credential, and Guard Cloud rejects a
+# snapshot that masks it.
 _SENSITIVE_KEY_RE = re.compile(
-    r"(auth|authorization|bearer|token|secret|password|credential|api[^a-z0-9]?key)",
+    r"^(?!evidenceauthority$).*?(auth|authorization|bearer|token|secret|password|credential|api[^a-z0-9]?key)",
     re.IGNORECASE,
 )
 

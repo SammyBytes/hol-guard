@@ -265,6 +265,20 @@ def _scan_records(
         raise InventoryScanFindingsUnavailableError from None
 
 
+def _first_item_per_id(items: list[GuardAgentInventoryItem]) -> tuple[GuardAgentInventoryItem, ...]:
+    """Keep the first item for each item ID.
+
+    A harness can read the same entry from more than one config file (ZCode's
+    Desktop ``config.json`` and CLI ``setting.json``), which yields two items
+    with one ID. Guard Cloud rejects a snapshot whose item IDs repeat, so the
+    whole harness would otherwise fail to sync.
+    """
+    unique: dict[str, GuardAgentInventoryItem] = {}
+    for item in items:
+        unique.setdefault(item.item_id, item)
+    return tuple(unique.values())
+
+
 @_native_url.redaction_pass()
 def inventory_snapshot_from_detection(
     detection: object,
@@ -353,7 +367,7 @@ def inventory_snapshot_from_detection(
         )
         for path in config_paths
     )
-    item_tuple = tuple(items)
+    item_tuple = _first_item_per_id(items)
     scan_findings, scanner_sources = _scan_records(
         cisco_runs,
         harness=harness,

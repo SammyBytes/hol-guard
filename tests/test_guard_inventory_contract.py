@@ -824,3 +824,78 @@ def test_inventory_snapshot_preserves_antigravity_agent_type(tmp_path: Path) -> 
 
     assert snapshot.agent_type == "antigravity"
     assert payload["agentType"] == "antigravity"
+
+
+def test_inventory_snapshot_keeps_one_item_when_two_configs_declare_the_same_entry(tmp_path: Path) -> None:
+    cli_dir = tmp_path / ".zcode" / "cli"
+    cli_dir.mkdir(parents=True)
+    desktop_config = cli_dir / "config.json"
+    cli_config = cli_dir / "setting.json"
+    for path in (desktop_config, cli_config):
+        path.write_text('{"mcp": {"servers": {"docs": {"command": "docs-mcp"}}}}\n', encoding="utf-8")
+
+    detection = HarnessDetection(
+        harness="zcode",
+        installed=True,
+        command_available=True,
+        config_paths=(str(desktop_config), str(cli_config)),
+        artifacts=tuple(
+            GuardArtifact(
+                artifact_id="zcode:global:mcp:docs",
+                name="docs",
+                harness="zcode",
+                artifact_type="mcp_server",
+                source_scope="global",
+                config_path=str(path),
+                command="docs-mcp",
+            )
+            for path in (desktop_config, cli_config)
+        ),
+    )
+
+    snapshot = inventory_snapshot_from_detection(
+        detection,
+        generated_at="2026-10-23T00:00:00Z",
+        home_dir=tmp_path,
+    )
+    item_ids = [item.item_id for item in snapshot.items]
+
+    assert len(item_ids) == len(set(item_ids))
+    docs_items = [item for item in snapshot.items if item.item_id == "zcode:global:mcp:docs"]
+    assert len(docs_items) == 1
+    assert docs_items[0].metadata.get("configPath") == "{home}/.zcode/cli/config.json"
+
+
+def test_inventory_snapshot_serialization_keeps_evidence_authority(tmp_path: Path) -> None:
+    trust_claim = {
+        "evidenceAuthority": "device_claim",
+        "affectsV4Score": False,
+        "authToken": "local-value",
+    }
+    snapshot = GuardAgentInventorySnapshot(
+        snapshot_id="snap-codex-1",
+        agent_id="agent-codex",
+        agent_type="codex",
+        generated_at="2026-10-23T00:00:00Z",
+        runtime_version="codex-test",
+        items=(
+            GuardAgentInventoryItem(
+                item_id="codex:global:skill:demo",
+                item_kind="skill",
+                display_name="demo",
+                description="Demo skill.",
+                source_fingerprint=fingerprint_text("demo"),
+                content_hash=fingerprint_text("demo"),
+                capability_categories=(),
+                metadata={"trustResolution": dict(trust_claim), "trustLayers": [dict(trust_claim)]},
+            ),
+        ),
+    )
+
+    payload = cast(dict[str, Any], serialize_inventory_snapshot(snapshot))
+    metadata = payload["items"][0]["metadata"]
+
+    for claim in (metadata["trustResolution"], metadata["trustLayers"][0]):
+        assert claim["evidenceAuthority"] == "device_claim"
+        assert claim["affectsV4Score"] is False
+        assert claim["authToken"] == "[REDACTED]"
