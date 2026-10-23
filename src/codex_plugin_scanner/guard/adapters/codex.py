@@ -37,9 +37,10 @@ from ..codex_hook_integrity import (
 )
 from ..codex_hook_inventory import (
     CODEX_HOOK_INVENTORY_UNMANAGED_EXECUTABLE,
+    CodexHookGroupQuestion,
     CodexHookInventory,
-    canonical_codex_hook_conflict_keys,
-    canonical_codex_hook_group_identity,
+    canonical_codex_hook_group_conflict_keys,
+    canonical_codex_hook_group_identities,
     enumerate_codex_hooks,
 )
 from ..codex_hook_launch_runtime import isolated_daemon_start_command, isolated_guard_cli_command
@@ -534,48 +535,33 @@ def _append_unique_hook_groups(
     merged = list(existing_groups) if isinstance(existing_groups, list) else []
     if not isinstance(incoming_groups, list):
         return merged
-    identities = {
-        canonical_codex_hook_group_identity(
+    # Both sides are known before the first comparison, so the resident is
+    # asked about every group once rather than once per comparison.
+    settled = [group for group in merged if isinstance(group, Mapping)]
+    questions = [
+        _hook_group_question(
+            group,
+            event_name=event_name,
             source_scope=source_scope,
             source_hooks_enabled=source_hooks_enabled,
-            event_name=event_name,
-            group=group,
         )
-        for group in merged
-        if isinstance(group, Mapping)
-    }
-    conflict_keys = {
-        key
-        for group in merged
-        if isinstance(group, Mapping)
-        for key in canonical_codex_hook_conflict_keys(
-            source_scope=source_scope,
-            source_hooks_enabled=source_hooks_enabled,
-            event_name=event_name,
-            group=group,
-        )
-    }
+        for group in (*settled, *(group for group in incoming_groups if isinstance(group, Mapping)))
+    ]
+    group_identities = canonical_codex_hook_group_identities(questions)
+    group_conflicts = canonical_codex_hook_group_conflict_keys(questions)
+    identities = set(group_identities[: len(settled)])
+    conflict_keys = {key for keys in group_conflicts[: len(settled)] for key in keys}
+    position = len(settled)
     for group in incoming_groups:
         if not isinstance(group, Mapping):
             if group not in merged:
                 merged.append(group)
             continue
-        identity = canonical_codex_hook_group_identity(
-            source_scope=source_scope,
-            source_hooks_enabled=source_hooks_enabled,
-            event_name=event_name,
-            group=group,
-        )
+        identity = group_identities[position]
+        incoming_conflicts = set(group_conflicts[position])
+        position += 1
         if identity in identities:
             continue
-        incoming_conflicts = set(
-            canonical_codex_hook_conflict_keys(
-                source_scope=source_scope,
-                source_hooks_enabled=source_hooks_enabled,
-                event_name=event_name,
-                group=group,
-            )
-        )
         if incoming_conflicts & conflict_keys:
             raise RuntimeError(
                 f"{_CODEX_HOOK_MIGRATION_CONFLICT}: Codex hook sources define the same {event_name!r} "
@@ -638,21 +624,44 @@ def _canonical_hook_semantics(
     if not isinstance(hooks, Mapping):
         return {}
     source_hooks_enabled = _payload_has_hooks_feature_enabled(payload)
-    semantics: dict[str, tuple[str, ...]] = {}
+    counts: list[tuple[str, int]] = []
+    questions: list[CodexHookGroupQuestion] = []
     for event_name, groups in hooks.items():
         if not isinstance(event_name, str) or not isinstance(groups, list):
             continue
-        semantics[event_name] = tuple(
-            canonical_codex_hook_group_identity(
+        mappings = [group for group in groups if isinstance(group, Mapping)]
+        counts.append((event_name, len(mappings)))
+        questions.extend(
+            _hook_group_question(
+                group,
+                event_name=event_name,
                 source_scope=source_scope,
                 source_hooks_enabled=source_hooks_enabled,
-                event_name=event_name,
-                group=group,
             )
-            for group in groups
-            if isinstance(group, Mapping)
+            for group in mappings
         )
+    identities = canonical_codex_hook_group_identities(questions)
+    semantics: dict[str, tuple[str, ...]] = {}
+    start = 0
+    for event_name, count in counts:
+        semantics[event_name] = identities[start : start + count]
+        start += count
     return semantics
+
+
+def _hook_group_question(
+    group: Mapping[str, object],
+    *,
+    event_name: str,
+    source_scope: str,
+    source_hooks_enabled: bool,
+) -> CodexHookGroupQuestion:
+    return CodexHookGroupQuestion(
+        source_scope=source_scope,
+        source_hooks_enabled=source_hooks_enabled,
+        event_name=event_name,
+        group=group,
+    )
 
 
 def _require_hook_semantics_readback(
@@ -682,18 +691,22 @@ def _migration_group_identities(
     hooks = payload.get("hooks")
     if not isinstance(hooks, Mapping):
         return set()
-    return {
-        canonical_codex_hook_group_identity(
-            source_scope=source_scope,
-            source_hooks_enabled=source_hooks_enabled,
-            event_name=event_name,
-            group=group,
+    return set(
+        canonical_codex_hook_group_identities(
+            [
+                _hook_group_question(
+                    group,
+                    event_name=event_name,
+                    source_scope=source_scope,
+                    source_hooks_enabled=source_hooks_enabled,
+                )
+                for event_name, groups in hooks.items()
+                if isinstance(event_name, str) and isinstance(groups, list)
+                for group in groups
+                if isinstance(group, Mapping)
+            ]
         )
-        for event_name, groups in hooks.items()
-        if isinstance(event_name, str) and isinstance(groups, list)
-        for group in groups
-        if isinstance(group, Mapping)
-    }
+    )
 
 
 def _unmanaged_migration_payload(
