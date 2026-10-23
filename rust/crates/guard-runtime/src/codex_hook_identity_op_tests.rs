@@ -225,7 +225,11 @@ fn the_result_binds_itself_to_its_request() {
     assert_eq!(result.schema, CODEX_HOOK_IDENTITY_RESULT_SCHEMA);
     assert_eq!(result.status, "ok");
     assert_eq!(result.code, "ok");
-    assert_eq!(result.request_sha256.len(), 64);
+    let digest = result
+        .request_sha256
+        .strip_prefix("sha256:")
+        .expect("the digest names the algorithm that took it");
+    assert_eq!(digest.len(), 64);
 }
 
 /// An integer wider than a JSON number travels as its digits, so the digest
