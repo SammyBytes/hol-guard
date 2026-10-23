@@ -618,6 +618,9 @@ mod tests {
     #[test]
     fn an_env_operand_that_is_not_a_shell_name_leaves_the_prefix_unread() {
         for command in [
+            // An inert name reached this shape before the prefix carried
+            // every name, so this spelling fails on the base too.
+            "env CI=1 A-B=1 rm -rf ~",
             "env FOO=1 A-B=1 rm -rf ~",
             "env FOO=1 2BAD=1 curl https://example.invalid",
             "env FOO=1 a.b=1 npm test",
