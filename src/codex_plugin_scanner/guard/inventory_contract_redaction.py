@@ -76,9 +76,11 @@ def _prefetch_export_redactions(
             commands.append(command)
         _collect_metadata_values(getattr(artifact, "metadata", None), urls, paths)
     for run in cisco_runs:
+        if not _is_supported_scanner_run(run):
+            continue
         commands.append(_finding_command_text(str(getattr(run, "message", ""))))
         for finding in tuple(getattr(run, "findings", ()) or ()):
-            commands.append(_finding_command_text(str(getattr(finding, "title", "") or "")))
+            commands.append(_finding_command_text(_scanner_finding_title(finding)))
             commands.append(_finding_command_text(str(getattr(finding, "description", "") or "")))
             file_path = getattr(finding, "file_path", None)
             if isinstance(file_path, str) and file_path:
@@ -134,6 +136,29 @@ def _safe_finding_text(value: str, *, home_dir: Path, workspace_dir: Path | None
     """Sanitize finding text without exposing private paths or credential values."""
     redacted = _redact_command_value(_finding_command_text(value), home_dir, workspace_dir)
     return redacted[:500]
+
+
+SUPPORTED_SCANNER_SOURCES = ("cisco-mcp-scanner", "cisco-skill-scanner")
+"""The scanners whose runs become inventory findings.
+
+A run from anything else is dropped before it is redacted, so asking about its
+text would be a request made for a finding that is never exported.
+"""
+
+
+def _is_supported_scanner_run(run: object) -> bool:
+    """Whether this run's findings reach the export at all."""
+    return str(getattr(run, "source", "")) in SUPPORTED_SCANNER_SOURCES
+
+
+def _scanner_finding_title(finding: object) -> str:
+    """The title a finding is redacted under, named once for both sides.
+
+    A finding that carries no title is exported under a stand-in rather than an
+    empty string, and the prefetch has to ask about the string the export will
+    actually redact or that finding costs its own round trip.
+    """
+    return str(getattr(finding, "title", "") or "Cisco scanner finding")
 
 
 def _finding_command_text(value: str) -> str:
