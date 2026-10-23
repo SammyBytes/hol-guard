@@ -43,13 +43,14 @@ def classify_endpoint_host(value: str | None) -> str:
     return _native_url.classify_endpoint_host(value)
 
 
-def _prefetch_artifact_redactions(
+def _prefetch_export_redactions(
     artifacts: tuple[object, ...],
+    cisco_runs: tuple[object, ...] = (),
     *,
     home_dir: Path,
     workspace_dir: Path | None,
 ) -> None:
-    """Answer every redaction an export of these artifacts makes, in batches.
+    """Answer every redaction a snapshot export makes, in batched requests.
 
     The per-value redaction below then reads the pass's answers instead of
     asking the resident once per string. Paths dominate that count: every
@@ -74,6 +75,14 @@ def _prefetch_artifact_redactions(
         if isinstance(command, str) and command:
             commands.append(command)
         _collect_metadata_values(getattr(artifact, "metadata", None), urls, paths)
+    for run in cisco_runs:
+        commands.append(_finding_command_text(str(getattr(run, "message", ""))))
+        for finding in tuple(getattr(run, "findings", ()) or ()):
+            commands.append(_finding_command_text(str(getattr(finding, "title", "") or "")))
+            commands.append(_finding_command_text(str(getattr(finding, "description", "") or "")))
+            file_path = getattr(finding, "file_path", None)
+            if isinstance(file_path, str) and file_path:
+                paths.append(file_path)
     _native_url.prefetch(
         urls,
         hosts,
@@ -123,9 +132,17 @@ def _safe_source_detail(run: object) -> str:
 
 def _safe_finding_text(value: str, *, home_dir: Path, workspace_dir: Path | None) -> str:
     """Sanitize finding text without exposing private paths or credential values."""
-    redacted = _SENSITIVE_VALUE_RE.sub("redacted", value)
-    redacted = _redact_command_value(redacted, home_dir, workspace_dir)
+    redacted = _redact_command_value(_finding_command_text(value), home_dir, workspace_dir)
     return redacted[:500]
+
+
+def _finding_command_text(value: str) -> str:
+    """The command string a finding's text is redacted as.
+
+    The prefetch has to ask about the same string this does, so the one
+    substitution both sides apply first lives here rather than in either.
+    """
+    return _SENSITIVE_VALUE_RE.sub("redacted", value)
 
 
 def _safe_artifact_metadata(

@@ -48,8 +48,10 @@ def test_an_export_asks_for_every_metadata_value_in_the_prefetched_batch(monkeyp
 
     from codex_plugin_scanner.guard import native_inventory_url_redaction as native_url
     from codex_plugin_scanner.guard.inventory_contract_redaction import (
-        _prefetch_artifact_redactions,
+        _prefetch_export_redactions,
+        _redact_known_path,
         _safe_artifact_metadata,
+        _safe_finding_text,
     )
 
     requests: list[list[dict[str, object]]] = []
@@ -84,10 +86,38 @@ def test_an_export_asks_for_every_metadata_value_in_the_prefetched_batch(monkeyp
         ),
         Artifact(artifact_type="skill", config_path=f"{home}/.config/two.json"),
     )
+
+    @dataclass
+    class Finding:
+        title: str
+        description: str
+        file_path: str | None = None
+
+    @dataclass
+    class Run:
+        message: str
+        findings: tuple[Finding, ...]
+
+    runs = (
+        Run(
+            message=f"scanned {home}/.config",
+            findings=(
+                Finding("npx tool --token abc", "found in /private/root", f"{home}/.config/hit.py"),
+                Finding("another finding", ""),
+            ),
+        ),
+    )
     with native_url.redaction_pass():
-        _prefetch_artifact_redactions(artifacts, home_dir=home, workspace_dir=None)
+        _prefetch_export_redactions(artifacts, runs, home_dir=home, workspace_dir=None)
         prefetched = len(requests)
         for artifact in artifacts:
             _safe_artifact_metadata(artifact, home_dir=home, workspace_dir=None)
+        for run in runs:
+            _safe_finding_text(run.message, home_dir=home, workspace_dir=None)
+            for finding in run.findings:
+                _safe_finding_text(finding.title, home_dir=home, workspace_dir=None)
+                _safe_finding_text(finding.description, home_dir=home, workspace_dir=None)
+                if finding.file_path:
+                    _redact_known_path(finding.file_path, home, None)
     assert prefetched == 1
     assert len(requests) == prefetched
