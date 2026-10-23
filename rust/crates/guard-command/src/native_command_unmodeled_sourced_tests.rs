@@ -801,3 +801,22 @@ fn nesting_beside_the_sourcing_keeps_its_evaluation_failure() {
     assert_ne!(action, "allow", "{code}");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// A sourced file in the workspace that this scan could not read keeps the
+/// failure it has always had. One byte that is not UTF-8 -- or padding past
+/// the read bound -- is all it takes to make a file unreadable, and a checkout
+/// this agent did not write controls both, so the relaxation above is for
+/// files outside the directory the command runs in and nothing else.
+#[test]
+fn an_unreadable_workspace_file_keeps_its_evaluation_failure() {
+    let root = project("opaque", ACTIVATE);
+    std::fs::write(
+        root.join("project").join("setup.sh"),
+        b"#!/bin/sh\n\xffexport PATH=/tmp:$PATH\n",
+    )
+    .unwrap();
+    let (action, code) = reviewed(&root, "source ./setup.sh && pytest -q");
+    assert_eq!(code, FAILED);
+    assert_ne!(action, "allow");
+    let _ = std::fs::remove_dir_all(&root);
+}

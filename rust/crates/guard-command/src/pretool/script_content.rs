@@ -238,12 +238,50 @@ pub(crate) fn only_nesting_is_sourcing(
     }
     let mut sourcing = false;
     for segment in segments.iter().filter(|segment| sources_a_file(segment)) {
-        if sourced_file(segment).is_none() {
+        let Some(target) = sourced_file(segment) else {
+            return false;
+        };
+        if !read_or_outside_the_workspace(target, context) {
             return false;
         }
         sourcing = true;
     }
     sourcing
+}
+
+/// Whether the file a sourcing names is one this scan read, or one that lives
+/// outside the directory the command runs in.
+///
+/// The two refusals [`sourced_program_sources`] folds together are not worth
+/// the same. A hidden home path is out of this scan's reach by the read screen
+/// alone, and nothing in the workspace decides that. A file in the workspace
+/// that this scan could not read is a different story: padding it past the
+/// read bound or writing one byte that is not UTF-8 is enough to make it
+/// unreadable, and a checkout this agent did not write controls both. That
+/// file keeps the failure a command running words this text does not hold has
+/// always had, so an unreadable workspace file cannot trade a block floor for
+/// a review card.
+fn read_or_outside_the_workspace(target: &str, context: PathContext<'_>) -> bool {
+    if resolve(target, context)
+        .as_deref()
+        .and_then(read_text)
+        .is_some()
+    {
+        return true;
+    }
+    let Some(cwd) = context.cwd.map(Path::new) else {
+        return false;
+    };
+    let Ok(candidate) = guard_secure_fs::resolve_candidate(
+        target,
+        Some(cwd),
+        Path::new(context.home_dir.unwrap_or_default()),
+    ) else {
+        return false;
+    };
+    let candidate = std::fs::canonicalize(&candidate).unwrap_or(candidate);
+    let workspace = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    !candidate.starts_with(&workspace)
 }
 
 /// Whether no segment other than the shell's `source` builtin runs words of
