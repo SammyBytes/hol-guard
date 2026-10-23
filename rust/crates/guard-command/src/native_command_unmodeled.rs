@@ -463,21 +463,54 @@ impl CompiledNativeCommandControls {
 /// and an `eval` to the shell. Read without the `&` it is the nested executor
 /// the arm below refuses unless the text names the program it runs, so
 /// backgrounding must not be the thing that admits it.
-fn backgrounded_nested_executor(
-    normalized: &str,
-    context: crate::pretool::PathContext<'_>,
-) -> bool {
+///
+/// The foreground text is read here rather than parsed again: a second parse
+/// answers for the shape the scan already gave up on, and the question is
+/// only which program the text puts in command position.
+fn backgrounded_nested_executor(normalized: &str) -> bool {
     let Some(foreground) = crate::pretool::foreground_job(normalized) else {
         return false;
     };
-    let structured = crate::critical_floor_context::parse_floor_command(
-        foreground,
-        context.cwd.map(std::path::Path::new),
-        context.home_dir.map(std::path::Path::new),
-    );
-    structured.uncertainty_reason.as_deref() == Some("nested_command_executor_not_yet_supported")
-        && !named_xargs_pipeline(foreground)
-        && !named_find_exec(foreground)
+    // Both of these name the program they run, so the floor below can still
+    // bound them and backgrounding takes nothing away.
+    if named_xargs_pipeline(foreground) || named_find_exec(foreground) {
+        return false;
+    }
+    let Some(program) = command_position_program(foreground) else {
+        return false;
+    };
+    if matches!(
+        program.as_str(),
+        "." | "eval" | "exec" | "parallel" | "source" | "xargs"
+    ) {
+        return true;
+    }
+    matches!(program.as_str(), "find" | "fd")
+        && unquoted_literal(foreground).split_whitespace().any(|word| {
+            matches!(word, "-exec" | "-execdir" | "-ok" | "-okdir" | "-x" | "-X")
+                || word == "--exec"
+                || word.starts_with("--exec=")
+                || word.starts_with("--exec-batch")
+        })
+}
+
+/// The program a simple command puts in command position, without the
+/// assignments and shell keywords that can stand in front of it, and without
+/// the directory and image extension the shell resolves away.
+fn command_position_program(text: &str) -> Option<String> {
+    let literal = unquoted_literal(text);
+    let word = literal
+        .split_whitespace()
+        .find(|word| !is_assignment(word) && !SHELL_PREFIXES.contains(word))?;
+    let base = word.rsplit(['/', '\\']).next().unwrap_or(word);
+    let lowered = base.to_ascii_lowercase();
+    Some(
+        lowered
+            .strip_suffix(".exe")
+            .or_else(|| lowered.strip_suffix(".cmd"))
+            .unwrap_or(&lowered)
+            .to_owned(),
+    )
 }
 
 /// A pipeline whose only data movement is a pipe into an `xargs` that names
@@ -599,7 +632,7 @@ fn reviewable_structure(
             let literal = unquoted_literal(normalized);
             !background_pipeline(normalized)
                 && (!moves_data(&literal) || literal_redirects_only(normalized))
-                && !backgrounded_nested_executor(normalized, context)
+                && !backgrounded_nested_executor(normalized)
         }
         Some("compound_shell_not_yet_supported") => {
             let literal = unquoted_literal(normalized);
