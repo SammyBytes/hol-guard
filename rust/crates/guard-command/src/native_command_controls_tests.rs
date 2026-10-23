@@ -545,3 +545,51 @@ fn only_an_expired_deadline_gets_the_try_again_reason() {
         super::floor::EXPIRED_DEADLINE_REASON
     );
 }
+
+#[test]
+fn recursive_removal_floor_asks_unless_it_removes_a_root() {
+    let floor = |command: &str| {
+        let model = crate::parse_command(&crate::CommandModelRequestV1 {
+            command: command.into(),
+            dialect: "posix".into(),
+            transport: "shell_string".into(),
+            extraction_provenance: "guard-shell".into(),
+        })
+        .unwrap();
+        crate::command_critical_floors::command_critical_floor_factors(
+            &crate::canonical_command::CanonicalCommand::from_v1(&model),
+            None,
+            &[],
+        )
+        .into_iter()
+        .find(|factor| factor.reason_code == "critical.destructive-filesystem")
+        .map(|factor| factor.basis.action_floor)
+    };
+    for command in [
+        "rm -rf ./stale-lab-dir",
+        "rm -rf build node_modules",
+        "rm -rf /srv/app/releases/old",
+    ] {
+        assert_eq!(
+            floor(command),
+            Some(crate::effect_decision::GuardAction::Review),
+            "{command}"
+        );
+    }
+    for command in [
+        "rm -rf /",
+        "rm -rf /*",
+        "rm -rf ~",
+        "rm -rf ~/*",
+        "rm -rf /etc",
+        "rm -rf ~/Documents",
+        "rm -rf $HOME",
+        "rm -rf \"$TARGET\"",
+    ] {
+        assert_eq!(
+            floor(command),
+            Some(crate::effect_decision::GuardAction::Block),
+            "{command}"
+        );
+    }
+}
