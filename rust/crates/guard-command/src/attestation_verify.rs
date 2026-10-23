@@ -35,8 +35,7 @@ use base64::engine::DecodePaddingMode;
 use base64::{alphabet, Engine};
 use serde_json::{Map, Value};
 
-use crate::attestation_envelope::{payload_with_signed_at, validated_trust_attestation_envelope};
-use crate::attestation_payload::{validate_attestation_payload, AttestationPayloadRules};
+use crate::attestation_envelope::validated_trust_attestation_envelope;
 use crate::attestation_signature::{load_attestation_public_key, verify_attestation_signature};
 use crate::attestation_verification::{
     trust_attestation_under_signature, TrustAttestationVerificationKey,
@@ -75,18 +74,6 @@ const PYTHON_BASE64: GeneralPurpose = GeneralPurpose::new(
         .with_decode_padding_mode(DecodePaddingMode::RequireCanonical),
 );
 
-/// The rules a verifier holds a signed payload to.
-///
-/// Python passes these three literally at this call site rather than taking
-/// them from the policy, so they are fixed here too: an attestation that
-/// reaches a verifier has been signed, carries a nonce, and names what it is
-/// about.
-const VERIFIER_PAYLOAD_RULES: AttestationPayloadRules = AttestationPayloadRules {
-    require_signed_at: true,
-    require_nonce: true,
-    require_subject_bindings: true,
-};
-
 /// Check a trust attestation and return its replay identity.
 ///
 /// `trusted_keys` of `None` accepts whatever key the envelope ships, which only
@@ -114,12 +101,11 @@ pub fn verify_trust_attestation(
     let read = validated_trust_attestation_envelope(envelope)
         .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
 
-    let signed_payload = payload_with_signed_at(payload, envelope.get("signedAt"));
-    let validated = validate_attestation_payload(&signed_payload, VERIFIER_PAYLOAD_RULES)
-        .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
-
+    // `trust_attestation_under_signature` carries the envelope's signing time
+    // into the payload and validates the result under the rules a verifier
+    // holds a signed attestation to, so the raw payload goes straight in.
     let under_signature =
-        trust_attestation_under_signature(&validated, &read, claim, trusted_keys, policy)
+        trust_attestation_under_signature(payload, &read, claim, trusted_keys, policy)
             .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
 
     let public_key = load_attestation_public_key(&read.public_key_pem)
