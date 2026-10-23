@@ -148,6 +148,12 @@ def prepare_installed_catalog_view(
         "guard_version": guard_version,
         "generated_at": generated_at,
     }
+    # The native cache answers with a view this observation already produced, so
+    # an unchanged catalog is not marshalled again one extension at a time.
+    reused = native_call(guard_home, action="reuse", observation=observation)
+    if reused:
+        discovery.require_handle(handle, guard_home)
+        return PreparedCatalogView.from_native(guard_home, reused)
     draft = native_call(guard_home, action="begin", observation=observation)["draft"]
     try:
         for item in registry.extensions:

@@ -315,6 +315,12 @@ pub fn evaluate(request: &Value) -> Value {
         if action.starts_with("completion_") {
             return completion::evaluate(request);
         }
+        if action == "reuse" {
+            let observation: Observation = serde_json::from_value(request["observation"].clone())
+                .map_err(|_| Error::Invalid)?;
+            observation.validate()?;
+            return cache::reuse(&observation);
+        }
         if action == "begin" {
             let observation: Observation = serde_json::from_value(request["observation"].clone())
                 .map_err(|_| Error::Invalid)?;
