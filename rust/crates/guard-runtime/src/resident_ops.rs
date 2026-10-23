@@ -522,6 +522,11 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
                     &request,
                 )
             }
+            ResidentOperationV1::InventoryScanFindings(request) => {
+                crate::inventory_scan_findings_op::evaluate_inventory_scan_findings_request(
+                    &request,
+                )
+            }
             ResidentOperationV1::CodexHookIdentity(request) => {
                 crate::codex_hook_identity_op::evaluate_codex_hook_identity_request(&request)
             }
