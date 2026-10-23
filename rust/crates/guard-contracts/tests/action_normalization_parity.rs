@@ -121,7 +121,10 @@ fn the_fixture_keeps_recording_keys_on_both_sides_of_the_line() {
         .iter()
         .filter(|case| case["action_bearing"] == Value::Bool(true))
         .count();
-    assert!(bearing >= 8, "the fixture must keep recording action-bearing keys");
+    assert!(
+        bearing >= 8,
+        "the fixture must keep recording action-bearing keys"
+    );
     assert!(
         keys.len() - bearing >= 4,
         "the fixture must keep recording names that only look like actions"
