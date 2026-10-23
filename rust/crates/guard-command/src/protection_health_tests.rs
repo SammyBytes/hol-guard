@@ -26,8 +26,7 @@ fn a_reason_code_must_be_a_stable_identifier() {
         "has space",
     ] {
         let error = ProtectionSignal::new(ProtectionCheckStatus::Unknown, reason_code)
-            .err()
-            .expect("a free-form reason is refused");
+            .expect_err("a free-form reason is refused");
         assert_eq!(
             error.message(),
             "protection signal reason_code must be a stable identifier"
@@ -57,8 +56,7 @@ fn only_the_first_hundred_harnesses_are_reported_and_only_those_are_checked() {
     let mut few: BTreeMap<String, ProtectionSignal> = BTreeMap::new();
     few.insert("zz-not-a-stable-id!".to_owned(), proven());
     let error = evaluate_protection_health(&every_check_proven(), &few)
-        .err()
-        .expect("a reported harness must be named truthfully");
+        .expect_err("a reported harness must be named truthfully");
     assert_eq!(
         error.message(),
         "harness protection identity must be a stable identifier"
@@ -77,8 +75,7 @@ fn a_harness_name_is_measured_in_characters() {
     let mut harnesses = BTreeMap::new();
     harnesses.insert(format!("{longest}0"), proven());
     let error = evaluate_protection_health(&every_check_proven(), &harnesses)
-        .err()
-        .expect("sixty-five is one too many");
+        .expect_err("sixty-five is one too many");
     assert_eq!(
         error.message(),
         "harness protection identity must be a stable identifier"
