@@ -127,6 +127,9 @@ def test_a_non_string_tool_name_names_no_shell(monkeypatch: pytest.MonkeyPatch, 
     assert sent[0]["request"]["action_envelope_command"] == "npm install left-pad"
 
 
+_BUDGET = native_package_authority._EXTRACT_MAX_REQUEST_BYTES - native_package_authority._EXTRACT_ENVELOPE_RESERVE_BYTES
+
+
 def test_arguments_too_large_to_send_leave_the_envelope_command(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -142,6 +145,43 @@ def test_arguments_too_large_to_send_leave_the_envelope_command(
     assert len(sent) == 1
     assert sent[0]["request"]["arguments"] is None
     assert sent[0]["request"]["action_envelope_command"] == "npm install left-pad"
+
+
+def test_arguments_and_envelope_too_large_together_are_asked_in_turn(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    sent = _install(monkeypatch)
+    arguments = {"argv": ["npm", "install", "left-pad"], "content": "x" * (_BUDGET - 128 * 1024)}
+    envelope = "npm install left-pad " + "y" * (256 * 1024)
+
+    native_package_authority.package_intent_extract_native(
+        "bash", arguments, action_envelope_command=envelope, guard_home=tmp_path
+    )
+
+    # The resident walks the arguments before the envelope command, so they
+    # go first and whole; the envelope command follows only when they name
+    # no package.
+    assert len(sent) == 2
+    assert sent[0]["request"]["arguments"] == arguments
+    assert sent[0]["request"]["action_envelope_command"] is None
+    assert sent[1]["request"]["arguments"] is None
+    assert sent[1]["request"]["action_envelope_command"] == envelope
+    assert sent[0]["request"]["request_id"] != sent[1]["request"]["request_id"]
+
+
+def test_an_intent_in_the_arguments_ends_the_turns(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    sent = _install(monkeypatch)
+    intent = object()
+    monkeypatch.setattr(native_package_authority, "_intent_from_response", lambda *_a, **_k: intent)
+    arguments = {"argv": ["npm", "install", "left-pad"], "content": "x" * (_BUDGET - 128 * 1024)}
+
+    answer = native_package_authority.package_intent_extract_native(
+        "bash", arguments, action_envelope_command="pip install " + "y" * (256 * 1024), guard_home=tmp_path
+    )
+
+    assert answer is intent
+    assert len(sent) == 1
+    assert sent[0]["request"]["action_envelope_command"] is None
 
 
 def test_arguments_within_the_budget_are_sent_whole(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

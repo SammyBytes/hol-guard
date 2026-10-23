@@ -85,7 +85,7 @@ fn the_action_envelope_command_answers_when_no_argument_names_a_package() {
     );
     assert_eq!(answer(&editor), parsed("pip install requests"));
     let unnamed = extract(json!(7), json!({"command": "npm install left-pad"}), None);
-    assert_eq!(answer(&unnamed), (Some(Value::Null), None));
+    assert_eq!(answer(&unnamed), (None, None));
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn a_call_that_names_no_package_answers_no_intent() {
     ] {
         let result = extract(tool_name, arguments, envelope);
         assert_eq!((result.status.as_str(), result.code.as_str()), ("ok", "ok"));
-        assert_eq!(answer(&result), (Some(Value::Null), None));
+        assert_eq!(answer(&result), (None, None));
     }
 }
 

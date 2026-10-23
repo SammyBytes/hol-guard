@@ -35,8 +35,9 @@ _RESIDENT_PROTOCOL_FEATURE = "resident-protocol-v2"
 _PACKAGE_AUTHORITY_FEATURE = "package-authority-v1"
 _PACKAGE_INTENT_EXTRACT_FEATURE = "package-intent-extract-v1"
 # Mirrors PACKAGE_INTENT_EXTRACT_MAX_BYTES: the tool arguments ride in the
-# request whole, and a hook request may carry up to 1 MB of them.
-_EXTRACT_MAX_REQUEST_BYTES = 4 * 1024 * 1024
+# request whole, so the bound matches the MCP tool-call identity request that
+# carries the same arguments.
+_EXTRACT_MAX_REQUEST_BYTES = 6 * 1024 * 1024 - 64 * 1024
 # Room the operation envelope adds around the request on the wire.
 _EXTRACT_ENVELOPE_RESERVE_BYTES = 1024
 # The resident reads commands five levels into the arguments and its decoder
@@ -225,16 +226,35 @@ def package_intent_extract_native(
         "home_dir": str(home_dir) if home_dir is not None else None,
         "environment": _resident_environment(environment),
     }
-    if _encoded_size(request) > _EXTRACT_MAX_REQUEST_BYTES - _EXTRACT_ENVELOPE_RESERVE_BYTES:
-        # Fields the resident never reads (a write's content, an MCP tool's
-        # payload) can outgrow the request. Dropping the arguments keeps the
-        # envelope command, which names the same command for a shell call.
-        request["arguments"] = None
+    deadline = time.monotonic() + timeout_seconds
+    if _fits(request):
+        return _extract_once(request, guard_home=guard_home, deadline=deadline)
+    # The arguments and the envelope command do not fit together. The resident
+    # walks the arguments before it reads the envelope command, so asking for
+    # each in turn gives the answer one request would have.
+    walked = {**request, "action_envelope_command": None}
+    if _fits(walked):
+        intent = _extract_once(walked, guard_home=guard_home, deadline=deadline)
+        if intent is not None:
+            return intent
+    if request["action_envelope_command"] is None:
+        return None
+    return _extract_once(
+        {**request, "request_id": _request_id(), "arguments": None}, guard_home=guard_home, deadline=deadline
+    )
+
+
+def _fits(request: dict[str, object]) -> bool:
+    return _encoded_size(request) <= _EXTRACT_MAX_REQUEST_BYTES - _EXTRACT_ENVELOPE_RESERVE_BYTES
+
+
+def _extract_once(request: dict[str, object], *, guard_home: Path, deadline: float) -> PackageIntent | None:
     response = _resident_request(
         operation="package_intent_extract",
         request=request,
         guard_home=guard_home,
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=max(0.0, deadline - time.monotonic()),
+        deadline_monotonic=deadline,
         required_features=(_PACKAGE_AUTHORITY_FEATURE, _PACKAGE_INTENT_EXTRACT_FEATURE),
         max_request_bytes=_EXTRACT_MAX_REQUEST_BYTES,
     )

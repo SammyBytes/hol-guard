@@ -37,9 +37,9 @@ pub const PACKAGE_INTENT_EXTRACT_FEATURE: &str = "package-intent-extract-v1";
 /// Largest canonical request serialization any of these ops will accept.
 pub const PACKAGE_AUTHORITY_MAX_BYTES: usize = 1024 * 1024;
 /// Largest canonical `package_intent_extract` request. The tool arguments ride
-/// in it whole, and a hook request may carry up to 1 MB of them, so the bound
-/// leaves room for escaping on top of that.
-pub const PACKAGE_INTENT_EXTRACT_MAX_BYTES: usize = 4 * 1024 * 1024;
+/// in it whole, so it matches the MCP tool-call identity bound on the request
+/// that carries the same arguments, a frame's slack under the transport limit.
+pub const PACKAGE_INTENT_EXTRACT_MAX_BYTES: usize = 6 * 1024 * 1024 - 64 * 1024;
 
 // ---------------------------------------------------------------------------
 // PackageIntentParse — `parse_package_intent` port entry.
