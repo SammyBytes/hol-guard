@@ -213,22 +213,45 @@ pub(crate) fn sourced_program_sources(
     sourcing.then_some(sources)
 }
 
-/// The text of every file the command sources, when sourcing is the only
-/// nesting the command does.
+/// Whether sourcing is the only nesting the command does and every file it
+/// sources is named in the text, whether or not this scan could read them.
 ///
-/// [`sourced_program_sources`] answers for the files a command sources and
-/// says nothing about the rest of it, which is what a floor wants once the
-/// shape is already known to be reviewable. Deciding that shape needs the
-/// stricter question: `eval evil && source ok.sh` sources a file this scan
-/// reads, and reading it bounds nothing, because `eval` runs words that are
-/// not in the text at all. Any other nested executor in the command is
-/// refused here, so only sourcing is read through.
-pub(crate) fn sole_sourcing_sources(
+/// This is the shape question on its own. [`sourced_program_sources`] answers
+/// it together with whether the files could be read, and returns `None` for
+/// either refusal, which reads a command running words this text does not hold
+/// the same way as one sourcing a file the read screen keeps out of reach.
+/// `~/.nvm/nvm.sh` is the second kind: a hidden home path the shell reads and
+/// this scan may not, sitting in a shape as plain as the `.venv/bin/activate`
+/// beside it. A floor that hands an unread file an ordinary review card, the
+/// way `bash FILE` has always been reviewed, has to tell the two apart. The
+/// file still has to be named here: `source $INIT` runs a path the text does
+/// not hold at all, and `eval evil && source ok.sh` runs words from nowhere.
+pub(crate) fn only_nesting_is_sourcing(
     model: &CanonicalCommandV1,
     context: PathContext<'_>,
-) -> Option<Vec<String>> {
-    let (_, segments) = structure(model, context)?;
-    let nested = segments.iter().any(|segment| {
+) -> bool {
+    let Some((_, segments)) = structure(model, context) else {
+        return false;
+    };
+    if !sourcing_is_the_only_nesting(&segments) {
+        return false;
+    }
+    let mut sourcing = false;
+    for segment in segments.iter().filter(|segment| sources_a_file(segment)) {
+        if sourced_file(segment).is_none() {
+            return false;
+        }
+        sourcing = true;
+    }
+    sourcing
+}
+
+/// Whether no segment other than the shell's `source` builtin runs words of
+/// its own. `eval evil && source ok.sh` sources a file this scan reads, and
+/// reading it bounds nothing, because `eval` runs words that are not in the
+/// text at all.
+fn sourcing_is_the_only_nesting(segments: &[crate::CommandSegmentV1]) -> bool {
+    !segments.iter().any(|segment| {
         !sources_a_file(segment)
             && segment.executable.as_deref().is_some_and(|executable| {
                 crate::parser_executables::is_nested_command_executor(
@@ -236,11 +259,7 @@ pub(crate) fn sole_sourcing_sources(
                     &segment.arguments,
                 )
             })
-    });
-    if nested {
-        return None;
-    }
-    sourced_program_sources(model, context)
+    })
 }
 
 /// Whether the segment runs the shell's `source` builtin, whatever file it

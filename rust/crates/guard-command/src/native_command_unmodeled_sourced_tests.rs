@@ -748,3 +748,43 @@ fn a_quoted_span_still_shows_the_program_a_substitution_runs() {
     let words: Vec<&str> = super::command_words(&masked).collect();
     assert!(words.contains(&"curl"), "{words:?}");
 }
+
+/// A file the read screen keeps out of reach is still a file this text names,
+/// and the same bytes handed to `bash` have always reviewed behind an approval
+/// card. `~/.nvm/nvm.sh` is the line every Node project's instructions open
+/// with: a hidden home path with no marker of its own the way a virtualenv has
+/// `pyvenv.cfg`, so this scan may not read it. It reviews rather than being
+/// refused outright with no approval left to give it.
+#[test]
+fn sourcing_a_file_this_scan_may_not_read_still_reaches_a_review() {
+    let root = project("toolchain", ACTIVATE);
+    std::fs::create_dir_all(root.join(".nvm")).unwrap();
+    std::fs::write(root.join(".nvm").join("nvm.sh"), "nvm() { :; }\n").unwrap();
+    for command in [
+        "source ~/.nvm/nvm.sh",
+        "source ~/.nvm/nvm.sh && nvm use 20",
+        ". ~/.nvm/nvm.sh && node -v",
+    ] {
+        let (action, code) = outcome(&root, command);
+        assert_ne!(code, FAILED, "{command}");
+        assert_ne!(action, "allow", "{command}: {code}");
+    }
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Only the sourcing is read through. Something else nested beside it runs
+/// words this text does not hold at all, so it keeps its evaluation failure
+/// however readable the sourced file is, and a sourced target the text does
+/// not name never reaches an allow.
+#[test]
+fn nesting_beside_the_sourcing_keeps_its_evaluation_failure() {
+    let root = project("nested", ACTIVATE);
+    let (_, code) = outcome(
+        &root,
+        "eval \"$(pyenv init -)\" && source .venv/bin/activate",
+    );
+    assert_eq!(code, FAILED);
+    let (action, code) = outcome(&root, "source $INIT && pytest -q");
+    assert_ne!(action, "allow", "{code}");
+    let _ = std::fs::remove_dir_all(&root);
+}

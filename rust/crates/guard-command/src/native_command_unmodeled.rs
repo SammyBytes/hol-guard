@@ -219,23 +219,31 @@ impl CompiledNativeCommandControls {
         // ordinary `source .venv/bin/activate && pytest -q` had no owner set at
         // all and was refused outright, with no approval left to give it.
         //
-        // Reading the file is the whole question. A file whose words this scan
-        // cannot tell a tame story about still names the programs it holds, and
-        // every one of them joins the owners below, so the floor it reaches can
-        // only rise. Asking the file to read tamely as well left `source
-        // ~/.nvm/nvm.sh && nvm use 20` with no owner set and no approval row,
-        // while `bash ~/.nvm/nvm.sh && nvm use 20` ran the same bytes behind an
-        // ordinary review card.
+        // A file whose words this scan cannot tell a tame story about still
+        // names the programs it holds, and every one of them joins the owners
+        // below, so the floor it reaches can only rise. Asking the file to
+        // read tamely as well refused ordinary activation scripts outright.
         let sources_files = interpreted.contains("source") || interpreted.contains(".");
         let sourced = if sources_files {
             crate::pretool::sourced_program_sources(command, context)
         } else {
             Some(Vec::new())
         };
-        let sourced_resolved = sources_files && sourced.is_some();
+        // A file this scan could not read is no more opaque than the same
+        // file handed to `bash`, which has always reviewed behind an approval
+        // card. `~/.nvm/nvm.sh` is the ordinary case: a hidden home path the
+        // read screen keeps out of reach, with no marker of its own the way a
+        // virtualenv has `pyvenv.cfg`. The shape still has to be only
+        // sourcing, and the file still has to be named in the text, so
+        // `source $INIT` and `eval evil && source ok.sh` keep their evaluation
+        // failure. Nothing is projected from a file that was not read: the
+        // owners below come only from text this scan held, and this floor
+        // starts at `review` and only rises.
+        let sourced_bounded = sources_files
+            && (sourced.is_some() || crate::pretool::only_nesting_is_sourcing(command, context));
         if shell.contains("$'")
             || shell.contains("$\"")
-            || synthesizes_program(&unquoted_literal(shell), sourced_resolved)
+            || synthesizes_program(&unquoted_literal(shell), sourced_bounded)
         {
             return None;
         }
@@ -267,7 +275,7 @@ impl CompiledNativeCommandControls {
             .is_some_and(|programs| !programs.is_empty());
         if INTERPRETERS.iter().any(|name| {
             interpreted.contains(*name)
-                && !(sourced_resolved && matches!(*name, "source" | "."))
+                && !(sourced_bounded && matches!(*name, "source" | "."))
                 && !(xargs_bounded && *name == "xargs")
                 && !(exec_names_program && EXEC_ACTIONS.contains(name))
         }) {
@@ -289,7 +297,7 @@ impl CompiledNativeCommandControls {
                 // launch such as `python3 -m http.server` looks like a script
                 // that was never read. The module name is already in the
                 // command.
-                None if !prefix::interpreter_launch_reads_a_file(&bare, sourced_resolved) => {}
+                None if !prefix::interpreter_launch_reads_a_file(&bare, sourced_bounded) => {}
                 None => return None,
             }
         }
@@ -584,7 +592,7 @@ fn reviewable_structure(
             named_xargs_pipeline(normalized)
                 || named_find_exec(normalized)
                 || ((!moves_data(&literal) || literal_redirects_only(normalized))
-                    && sourcing_reads_its_files(command, context))
+                    && sourcing_names_its_files(command, context))
         }
         Some("command_redirect_not_yet_supported") => {
             let text = without_lookups(normalized);
@@ -643,20 +651,21 @@ fn reviewable_structure(
 }
 
 /// Whether every nested executor the command holds is the shell's `source`
-/// builtin reading a file this scan has in hand.
+/// builtin naming a file the text itself spells out.
 ///
-/// The floor reads the same files again to collect the programs they name.
-/// Here the only question is whether the shape has an owner set at all, so a
-/// command that sources something this scan cannot read, or that nests
-/// anything else alongside the sourcing, keeps its evaluation failure. What
-/// the file goes on to say is the floor's to weigh, not this shape's: an
-/// unreadable story is still every program the file names, and a floor that
-/// starts at `review` and only rises turns none of them into an allow.
-fn sourcing_reads_its_files(
+/// The floor reads those files again to collect the programs they name, and
+/// whether it can read them is its question, not this shape's. Asking it here
+/// too left `source ~/.nvm/nvm.sh && nvm use 20` with an evaluation failure
+/// and no approval row, because a hidden home path is one this scan may not
+/// read, while `bash ~/.nvm/nvm.sh && nvm use 20` ran the same bytes behind an
+/// ordinary review card. A file the text does not name at all, and anything
+/// else nested alongside the sourcing, keep their evaluation failure: those
+/// run words this text does not hold.
+fn sourcing_names_its_files(
     command: &CanonicalCommandV1,
     context: crate::pretool::PathContext<'_>,
 ) -> bool {
-    crate::pretool::sole_sourcing_sources(command, context).is_some_and(|texts| !texts.is_empty())
+    crate::pretool::only_nesting_is_sourcing(command, context)
 }
 
 /// A command with its heredocs removed that moves no data, or only to
