@@ -57,7 +57,8 @@ def test_one_request_carries_the_whole_call(monkeypatch: pytest.MonkeyPatch, tmp
             "score": float("nan"),
             "nested": [{"commands": ["pip install requests"]}, True],
             "bad": "\ud800",
-            "bad-\udfff": "dropped",
+            "bad-\udfff": {"command": "npm install kept"},
+            7: "dropped",
         },
         action_envelope_command="",
         workspace=tmp_path,
@@ -78,6 +79,8 @@ def test_one_request_carries_the_whole_call(monkeypatch: pytest.MonkeyPatch, tmp
         "score": None,
         "nested": [{"commands": ["pip install requests"]}, None],
         "bad": None,
+        # The value under a key JSON cannot carry is still walked.
+        repr("bad-\udfff"): {"command": "npm install kept"},
     }
     assert request["action_envelope_command"] is None
     assert request["workspace"] == str(tmp_path)
@@ -122,3 +125,31 @@ def test_a_non_string_tool_name_names_no_shell(monkeypatch: pytest.MonkeyPatch, 
 
     assert sent[0]["request"]["tool_name"] is None
     assert sent[0]["request"]["action_envelope_command"] == "npm install left-pad"
+
+
+def test_arguments_too_large_to_send_leave_the_envelope_command(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    sent = _install(monkeypatch)
+
+    native_package_authority.package_intent_extract_native(
+        "mcp__files__write",
+        {"command": "npm install left-pad", "content": "\u00e9" * (1024 * 1024)},
+        action_envelope_command="npm install left-pad",
+        guard_home=tmp_path,
+    )
+
+    assert len(sent) == 1
+    assert sent[0]["request"]["arguments"] is None
+    assert sent[0]["request"]["action_envelope_command"] == "npm install left-pad"
+
+
+def test_arguments_within_the_budget_are_sent_whole(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    sent = _install(monkeypatch)
+    arguments = {"command": "npm install left-pad", "content": "x" * (1024 * 1024)}
+
+    native_package_authority.package_intent_extract_native(
+        "bash", arguments, action_envelope_command=None, guard_home=tmp_path
+    )
+
+    assert sent[0]["request"]["arguments"] == arguments

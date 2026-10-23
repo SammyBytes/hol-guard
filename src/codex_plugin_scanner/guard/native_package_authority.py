@@ -37,6 +37,8 @@ _PACKAGE_INTENT_EXTRACT_FEATURE = "package-intent-extract-v1"
 # Mirrors PACKAGE_INTENT_EXTRACT_MAX_BYTES: the tool arguments ride in the
 # request whole, and a hook request may carry up to 1 MB of them.
 _EXTRACT_MAX_REQUEST_BYTES = 4 * 1024 * 1024
+# Room the operation envelope adds around the request on the wire.
+_EXTRACT_ENVELOPE_RESERVE_BYTES = 1024
 # The resident reads commands five levels into the arguments and its decoder
 # refuses deeper nesting than 128, so anything past this depth is sent as null
 # rather than failing the whole request.
@@ -223,6 +225,11 @@ def package_intent_extract_native(
         "home_dir": str(home_dir) if home_dir is not None else None,
         "environment": _resident_environment(environment),
     }
+    if _encoded_size(request) > _EXTRACT_MAX_REQUEST_BYTES - _EXTRACT_ENVELOPE_RESERVE_BYTES:
+        # Fields the resident never reads (a write's content, an MCP tool's
+        # payload) can outgrow the request. Dropping the arguments keeps the
+        # envelope command, which names the same command for a shell call.
+        request["arguments"] = None
     response = _resident_request(
         operation="package_intent_extract",
         request=request,
@@ -249,12 +256,32 @@ def _command_tree(value: object, *, depth: int) -> object:
     if isinstance(value, list):
         return [_command_tree(item, depth=depth + 1) for item in value]
     if isinstance(value, dict):
-        return {
-            key: _command_tree(item, depth=depth + 1)
-            for key, item in value.items()
-            if isinstance(key, str) and _transportable(key)
-        }
+        tree: dict[str, object] = {}
+        renamed: list[tuple[str, object]] = []
+        for key, item in value.items():
+            if not isinstance(key, str):
+                continue
+            if _transportable(key):
+                tree[key] = _command_tree(item, depth=depth + 1)
+            else:
+                # A key JSON cannot carry never names a command, but the
+                # value under it is still walked; repr() escapes it and its
+                # quotes keep it from colliding with a key the resident reads.
+                renamed.append((repr(key), item))
+        for key, item in renamed:
+            if key not in tree:
+                tree[key] = _command_tree(item, depth=depth + 1)
+        return tree
     return None
+
+
+def _encoded_size(value: object) -> int:
+    """The ASCII-escaped wire length of ``value``; past any bound when unencodable."""
+
+    try:
+        return len(json.dumps(value))
+    except (TypeError, ValueError):
+        return _EXTRACT_MAX_REQUEST_BYTES + 1
 
 
 def _transportable(text: str) -> bool:
