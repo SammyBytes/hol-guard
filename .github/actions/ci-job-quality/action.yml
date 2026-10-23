@@ -56,6 +56,9 @@ runs:
         tests/test_guard_approval_extension_recommendation.py \
         scripts/ci/normalize_rust_toolchains.py \
         tests/test_ci_rust_toolchain_cache.py \
+        scripts/ci/dashboard_integration_server.py \
+        scripts/ci/dashboard_integration_discovery.py \
+        tests/test_dashboard_integration_discovery.py \
         tests/test_ci_native_evaluator_fast_path.py \
         scripts/ci/native_approval_contract_gate.py \
         tests/test_ci_native_approval_workflow.py \
@@ -126,6 +129,9 @@ runs:
         tests/test_guard_approval_extension_recommendation.py \
         scripts/ci/normalize_rust_toolchains.py \
         tests/test_ci_rust_toolchain_cache.py \
+        scripts/ci/dashboard_integration_server.py \
+        scripts/ci/dashboard_integration_discovery.py \
+        tests/test_dashboard_integration_discovery.py \
         tests/test_ci_native_evaluator_fast_path.py \
         scripts/ci/native_approval_contract_gate.py \
         tests/test_ci_native_approval_workflow.py \
