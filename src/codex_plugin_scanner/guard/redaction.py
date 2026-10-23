@@ -103,10 +103,7 @@ _REDACTION_PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     (
         "connection-env",
         re.compile(
-            r"(?im)^([ \t]*(?:export[ \t]+)?)([A-Z0-9_]*(?:URL|URI|DSN))=("
-            + _ASSIGNED_URL
-            + r")"
-            + _ASSIGNMENT_TAIL,
+            r"(?im)^([ \t]*(?:export[ \t]+)?)([A-Z0-9_]*(?:URL|URI|DSN))=(" + _ASSIGNED_URL + r")" + _ASSIGNMENT_TAIL,
         ),
         r"\1\2=*****\4",
     ),

