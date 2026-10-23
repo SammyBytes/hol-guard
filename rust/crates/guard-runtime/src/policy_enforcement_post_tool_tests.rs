@@ -677,6 +677,7 @@ fn observe_keeps_credential_block_but_does_not_enforce_policy_only_floor() {
         "sensitive_path",
         "scanner_budget_exhausted",
         "output_too_large",
+        "no_output_to_review",
     ] {
         let credential = apply_post_tool_policy(
             &observed_snapshot,

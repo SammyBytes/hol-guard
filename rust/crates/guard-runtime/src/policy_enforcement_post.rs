@@ -8,12 +8,13 @@ mod post_action;
 
 /// Native scanner denials that Watch keeps: output that matched
 /// credential-shaped text, read a sensitive path, or was never fully scanned.
-const WATCH_KEPT_DENIAL_CODES: [&str; 5] = [
+const WATCH_KEPT_DENIAL_CODES: [&str; 6] = [
     "output_secret_match",
     "source_secret_match",
     "sensitive_path",
     "scanner_budget_exhausted",
     "output_too_large",
+    "no_output_to_review",
 ];
 
 fn plain_inline_output(payload: &Value) -> bool {
@@ -140,9 +141,12 @@ pub(crate) fn apply_post_tool_policy_with_delivery(
             return Ok(response);
         }
         // The action has already run, so withholding output that may carry a
-        // credential stops nothing. Watch records every other verdict.
-        if response.decision == "deny"
-            && WATCH_KEPT_DENIAL_CODES.contains(&response.reason_code.as_str())
+        // credential stops nothing. A reviewed excerpt is all the scanner
+        // vouched for. Watch records every other verdict.
+        if (response.decision == "deny"
+            && WATCH_KEPT_DENIAL_CODES.contains(&response.reason_code.as_str()))
+            || (response.decision == "allow"
+                && response.model_output_action == "replace_with_reviewed_excerpt")
         {
             return Ok(response);
         }
