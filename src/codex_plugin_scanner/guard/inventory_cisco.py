@@ -114,9 +114,7 @@ def _unavailable_runs(*, mcp_mode: str, skill_mode: str) -> tuple[CiscoInventory
                 ),
                 findings=(),
                 duration_ms=0,
-                metadata=_local_scanner_metadata(
-                    {"target": "unavailable", "targetsScanned": 0, "mode": mcp_mode}
-                ),
+                metadata=_local_scanner_metadata({"target": "unavailable", "targetsScanned": 0, "mode": mcp_mode}),
             )
         )
     if skill_mode != "off":
@@ -130,9 +128,7 @@ def _unavailable_runs(*, mcp_mode: str, skill_mode: str) -> tuple[CiscoInventory
                 ),
                 findings=(),
                 duration_ms=0,
-                metadata=_local_scanner_metadata(
-                    {"target": "unavailable", "skillsScanned": 0, "mode": skill_mode}
-                ),
+                metadata=_local_scanner_metadata({"target": "unavailable", "skillsScanned": 0, "mode": skill_mode}),
             )
         )
     return tuple(runs)
@@ -212,9 +208,7 @@ def _run_single_mcp_inventory_scan(
     )
 
 
-def _build_mcp_inventory_budget_exhausted_run(
-    *, target: CiscoMcpScanTarget, mode: str
-) -> CiscoInventoryRun:
+def _build_mcp_inventory_budget_exhausted_run(*, target: CiscoMcpScanTarget, mode: str) -> CiscoInventoryRun:
     return CiscoInventoryRun(
         source="cisco-mcp-scanner",
         status="timed_out",

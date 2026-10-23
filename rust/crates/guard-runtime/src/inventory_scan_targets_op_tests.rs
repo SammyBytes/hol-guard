@@ -523,7 +523,8 @@ fn the_result_carries_the_schema_and_binds_itself_to_its_request() {
     assert_eq!(result.request_id, "inventory-scan-targets-test");
     assert_eq!(result.status, "ok");
     assert_eq!(result.code, "ok");
-    assert_eq!(result.request_sha256.len(), 64);
+    assert!(result.request_sha256.starts_with("sha256:"));
+    assert_eq!(result.request_sha256.len(), "sha256:".len() + 64);
     assert!(result.payload.is_some());
 }
 
