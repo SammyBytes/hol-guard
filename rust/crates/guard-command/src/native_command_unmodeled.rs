@@ -588,12 +588,21 @@ fn reviewable_structure(
         // chance: `source .venv/bin/activate && pytest -q`, the first thing
         // any Python project runs, reached an evaluation failure here and
         // blocked outright, with no approval left to give it.
+        //
+        // The shell's `exec` is a nested executor by the same reading, and the
+        // program it runs is the one this text already names: `exec` replaces
+        // the shell rather than forking, so `exec npm test` runs what
+        // `npm test` runs, as this user and in this directory. It reached an
+        // evaluation failure here and blocked outright, with no approval left
+        // to give it. An `exec` carrying an option, or naming no program at
+        // all, keeps that failure (see `prefix`).
         Some("nested_command_executor_not_yet_supported") => {
             let literal = unquoted_literal(normalized);
             named_xargs_pipeline(normalized)
                 || named_find_exec(normalized)
                 || ((!moves_data(&literal) || literal_redirects_only(normalized))
-                    && sourcing_names_its_files(command, context))
+                    && (sourcing_names_its_files(command, context)
+                        || prefix::launch_only(&literal)))
         }
         Some("command_redirect_not_yet_supported") => {
             let text = without_lookups(normalized);
