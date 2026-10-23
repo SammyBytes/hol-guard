@@ -1,7 +1,6 @@
 //! Replays vectors recorded from the retired Python receipt payload builder
 //! (`tests/fixtures/cloud_receipt_payload/vectors.json`).
 
-use super::cloud_request_vectors_tests::first_difference;
 use super::runner_authority_op::dispatch;
 use super::store_vectors_support_tests::gunzip_json;
 
@@ -24,21 +23,7 @@ fn recorded_python_receipts_match_the_resident() {
             _ => false,
         };
         if !matches {
-            let name = vector["name"].as_str().unwrap();
-            eprintln!(
-                "ARM|{name}|ok={}|error_key={}",
-                result.is_ok(),
-                vector.get("expected_error").is_some()
-            );
-            if let Ok(actual) = &result {
-                match first_difference(actual, &vector["expected"], String::new()) {
-                    Some((path, recomputed, recorded)) => {
-                        eprintln!("DIFF|{name}|{path}|{recomputed}|{recorded}")
-                    }
-                    None => eprintln!("DIFF|{name}|<equal>||"),
-                }
-            }
-            failures.push(name.to_owned());
+            failures.push(vector["name"].as_str().unwrap().to_owned());
         }
     }
     assert!(

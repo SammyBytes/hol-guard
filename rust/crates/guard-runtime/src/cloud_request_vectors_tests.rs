@@ -39,65 +39,6 @@ fn summary(result: &Value) -> Value {
     })
 }
 
-/// The first place two recorded values disagree, as a JSON pointer plus both
-/// debug forms. Printing the whole value hides a disagreement that survives
-/// serialisation, so the walk reports the exact element instead.
-pub(super) fn first_difference(
-    left: &Value,
-    right: &Value,
-    path: String,
-) -> Option<(String, String, String)> {
-    match (left, right) {
-        (Value::Object(left_map), Value::Object(right_map)) => {
-            let mut keys: Vec<&String> = left_map.keys().chain(right_map.keys()).collect();
-            keys.sort();
-            keys.dedup();
-            for key in keys {
-                match (left_map.get(key), right_map.get(key)) {
-                    (Some(left_value), Some(right_value)) => {
-                        if let Some(found) =
-                            first_difference(left_value, right_value, format!("{path}/{key}"))
-                        {
-                            return Some(found);
-                        }
-                    }
-                    (left_value, right_value) => {
-                        return Some((
-                            format!("{path}/{key}"),
-                            format!("{left_value:?}"),
-                            format!("{right_value:?}"),
-                        ))
-                    }
-                }
-            }
-            None
-        }
-        (Value::Array(left_items), Value::Array(right_items)) => {
-            for index in 0..left_items.len().max(right_items.len()) {
-                match (left_items.get(index), right_items.get(index)) {
-                    (Some(left_value), Some(right_value)) => {
-                        if let Some(found) =
-                            first_difference(left_value, right_value, format!("{path}/{index}"))
-                        {
-                            return Some(found);
-                        }
-                    }
-                    (left_value, right_value) => {
-                        return Some((
-                            format!("{path}/{index}"),
-                            format!("{left_value:?}"),
-                            format!("{right_value:?}"),
-                        ))
-                    }
-                }
-            }
-            None
-        }
-        _ if left == right => None,
-        _ => Some((path, format!("{left:?}"), format!("{right:?}"))),
-    }
-}
-
 #[test]
 fn recorded_python_vectors_match_the_resident() {
     let document = gunzip_json(VECTORS);
@@ -118,25 +59,6 @@ fn recorded_python_vectors_match_the_resident() {
             _ => false,
         };
         if !matches {
-            eprintln!(
-                "ARM|{kind}/{name}|ok={}|error_key={}|summary={}",
-                result.is_ok(),
-                vector.get("expected_error").is_some(),
-                vector["summary"]
-            );
-            if let Ok(actual) = &result {
-                let recorded = if vector["summary"] == true {
-                    summary(actual)
-                } else {
-                    actual.clone()
-                };
-                match first_difference(&recorded, &vector["expected"], String::new()) {
-                    Some((path, recomputed, recorded_value)) => {
-                        eprintln!("DIFF|{kind}/{name}|{path}|{recomputed}|{recorded_value}")
-                    }
-                    None => eprintln!("DIFF|{kind}/{name}|<equal>||"),
-                }
-            }
             failures.push(format!("{kind} / {name}"));
         }
     }
