@@ -19,15 +19,6 @@ from .local_cli_identity import UnlistedCliIdentity, identify_unlisted_cli
 HelpStatus = Literal["ok", "empty", "failed"]
 
 _COMMAND_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,40}$")
-_SECTION_HEADER = re.compile(
-    r"^(?:commands|available commands|core commands|additional commands|"
-    r"management commands|general commands|positional arguments)\s*:?\s*$",
-    re.IGNORECASE,
-)
-_ARGPARSE_SET = re.compile(r"\{([A-Za-z][A-Za-z0-9_-]*(?:\s*,\s*[A-Za-z][A-Za-z0-9_-]*)+)\}")
-_YARGS_GROUP_HEADER = re.compile(r"^[A-Z][A-Z0-9 &/-]{0,40}:?$")
-_NON_COMMAND_GROUP = re.compile(r"EXAMPLE|OPTION|FLAG|POSITIONAL|ARGUMENT|USAGE")
-_SKIP_NAMES = frozenset({"help", "completion", "completions"})
 _HELP_TIMEOUT_SECONDS = 2.5
 _HELP_OUTPUT_LIMIT = 8192
 _MAX_NESTED_PROBES = 8
@@ -39,6 +30,7 @@ def parse_cli_help_text(
     *,
     parent_id: str | None = None,
     invocation: Sequence[str] = (),
+    guard_home: Path | None = None,
 ) -> tuple[LocalCliCommand, ...]:
     """Extract first-level commands from typical CLI --help output.
 
@@ -47,52 +39,37 @@ def parse_cli_help_text(
     indented row and groups commands under uppercase headings such as
     ``ACCOUNT``. Under those headings only invocation-prefixed rows count;
     prose, examples, options and positionals never do.
+
+    The reading itself is the resident's, in ``rust/.../local_cli_help.rs``.
+    Help text is whatever a third-party program printed, so nothing here parses
+    it. A resident that cannot answer leaves the CLI's commands undiscovered.
     """
 
-    found: list[LocalCliCommand] = []
-    seen: set[str] = set()
-    in_section = False
-    prefixed_only = False
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-        stripped = line.strip()
-        if not stripped:
-            if in_section and raw_line == "":
-                in_section = False
-            continue
-        if _SECTION_HEADER.fullmatch(stripped):
-            in_section = True
-            prefixed_only = False
-            for name in _argparse_names(stripped):
-                _append_command(found, seen, name, parent_id=parent_id)
-            continue
-        if invocation and raw_line == stripped and _YARGS_GROUP_HEADER.fullmatch(stripped):
-            in_section = not _NON_COMMAND_GROUP.search(stripped)
-            prefixed_only = True
-            continue
-        if not in_section:
-            continue
-        prefixed = _strip_invocation(stripped, invocation) if raw_line[:1].isspace() else None
-        if prefixed is not None:
-            parsed = _row_command(prefixed)
-            if parsed is not None:
-                _append_command(found, seen, parsed[0], description=parsed[1], parent_id=parent_id)
-            continue
-        if prefixed_only:
-            continue
-        for name in _argparse_names(stripped):
-            _append_command(found, seen, name, parent_id=parent_id)
-        parsed = _row_command(stripped)
-        if parsed is None:
-            if stripped.endswith(":") and not stripped.startswith("-"):
-                in_section = False
-            continue
-        name, description = parsed
-        _append_command(found, seen, name, description=description, parent_id=parent_id)
-    if not found:
-        for name in _argparse_names(text):
-            _append_command(found, seen, name, parent_id=parent_id)
-    return tuple(found)
+    from ..config import resolve_guard_home
+    from ..native_local_cli_help_parse import native_local_cli_help_commands
+
+    home = guard_home if guard_home is not None else resolve_guard_home()
+    try:
+        rows = native_local_cli_help_commands(
+            guard_home=home,
+            text=text,
+            parent_id=parent_id,
+            invocation=tuple(invocation),
+        )
+    except Exception:
+        return ()
+    if rows is None:
+        return ()
+    return tuple(
+        LocalCliCommand(
+            command_id=str(row["command_id"]),
+            name=str(row["name"]),
+            usage=str(row["usage"]),
+            description=str(row["description"]),
+            parent_id=None if row["parent_id"] is None else str(row["parent_id"]),
+        )
+        for row in rows
+    )
 
 
 def help_invocation_for_command(
@@ -285,59 +262,3 @@ def _safe_probe_path(path_text: str) -> bool:
     return not (len(parts) > 1 and parts[0] == "/" and parts[1] in {"proc", "dev", "sys"})
 
 
-def _strip_invocation(line: str, invocation: Sequence[str]) -> str | None:
-    words = [word.lower() for word in invocation if word]
-    if not words:
-        return None
-    parts = line.split(maxsplit=len(words))
-    if len(parts) <= len(words) or [part.lower() for part in parts[: len(words)]] != words:
-        return None
-    return parts[len(words)]
-
-
-def _row_command(line: str) -> tuple[str, str] | None:
-    if line.startswith("-"):
-        return None
-    parts = line.split()
-    if not parts:
-        return None
-    name = parts[0]
-    if not _COMMAND_NAME.fullmatch(name) or name.lower() in _SKIP_NAMES:
-        return None
-    description = line[len(name) :].strip()
-    return name, description[:200]
-
-
-def _argparse_names(text: str) -> tuple[str, ...]:
-    names: list[str] = []
-    for match in _ARGPARSE_SET.finditer(text):
-        for raw in match.group(1).split(","):
-            name = raw.strip()
-            if _COMMAND_NAME.fullmatch(name) and name.lower() not in _SKIP_NAMES:
-                names.append(name)
-    return tuple(names)
-
-
-def _append_command(
-    found: list[LocalCliCommand],
-    seen: set[str],
-    name: str,
-    *,
-    description: str = "",
-    parent_id: str | None,
-) -> None:
-    command_id = name if parent_id is None else f"{parent_id}.{name}"
-    if command_id in seen or name.lower() in _SKIP_NAMES:
-        return
-    if parent_id is None and not _COMMAND_NAME.fullmatch(name):
-        return
-    seen.add(command_id)
-    found.append(
-        LocalCliCommand(
-            command_id=command_id,
-            name=name,
-            usage=name,
-            description=description,
-            parent_id=parent_id,
-        )
-    )
