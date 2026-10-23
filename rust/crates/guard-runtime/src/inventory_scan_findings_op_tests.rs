@@ -412,6 +412,21 @@ fn a_detection_that_did_not_walk_symlinks_reports_no_symlink_findings() {
 }
 
 #[test]
+fn a_request_missing_a_scan_input_is_not_read_as_an_empty_scan() {
+    // Every caller sends all three, so a request without one was built wrong
+    // or lost something in transit. Defaulting them would answer such a
+    // request `ok` with no symlink evidence and no scanner findings, which the
+    // caller cannot tell apart from an inventory that is actually clean, so
+    // the decode has to refuse it instead.
+    for field in ["include_symlinks", "cisco_runs", "items"] {
+        let mut wire = request(vec![], vec![]);
+        wire.as_object_mut().expect("object").remove(field);
+        let parsed = serde_json::from_value::<InventoryScanFindingsRequestV1>(wire);
+        assert!(parsed.is_err(), "{field} was read as a default");
+    }
+}
+
+#[test]
 fn the_feature_is_advertised() {
     assert!(crate::resident_op_features::RESIDENT_OP_FEATURES
         .contains(&guard_contracts::INVENTORY_SCAN_FINDINGS_FEATURE));

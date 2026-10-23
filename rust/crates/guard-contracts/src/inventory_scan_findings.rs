@@ -77,13 +77,17 @@ pub struct InventoryScanFindingsRequestV1 {
     /// Whether the caller's detection walked symlinks at all. A detection that
     /// did not look has no symlink evidence to report, and reporting findings
     /// from stale metadata would claim an inspection that never ran.
-    #[serde(default)]
+    ///
+    /// It carries no default, and neither do the two fields below. Every
+    /// caller sends all three, so a request missing one is a request that was
+    /// built wrong or lost something in transit, and the three stand for the
+    /// scan's protection-relevant input: a default would turn that request
+    /// into an answered scan that walked no links and read no runs, which
+    /// reads at the caller exactly like a clean inventory.
     pub include_symlinks: bool,
     /// The scanner runs, as the duck-typed objects the Python caller read.
-    #[serde(default)]
     pub cisco_runs: Vec<Map<String, Value>>,
     /// The inventory items the findings attach to, in the caller's order.
-    #[serde(default)]
     pub items: Vec<InventoryScanFindingsItemV1>,
 }
 
