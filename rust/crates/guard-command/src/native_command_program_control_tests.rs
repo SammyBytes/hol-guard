@@ -175,3 +175,52 @@ fn native_mcp_defaults_are_opt_in_tightening_only_and_redacted() {
         }));
     }
 }
+
+#[test]
+fn jvm_build_goals_leave_the_package_firewall_to_dependency_work() {
+    let permission = "command.package.jvm.permission.package-protection";
+    let controls =
+        authored_controls(&binding(&[("permission", permission, "disabled")], false)).unwrap();
+    let claims = |command: &str| {
+        let result = evaluate_pre_tool_envelope_with_extensions(
+            "claude-code",
+            "PreToolUse",
+            &serde_json::json!({"tool_name":"Bash","tool_input":{"command":command}}),
+            Some(&controls),
+            None,
+        );
+        let claimed = result
+            .command_extensions
+            .as_ref()
+            .unwrap()
+            .permission_observations
+            .iter()
+            .any(|item| item.permission_id == permission);
+        (result.minimum_action.clone(), claimed)
+    };
+    for command in [
+        "mvn -q test",
+        "mvn clean verify",
+        "./mvnw -o test-compile",
+        "gradle build",
+        "gradle --console=plain check",
+        "./gradlew :app:test",
+    ] {
+        let (action, claimed) = claims(command);
+        assert!(!claimed, "{command}");
+        assert_ne!(action, "block", "{command}");
+    }
+    for command in [
+        "mvn dependency:copy-dependencies",
+        "mvn -Dartifact=org.example:library:1.0 dependency:get",
+        "mvn install",
+        "mvn deploy",
+        "gradle publish",
+        "gradle --refresh-dependencies build",
+        "./gradlew build --write-locks",
+    ] {
+        let (action, claimed) = claims(command);
+        assert!(claimed, "{command}");
+        assert_eq!(action, "block", "{command}");
+    }
+}

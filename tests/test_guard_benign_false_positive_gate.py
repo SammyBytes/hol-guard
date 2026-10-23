@@ -479,6 +479,55 @@ def test_an_environment_dump_is_reviewed_rather_than_refused(
         assert not always_gap(_ROWS[case.case_id]), f"environment dump offers no Always allow: {description}"
 
 
+def test_jvm_build_goals_run_without_an_approval_prompt(
+    gate_environment: tuple[BenignFixture, HookWorker],
+) -> None:
+    """Compiling or testing a Java project is ordinary work, not a package fetch.
+
+    The JVM package firewall owns ``mvn`` and ``gradle`` by executable name and
+    carries no rule that tells a dependency operation from a lifecycle goal, so
+    every invocation but a bare ``--version`` queued a review row: ``mvn -q
+    test`` and ``./gradlew test`` both asked. A lifecycle goal reads the
+    dependency cache the project already resolved, and the workspace sandbox it
+    routes to instead has no network at all, so it cannot reach a registry.
+    The operations that fetch or publish artifacts keep the review.
+    """
+    fixture, worker = gate_environment
+    goals = ("mvn -q test", "mvn clean verify", "./mvnw test-compile", "gradle build", "./gradlew :app:test")
+    for index, command in enumerate(goals):
+        case = GateCase(
+            case_id=f"jvm-build-{index}@claude-code",
+            base_id=f"jvm-build-{index}",
+            fix_area="package",
+            harness="claude-code",
+            tool="shell",
+            tool_input={"command": command},
+            cwd="worktree",
+            expect="allow",
+        )
+        result, approvals = _review(case, fixture, worker)
+        description = _describe(case, result, approvals)
+        assert approvals == 0, f"JVM build goal queued a review: {description}"
+        assert _quiet_allow(result, approvals) or _contained(result), description
+    fetches = ("mvn dependency:copy-dependencies", "mvn deploy", "gradle --refresh-dependencies build")
+    for index, command in enumerate(fetches):
+        case = GateCase(
+            case_id=f"jvm-fetch-{index}@claude-code",
+            base_id=f"jvm-fetch-{index}",
+            fix_area="package",
+            harness="claude-code",
+            tool="shell",
+            tool_input={"command": command},
+            cwd="worktree",
+            expect="not_allow",
+        )
+        result, approvals = _review(case, fixture, worker)
+        description = _describe(case, result, approvals)
+        assert _decision(result) != "allow", f"package fetch was allowed: {description}"
+        assert approvals == 1, f"package fetch left no approval to give: {description}"
+        assert not always_gap(_ROWS[case.case_id]), f"package fetch offers no Always allow: {description}"
+
+
 @pytest.mark.parametrize("case", mcp_cases(_DOCUMENT), ids=lambda case: case.case_id)
 def test_mcp_connectors_are_set_up_before_they_are_reviewed(
     case: McpCase, gate_environment: tuple[BenignFixture, HookWorker]
