@@ -24,6 +24,7 @@ from urllib.parse import urlunsplit as urlunsplit
 
 from ..path_support import resolves_within_root as resolves_within_root
 from ..version import __version__ as __version__
+from . import native_inventory_url_redaction as _native_url
 from .inventory_agent_types import _AGENT_INVENTORY_TYPES as _AGENT_INVENTORY_TYPES
 from .inventory_agent_types import AgentInventoryType as AgentInventoryType
 from .inventory_agent_types import agent_type as _agent_type
@@ -103,6 +104,7 @@ from .inventory_contract_models import InventorySeverity as InventorySeverity
 from .inventory_contract_redaction import (
     _assert_serialized_inventory_payload_safe as _assert_serialized_inventory_payload_safe,
 )
+from .inventory_contract_redaction import _prefetch_artifact_urls
 from .inventory_contract_redaction import _redact_command_value as _redact_command_value
 from .inventory_contract_redaction import _redact_known_path as _redact_known_path
 from .inventory_contract_redaction import _safe_artifact_metadata as _safe_artifact_metadata
@@ -270,6 +272,7 @@ def _scan_records(
         raise InventoryScanFindingsUnavailableError from None
 
 
+@_native_url.redaction_pass()
 def inventory_snapshot_from_detection(
     detection: object,
     *,
@@ -294,6 +297,7 @@ def inventory_snapshot_from_detection(
             workspace_dir=workspace_dir,
         )
     )
+    _prefetch_artifact_urls(artifact_tuple)
     source_evidence = native_inventory_source_evidence(
         [
             {
