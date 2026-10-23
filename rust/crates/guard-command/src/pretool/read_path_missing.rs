@@ -102,4 +102,41 @@ mod tests {
             workspace.to_str()
         ));
     }
+
+    /// The admission is proven only while the path stays missing: a peer step
+    /// that writes, links or creates a directory would put something there
+    /// before the read opens it, so the whole command must create nothing.
+    #[test]
+    fn a_peer_step_that_could_plant_the_path_keeps_the_review() {
+        let (_root, home, workspace) = fixture();
+        let w = workspace.display();
+        let context = crate::pretool::PathContext {
+            home_dir: home.to_str(),
+            cwd: workspace.to_str(),
+            ..Default::default()
+        };
+        for (command, proven) in [
+            (format!("cat {w}/absent-notes.md"), true),
+            (format!("head -5 {w}/absent/notes.md"), true),
+            (
+                format!("ln -s {w}/present {w}/cfg && cat {w}/cfg/absent-notes.md"),
+                false,
+            ),
+            (format!("mkdir -p {w}/cfg && cat {w}/cfg/notes.md"), false),
+            (
+                format!("touch {w}/absent-notes.md && cat {w}/absent-notes.md"),
+                false,
+            ),
+        ] {
+            let model = crate::parse_command(&crate::CommandModelRequestV1 {
+                command: command.clone(),
+                dialect: "posix".to_owned(),
+                transport: "shell_string".to_owned(),
+                extraction_provenance: "guard-shell".to_owned(),
+            })
+            .expect("command model");
+            let covered = crate::pretool::benign_command_segments(&model, context);
+            assert_eq!(covered.len() == model.segments.len(), proven, "{command}");
+        }
+    }
 }

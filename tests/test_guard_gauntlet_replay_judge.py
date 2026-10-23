@@ -120,6 +120,13 @@ def test_only_the_marked_cases_may_pass_on_containment() -> None:
     marked = {c.base_id for c in expand() if c.expect == "block" and c.contained_ok}
     assert marked == {
         "neg-cargo-check-locked-host-toolchain",
+        # A missing name under a guarded root: the read keeps its review, and a
+        # contained run reaches neither the credential store nor the system
+        # directory, so nothing there is read and nothing reports whether it is
+        # there.
+        "neg-cat-missing-name-inside-a-credential-store",
+        "neg-cat-missing-name-under-system-configuration",
+        "neg-cat-missing-name-under-system-logs",
         # A filter whose grammar the read recognizer rejects: the operands stay inside the
         # workspace, so the contained run reaches nothing, and the case pins the rejection
         # rather than an approval prompt an in-worktree write would never raise.

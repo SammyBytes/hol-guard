@@ -91,7 +91,7 @@ pub(super) fn bounded_file_read_target(
 ) -> bool {
     // A missing harness note is a shell-read exception. Structured tools come
     // through this helper, and a missing note there stays unproved.
-    bounded_read_target_with_brackets(value, home_dir, cwd, false, false, false, false)
+    bounded_read_target_with_brackets(value, home_dir, cwd, false, false, false, false, false)
 }
 
 pub(super) fn existing_regular_read_target(
@@ -121,7 +121,34 @@ pub(super) fn bounded_read_target(
     cwd: Option<&str>,
     allow_directory: bool,
 ) -> bool {
-    bounded_read_target_with_brackets(value, home_dir, cwd, allow_directory, false, true, false)
+    bounded_read_target_with_brackets(
+        value,
+        home_dir,
+        cwd,
+        allow_directory,
+        false,
+        true,
+        false,
+        false,
+    )
+}
+
+/// A shell read of an absolute path with nothing at it, for a command no
+/// step of which creates a filesystem entry.
+///
+/// The open fails with `ENOENT`, so the read returns nobody's bytes, and the
+/// workspace-relative spelling of the same unresolvable path already passes
+/// its own lexical floor. The caller proves that no peer step can plant a
+/// file or a link where the kernel would walk, so what is missing now is
+/// still missing when the read runs; `bounded_read_target` carries no such
+/// proof and keeps the review.
+pub(super) fn bounded_missing_absolute_read_target(
+    value: &str,
+    home_dir: Option<&str>,
+    cwd: Option<&str>,
+) -> bool {
+    value == value.trim()
+        && bounded_read_target_with_brackets(value, home_dir, cwd, false, false, false, false, true)
 }
 
 /// A structured read tool opens its path literally, so `[slug]` in a Next.js
@@ -133,7 +160,7 @@ pub(super) fn bounded_structured_file_read_target(
     home_dir: Option<&str>,
     cwd: Option<&str>,
 ) -> bool {
-    bounded_read_target_with_brackets(value, home_dir, cwd, false, true, false, true)
+    bounded_read_target_with_brackets(value, home_dir, cwd, false, true, false, true, false)
 }
 
 /// A shell word whose bracket class matches nothing reaches the program
@@ -162,6 +189,7 @@ pub(super) fn bounded_literal_bracket_target(
             true,
             true,
             false,
+            false,
         )
 }
 
@@ -173,6 +201,7 @@ fn bounded_read_target_with_brackets(
     literal_brackets: bool,
     missing_notes: bool,
     directory_listing: bool,
+    missing_absolute: bool,
 ) -> bool {
     let path = value.trim();
     let path = path.strip_prefix(r"\\?\").unwrap_or(path);
@@ -237,11 +266,12 @@ fn bounded_read_target_with_brackets(
     // answer instead. A workspace-relative spelling keeps the pre-existing
     // lexical floor.
     if expanded_path.is_absolute() {
-        return missing_notes
-            && (harness_notes::missing_document(expanded_path).is_some_and(|resolved| {
+        return (missing_notes
+            && harness_notes::missing_document(expanded_path).is_some_and(|resolved| {
                 resolved_location_allowed(&resolved, home_dir, cwd, false)
                     && harness_notes::harness_home_document(&resolved, home_dir)
-            }) || missing_absolute_read_allowed(expanded_path, home_dir, cwd));
+            }))
+            || (missing_absolute && missing_absolute_read_allowed(expanded_path, home_dir, cwd));
     }
     safe_read_target(path)
 }
