@@ -54,6 +54,16 @@ pub(crate) fn unwrap(command: &str) -> Option<String> {
     } else {
         return None;
     };
+    // `cd web && { npm ci; npm test; }` runs `npm test` only when `cd web`
+    // succeeded, and the braces are the whole of that: blanking them leaves a
+    // text that runs it either way, and that text is what the decision and the
+    // sandbox shape are bound to. A list behind `&&` or `||` therefore keeps
+    // its group. A group that opens the command, or holds a single command
+    // behind one of those operators, means the same either way.
+    let first = inner.iter().position(|c| !c.is_whitespace())?;
+    if follows_a_conditional(&chars, open) && holds_a_list_operator(&inner[first..last]) {
+        return None;
+    }
     let mut ungrouped = chars;
     ungrouped[open] = ' ';
     ungrouped[close] = ' ';
@@ -66,25 +76,42 @@ pub(crate) fn unwrap(command: &str) -> Option<String> {
 }
 
 /// The positions of the only unquoted `{` and `}`, in that order.
+///
+/// A `#` where a word could start comments out the rest of its line, so the
+/// braces it covers are not braces at all: `{ echo hi # ; }` is an unterminated
+/// group the shell refuses, and reading the commented `}` as the group's end
+/// would hand `echo hi #` a decision for a command that never runs.
 fn unquoted_braces(chars: &[char]) -> Option<(usize, usize)> {
     let mut open = None;
     let mut close = None;
     let mut single = false;
     let mut double = false;
     let mut escaped = false;
+    let mut comment = false;
+    let mut in_word = false;
     for (index, &c) in chars.iter().enumerate() {
+        if comment {
+            comment = c != '\n';
+            continue;
+        }
         if escaped {
             escaped = false;
+            in_word = true;
             continue;
         }
         if single {
             single = c != '\'';
+            in_word = true;
             continue;
         }
         match c {
             '\\' => escaped = true,
             '"' => double = !double,
             '\'' if !double => single = true,
+            '#' if !double && !in_word => {
+                comment = true;
+                continue;
+            }
             '{' | '}' if !double => {
                 let slot = if c == '{' { &mut open } else { &mut close };
                 if slot.replace(index).is_some() {
@@ -93,12 +120,75 @@ fn unquoted_braces(chars: &[char]) -> Option<(usize, usize)> {
             }
             _ => {}
         }
+        in_word = double || !starts_a_word_position(c);
     }
     if single || double || escaped {
         return None;
     }
     let (open, close) = (open?, close?);
     (open < close).then_some((open, close))
+}
+
+/// Whether a word could start after this character: `#` opens a comment only
+/// there, and `echo a#b` keeps its `#` as part of the word.
+fn starts_a_word_position(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\n' | ';' | '&' | '|' | '(' | ')')
+}
+
+/// Whether the group stands behind a `&&` or a `||`, the operators that make
+/// what follows conditional. The opening brace has already been placed at the
+/// start of a list element, so an operator character there is one of those two.
+fn follows_a_conditional(chars: &[char], open: usize) -> bool {
+    matches!(
+        chars[..open]
+            .iter()
+            .rev()
+            .copied()
+            .find(|c| !matches!(c, ' ' | '\t')),
+        Some('&' | '|')
+    )
+}
+
+/// Whether the body is itself a list rather than one command: a `;`, a newline
+/// or an unquoted `&` or `|` the shell would act on.
+fn holds_a_list_operator(inner: &[char]) -> bool {
+    let mut single = false;
+    let mut double = false;
+    let mut escaped = false;
+    let mut comment = false;
+    let mut in_word = false;
+    for &c in inner {
+        if comment {
+            // The line the comment ends is itself a separator.
+            if c == '\n' {
+                return true;
+            }
+            continue;
+        }
+        if escaped {
+            escaped = false;
+            in_word = true;
+            continue;
+        }
+        if single {
+            single = c != '\'';
+            in_word = true;
+            continue;
+        }
+        match c {
+            '\\' => escaped = true,
+            '"' => double = !double,
+            '\'' if !double => single = true,
+            '#' if !double && !in_word => {
+                comment = true;
+                continue;
+            }
+            ';' | '\n' | '&' | '|' if !double => return true,
+            _ => {}
+        }
+        in_word = double || !starts_a_word_position(c);
+    }
+    false
 }
 
 #[cfg(test)]

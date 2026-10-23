@@ -7,8 +7,8 @@ fn a_trailing_brace_group_reads_as_its_command_list() {
         Some("npm run build; npm test")
     );
     assert_eq!(
-        unwrap("cd web && { npm ci; npm test; }").as_deref(),
-        Some("cd web &&   npm ci; npm test")
+        unwrap("cd web && { npm test; }").as_deref(),
+        Some("cd web &&   npm test")
     );
     assert_eq!(unwrap("{\n  pytest -q\n}").as_deref(), Some("pytest -q"));
 }
@@ -51,4 +51,36 @@ fn an_empty_or_oversized_group_is_refused() {
     assert_eq!(unwrap("{   }"), None);
     assert_eq!(unwrap(&format!("{{ echo {}; }}", "a".repeat(9000))), None);
     assert_eq!(unwrap("{ cat <<EOF; }"), None);
+}
+
+#[test]
+fn a_conditional_list_keeps_the_group_that_makes_it_conditional() {
+    // `npm test` runs only when `cd web` succeeded; the braces are the whole
+    // of that, so the flattened text would not be the same command.
+    assert_eq!(unwrap("cd web && { npm ci; npm test; }"), None);
+    assert_eq!(unwrap("make || { git checkout .; git clean -fd; }"), None);
+    assert_eq!(unwrap("cd web && {\n  npm ci\n  npm test\n}"), None);
+    // A separator that is not conditional runs the same list either way.
+    assert_eq!(
+        unwrap("cd web; { npm ci; npm test; }").as_deref(),
+        Some("cd web;   npm ci; npm test")
+    );
+    // One command behind the operator stays conditional once ungrouped.
+    assert_eq!(
+        unwrap("cd web && {\n  npm test\n}").as_deref(),
+        Some("cd web &&  \n  npm test")
+    );
+}
+
+#[test]
+fn a_commented_terminator_or_brace_is_not_a_group() {
+    // The shell sees `{ echo hi` with no closing brace and refuses the whole
+    // command, so `echo hi #` must not be decided in its place.
+    assert_eq!(unwrap("{ echo hi # ; }"), None);
+    assert_eq!(unwrap("{ npm test; # }"), None);
+    // A `#` inside a word is part of it, not a comment.
+    assert_eq!(
+        unwrap("{ git log --format=%h#%s; }").as_deref(),
+        Some("git log --format=%h#%s")
+    );
 }
