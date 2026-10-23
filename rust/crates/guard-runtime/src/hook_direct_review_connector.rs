@@ -235,10 +235,6 @@ pub(super) fn prepare(
     if !crate::connector_setup::is_non_recognition(reason_code) {
         return Ok(None);
     }
-    // A daemon whose drain cannot raise the setup notice keeps the review.
-    if context.binding.connector_setup_notice != Some(true) {
-        return Err(defer);
-    }
     let cause = first_blocked_cause(reason_code).ok_or(defer)?;
     let payload = context.recorded_payload;
     // `Path.resolve` raises on an embedded NUL, which the daemon does not catch.
@@ -251,6 +247,11 @@ pub(super) fn prepare(
     let (Some(command), Some(cwd)) = (command, cwd) else {
         return Ok(None);
     };
+    // A daemon whose drain cannot raise the setup notice keeps every review
+    // it would look up; one with no command or launch directory it never does.
+    if context.binding.connector_setup_notice != Some(true) {
+        return Err(defer);
+    }
     // `str(cwd)`, `str(home_dir)` and `str(Path.home())` are pathlib's
     // spellings; a Windows verbatim path or any other spelling defers.
     if !pathlib_normal(&cwd) || !pathlib_normal(context.home_dir) {
@@ -482,3 +483,7 @@ mod hint;
 #[cfg(test)]
 #[path = "hook_direct_review_connector_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "hook_direct_review_connector_prepare_tests.rs"]
+mod prepare_tests;

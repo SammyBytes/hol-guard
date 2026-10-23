@@ -225,15 +225,23 @@ struct Flags {
 }
 
 /// The connector a prepared lookup names. It records the launch, so it runs
-/// only once nothing but the write can defer.
+/// only once nothing but the write and the evidence offer can defer, and only
+/// while the evidence queue has room for the hook's record: a record the
+/// queue refuses hands the hook to the daemon, which would look it up again.
 fn run_lookup(
     context: &Context<'_>,
     lookup: Option<connector::Lookup>,
 ) -> Result<Option<connector::Setup>, HookDirectDefer> {
-    match lookup {
-        Some(lookup) => lookup.run(context.guard_home),
-        None => Ok(None),
+    let Some(lookup) = lookup else {
+        return Ok(None);
+    };
+    if context
+        .hint
+        .is_some_and(|scope| !scope.policy_store.direct_evidence().has_headroom())
+    {
+        return Err(HookDirectDefer::EvidenceFull);
     }
+    lookup.run(context.guard_home)
 }
 
 /// The request as it is stored: grouped under its connector with the setup
