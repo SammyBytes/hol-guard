@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from . import native_execution
 from .native_context import _canonical_request_sha256, _resolve_digest_home, ensure_resident_prerequisite
@@ -88,9 +88,9 @@ def capture_retry_lineage(
         return None
     if decoded is None:
         return None
-    lineage = _validated_lineage(decoded, wire, request_sha256)
-    _record(home, status.identity, success=lineage is not _INVALID)
-    return None if lineage is _INVALID else lineage  # type: ignore[return-value]
+    valid, lineage = _validated_lineage(decoded, wire, request_sha256)
+    _record(home, status.identity, success=valid)
+    return lineage
 
 
 def _payload_row(payload: Mapping[str, object]) -> dict[str, object]:
@@ -124,18 +124,21 @@ def _transportable(text: str) -> bool:
     return True
 
 
-_INVALID = object()
+def _validated_lineage(
+    decoded: dict[str, Any], wire: dict[str, object], request_sha256: str
+) -> tuple[bool, dict[str, object] | None]:
+    """Whether the reply is a bound, well-formed answer, and the record it carries."""
 
-
-def _validated_lineage(decoded: dict[str, Any], wire: dict[str, object], request_sha256: str) -> object:
     if set(decoded) != _RESULT_KEYS or decoded.get("code") != "ok":
-        return _INVALID
+        return False, None
     if decoded.get("request_id") != wire["request_id"] or decoded.get("request_sha256") != request_sha256:
-        return _INVALID
+        return False, None
     lineage = decoded.get("lineage")
-    if lineage is not None and not isinstance(lineage, dict):
-        return _INVALID
-    return lineage
+    if lineage is None:
+        return True, None
+    if not isinstance(lineage, dict):
+        return False, None
+    return True, cast("dict[str, object]", lineage)
 
 
 def _record(home: Path, identity: NativeRuntimeIdentity | None, *, success: bool) -> None:
