@@ -412,6 +412,7 @@ fn evaluate_validated_envelope(
                     payload_kind,
                     native,
                     delivery.as_ref(),
+                    envelope.recording_only,
                 )?
             } else {
                 native

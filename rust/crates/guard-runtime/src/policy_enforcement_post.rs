@@ -6,6 +6,9 @@ use crate::bash_post_delivery::VerifiedBashDelivery;
 #[path = "policy_enforcement_post_action.rs"]
 mod post_action;
 
+/// Native scanner verdicts for output that matched credential-shaped text.
+const CREDENTIAL_OUTPUT_CODES: [&str; 2] = ["output_secret_match", "source_secret_match"];
+
 fn plain_inline_output(payload: &Value) -> bool {
     match payload.get("tool_response") {
         Some(Value::String(_)) => true,
@@ -27,7 +30,7 @@ pub(crate) fn apply_post_tool_policy(
     payload_kind: GuardHookPayloadKindV2,
     response: HookReviewResponseV1,
 ) -> Result<HookReviewResponseV1, String> {
-    apply_post_tool_policy_with_delivery(snapshot, request, payload_kind, response, None)
+    apply_post_tool_policy_with_delivery(snapshot, request, payload_kind, response, None, false)
 }
 
 pub(crate) fn apply_post_tool_policy_with_delivery(
@@ -36,6 +39,7 @@ pub(crate) fn apply_post_tool_policy_with_delivery(
     payload_kind: GuardHookPayloadKindV2,
     mut response: HookReviewResponseV1,
     delivery: Option<&VerifiedBashDelivery>,
+    recording_only: bool,
 ) -> Result<HookReviewResponseV1, String> {
     if !matches!(snapshot.mode.as_str(), "enforce" | "observe") {
         return Err("native_policy_mode_invalid".to_owned());
@@ -118,10 +122,21 @@ pub(crate) fn apply_post_tool_policy_with_delivery(
         && snapshot.mode == "enforce"
         && matches!(effective.as_str(), "allow" | "warn")
         && delivery.is_some_and(VerifiedBashDelivery::clean_completion);
-    if snapshot.mode == "observe" {
+    // Watch is the snapshot's observe mode or this harness's own Watch
+    // override, which reaches the edge as `recording_only`. PreToolUse already
+    // continues on either, so a review here would wait on an inbox row that
+    // Watch never writes.
+    if snapshot.mode == "observe" || recording_only {
         let canonical_digest = guard_hook_core::canonical_observed_output_sha256(&request.payload);
         if response.decision == "allow" && response.model_output_action == "allow_original" {
             response.reviewed_output_sha256 = canonical_digest;
+            return Ok(response);
+        }
+        // The action has already run, so withholding credential-shaped text
+        // from the model stops nothing. Watch records every other verdict.
+        if response.decision == "deny"
+            && CREDENTIAL_OUTPUT_CODES.contains(&response.reason_code.as_str())
+        {
             return Ok(response);
         }
         response.decision = "allow".to_owned();
