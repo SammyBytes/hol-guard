@@ -23,12 +23,16 @@
 //! * A `signature` that is not base64 reaches `base64.b64decode(validate=True)`
 //!   inside Python's `try`, which catches only `InvalidSignature`, so Python
 //!   surfaces `binascii.Error`'s own text. This side reports
-//!   `Trust attestation signature is not base64`.
+//!   `Trust attestation signature is not base64`. Which strings count as
+//!   base64 is Python's: canonical padding is required, and a final character
+//!   whose unused bits are set still decodes.
 //!
 //! A caller that has to reproduce Python's exact text in those two cases cannot
 //! read it off this function.
 
-use base64ct::{Base64, Encoding};
+use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
+use base64::engine::DecodePaddingMode;
+use base64::{alphabet, Engine};
 use serde_json::{Map, Value};
 
 use crate::attestation_envelope::{payload_with_signed_at, validated_trust_attestation_envelope};
@@ -59,6 +63,17 @@ impl std::fmt::Display for TrustAttestationError {
 }
 
 impl std::error::Error for TrustAttestationError {}
+
+/// `base64.b64decode(..., validate=True)`, which Python decodes the signature
+/// with: the standard alphabet and canonical padding, and, as CPython does, a
+/// final character whose unused bits are not zero still decodes. A strict
+/// decoder would refuse a signature Python verifies.
+const PYTHON_BASE64: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::STANDARD,
+    GeneralPurposeConfig::new()
+        .with_decode_allow_trailing_bits(true)
+        .with_decode_padding_mode(DecodePaddingMode::RequireCanonical),
+);
 
 /// The rules a verifier holds a signed payload to.
 ///
@@ -109,7 +124,7 @@ pub fn verify_trust_attestation(
 
     let public_key = load_attestation_public_key(&read.public_key_pem)
         .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
-    let Ok(signature) = Base64::decode_vec(&read.signature) else {
+    let Ok(signature) = PYTHON_BASE64.decode(&read.signature) else {
         return Err(TrustAttestationError(
             "Trust attestation signature is not base64".to_owned(),
         ));

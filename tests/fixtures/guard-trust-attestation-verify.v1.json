@@ -1828,6 +1828,80 @@
       "error": "Trust attestation signature verification failed"
     },
     {
+      "name": "a signature whose unused trailing bits are set still verifies",
+      "payload": {
+        "payloadVersion": "guard-aibom-trust-attestation.v3",
+        "domainSeparator": "hol-guard:aibom-trust-attestation:v3",
+        "agentId": "codex:local",
+        "itemId": "plugin:test",
+        "itemKind": "plugin",
+        "contentHash": "sha256:content",
+        "capturedAt": "2026-07-16T12:00:00Z",
+        "evidenceHash": "sha256:evidence",
+        "scope": "trust_resolution",
+        "evidenceSchemaVersion": "guard-aibom-local-baseline-evidence.v1",
+        "policyVersion": "guard-policy.v1",
+        "nonce": "nonce-1",
+        "sequence": 8,
+        "expiresAt": "2026-07-16T12:05:00Z",
+        "adapterId": "codex",
+        "adapterVersion": "2.0.0",
+        "configPathHash": "sha256:config",
+        "repositoryId": "sha256:repo-a",
+        "claimHash": "0835fe604e1241f4a8c9c823a825f22fe3b11e364cb7d4ea4285a82e067a9d02",
+        "signedAt": "2026-07-16T12:00:00Z"
+      },
+      "envelope": {
+        "payloadVersion": "guard-aibom-trust-attestation.v3",
+        "payloadHash": "7d2a7c68437cf09529466ef3ea2a27f96ef039a34b97bfa3b34ead687b94b45b",
+        "signature": "MEUCIQDShvna0BUtpTOTCbIRAPiYttlWsUQ5dV3cdOgN9vSFfAIgIFnl6NtbtCrAEblQUNzoXOS4tburYfxT8nIKYoXLQNJ=",
+        "signatureAlgorithm": "ecdsa-p256-sha256",
+        "signedAt": "2026-07-16T12:00:00Z",
+        "keyId": "guard-trust-ec",
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiYzAe7PcABdBbBhZBRqF6AaWyUqI\nNPxHXfIGVTRX9n3/rYFtghmMS09AcEZjhDKMK0QUCv6Abc1iFiKkUyJ4xg==\n-----END PUBLIC KEY-----",
+        "fingerprintSha256": "ffd70688c62434827ed094900657b17ee9fcf2c4b9825b783886886bcdd53799",
+        "publicJwkThumbprint": "ec-thumbprint"
+      },
+      "claim": {
+        "resolutionSource": "local",
+        "status": "local",
+        "evidenceAuthority": "device_claim",
+        "affectsV4Score": false,
+        "trustScore": 90,
+        "capturedAt": "2026-07-16T12:00:00Z",
+        "provenance": {
+          "origin": "hol-guard-local",
+          "verificationStatus": "locally_derived",
+          "derivation": "test"
+        },
+        "metadata": {
+          "evidence": {
+            "source": "hol-guard-local-baseline",
+            "capturedAt": "2026-07-16T12:00:00Z"
+          },
+          "evidenceHash": "8fda5d32eebe28bc033609001afa619a120de93fbf6bff638a4f0e091f3a872d",
+          "evidenceSchemaVersion": "guard-aibom-local-baseline-evidence.v1"
+        }
+      },
+      "trusted_keys": [
+        {
+          "key_id": "guard-trust-ec",
+          "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiYzAe7PcABdBbBhZBRqF6AaWyUqI\nNPxHXfIGVTRX9n3/rYFtghmMS09AcEZjhDKMK0QUCv6Abc1iFiKkUyJ4xg==\n-----END PUBLIC KEY-----",
+          "fingerprint_sha256": "ffd70688c62434827ed094900657b17ee9fcf2c4b9825b783886886bcdd53799",
+          "public_jwk_thumbprint": "ec-thumbprint"
+        }
+      ],
+      "policy": {
+        "revoked_key_ids": [],
+        "key_not_before": {},
+        "minimum_sequence": null,
+        "seen_replay_keys": [],
+        "now": "2026-07-16T12:01:00Z",
+        "require_nonce": true
+      },
+      "replay_key": "4dc4ac25a65316869993be1c719cb6e479bfb71c6e79e7eae822f786cc1082d0"
+    },
+    {
       "name": "a signature that is not base64 is refused",
       "payload": {
         "payloadVersion": "guard-aibom-trust-attestation.v3",
@@ -1963,6 +2037,81 @@
           "key_id": "guard-trust-ec",
           "public_key_pem": "-----BEGIN PUBLIC KEY-----\nQUJD\n-----END PUBLIC KEY-----",
           "fingerprint_sha256": "d840abecfb3a028aa0070571e03e02cd9129a3fd513782b1e317eb687a2dd76e",
+          "public_jwk_thumbprint": "ec-thumbprint"
+        }
+      ],
+      "policy": {
+        "revoked_key_ids": [],
+        "key_not_before": {},
+        "minimum_sequence": null,
+        "seen_replay_keys": [],
+        "now": "2026-07-16T12:01:00Z",
+        "require_nonce": true
+      },
+      "rust_error": "Trust attestation public key must be RSA or EC",
+      "python_error_type": "ValueError"
+    },
+    {
+      "name": "a public key whose point is off the curve is refused",
+      "payload": {
+        "payloadVersion": "guard-aibom-trust-attestation.v3",
+        "domainSeparator": "hol-guard:aibom-trust-attestation:v3",
+        "agentId": "codex:local",
+        "itemId": "plugin:test",
+        "itemKind": "plugin",
+        "contentHash": "sha256:content",
+        "capturedAt": "2026-07-16T12:00:00Z",
+        "evidenceHash": "sha256:evidence",
+        "scope": "trust_resolution",
+        "evidenceSchemaVersion": "guard-aibom-local-baseline-evidence.v1",
+        "policyVersion": "guard-policy.v1",
+        "nonce": "nonce-1",
+        "sequence": 8,
+        "expiresAt": "2026-07-16T12:05:00Z",
+        "adapterId": "codex",
+        "adapterVersion": "2.0.0",
+        "configPathHash": "sha256:config",
+        "repositoryId": "sha256:repo-a",
+        "claimHash": "0835fe604e1241f4a8c9c823a825f22fe3b11e364cb7d4ea4285a82e067a9d02",
+        "signedAt": "2026-07-16T12:00:00Z"
+      },
+      "envelope": {
+        "payloadVersion": "guard-aibom-trust-attestation.v3",
+        "payloadHash": "7d2a7c68437cf09529466ef3ea2a27f96ef039a34b97bfa3b34ead687b94b45b",
+        "signature": "MEUCIQDShvna0BUtpTOTCbIRAPiYttlWsUQ5dV3cdOgN9vSFfAIgIFnl6NtbtCrAEblQUNzoXOS4tburYfxT8nIKYoXLQNI=",
+        "signatureAlgorithm": "ecdsa-p256-sha256",
+        "signedAt": "2026-07-16T12:00:00Z",
+        "keyId": "guard-trust-ec",
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiYzAe7PcABdBbBhZBRqF6AaWyUqI\nNPxHXfIGVTRX9n3/rYFtghmMS09AcEZjhDKMK0QUCv6Abc1iFiKkUyJ4xw==\n-----END PUBLIC KEY-----",
+        "fingerprintSha256": "fa0dbc2dee3b8faffa4680e8f7fd9c6950862a809cf7b272d4df8dc7fc63f620",
+        "publicJwkThumbprint": "ec-thumbprint"
+      },
+      "claim": {
+        "resolutionSource": "local",
+        "status": "local",
+        "evidenceAuthority": "device_claim",
+        "affectsV4Score": false,
+        "trustScore": 90,
+        "capturedAt": "2026-07-16T12:00:00Z",
+        "provenance": {
+          "origin": "hol-guard-local",
+          "verificationStatus": "locally_derived",
+          "derivation": "test"
+        },
+        "metadata": {
+          "evidence": {
+            "source": "hol-guard-local-baseline",
+            "capturedAt": "2026-07-16T12:00:00Z"
+          },
+          "evidenceHash": "8fda5d32eebe28bc033609001afa619a120de93fbf6bff638a4f0e091f3a872d",
+          "evidenceSchemaVersion": "guard-aibom-local-baseline-evidence.v1"
+        }
+      },
+      "trusted_keys": [
+        {
+          "key_id": "guard-trust-ec",
+          "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiYzAe7PcABdBbBhZBRqF6AaWyUqI\nNPxHXfIGVTRX9n3/rYFtghmMS09AcEZjhDKMK0QUCv6Abc1iFiKkUyJ4xw==\n-----END PUBLIC KEY-----",
+          "fingerprint_sha256": "fa0dbc2dee3b8faffa4680e8f7fd9c6950862a809cf7b272d4df8dc7fc63f620",
           "public_jwk_thumbprint": "ec-thumbprint"
         }
       ],
