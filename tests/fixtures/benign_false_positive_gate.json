@@ -23664,7 +23664,8 @@
         "command": "find . -name node_modules -prune -o -type f -exec cat {} +"
       },
       "cwd": "worktree",
-      "expect": "not_allow"
+      "expect": "not_allow",
+      "contained_ok": true
     }
   ],
   "mcp_cases": [
