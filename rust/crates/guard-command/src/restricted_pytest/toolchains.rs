@@ -8,7 +8,8 @@ use std::os::unix::fs::MetadataExt;
 #[path = "user_tools.rs"]
 mod user_tools;
 pub(super) use user_tools::{
-    host_cargo_caches, host_corepack_home, host_go_module_cache, host_rustup_home, is_package_tree,
+    host_cargo_caches, host_corepack_home, host_go_module_cache, host_maven_repository,
+    host_rustup_home, is_package_tree,
 };
 
 /// Where `xcode-select -s` records the developer directory: the current
@@ -260,6 +261,7 @@ pub(super) fn workspace_exec_roots(
     workspace: &Path,
     go: bool,
     cargo: bool,
+    maven: bool,
 ) -> (Vec<PathBuf>, String) {
     let mut roots: Vec<PathBuf> = Vec::new();
     let mut entries: Vec<String> = Vec::new();
@@ -339,6 +341,18 @@ pub(super) fn workspace_exec_roots(
             }
         }
     }
+    // A Maven build resolves its dependencies from the local repository the
+    // host has already filled. The launch environment points the run's own
+    // local repository at a private directory with this one linked in, and
+    // runs offline. Only a run that reaches Maven gets it: the repository
+    // holds whatever the host has fetched, an internal artifact included.
+    if maven {
+        if let Some(repository) = host_maven_repository() {
+            if !roots.contains(&repository) {
+                roots.push(repository);
+            }
+        }
+    }
     (roots, entries.join(":"))
 }
 
@@ -364,15 +378,40 @@ const CARGO_WRITTEN_CHILDREN: &[(&str, &str)] = &[("registry", "src"), ("git", "
 /// the registry nor the link that would name it.
 pub(super) fn private_links(private_tmp: &Path, granted: &[PathBuf]) -> Vec<(PathBuf, PathBuf)> {
     let home = super::environment::cargo_home(private_tmp);
-    host_cargo_caches()
+    let mut links = maven_links(private_tmp, granted);
+    links.extend(
+        host_cargo_caches()
+            .into_iter()
+            .filter(|(_, cache)| granted.iter().any(|root| cache.starts_with(root)))
+            .flat_map(|(name, cache)| {
+                let written = CARGO_WRITTEN_CHILDREN
+                    .iter()
+                    .find_map(|(cache, child)| (*cache == name).then_some(*child));
+                cache_links(&home.join(name), &cache, written)
+            }),
+    );
+    links
+}
+
+/// The links that put the host's Maven repository below the run's own local
+/// repository. Maven writes its resolver locks and the artifacts it builds at
+/// the top of that directory, so the run gets one of its own, holding a link
+/// to each group the host has already fetched. `granted` is the plan's own
+/// executable roots, so a run that compiles no Java project reaches neither
+/// the repository nor a link that would name it.
+fn maven_links(private_tmp: &Path, granted: &[PathBuf]) -> Vec<(PathBuf, PathBuf)> {
+    let Some(repository) = host_maven_repository() else {
+        return Vec::new();
+    };
+    if !granted.iter().any(|root| repository.starts_with(root)) {
+        return Vec::new();
+    }
+    let local = super::environment::maven_repository(private_tmp);
+    fs::read_dir(&repository)
         .into_iter()
-        .filter(|(_, cache)| granted.iter().any(|root| cache.starts_with(root)))
-        .flat_map(|(name, cache)| {
-            let written = CARGO_WRITTEN_CHILDREN
-                .iter()
-                .find_map(|(cache, child)| (*cache == name).then_some(*child));
-            cache_links(&home.join(name), &cache, written)
-        })
+        .flatten()
+        .flatten()
+        .map(|group| (local.join(group.file_name()), group.path()))
         .collect()
 }
 
@@ -540,6 +579,7 @@ mod tests {
             Path::new("/nonexistent-workspace"),
             false,
             false,
+            false,
         );
         assert!(!roots.contains(&outside.0) && !roots.contains(&link));
         assert_eq!(path, "/usr/bin:/bin");
@@ -552,8 +592,10 @@ mod tests {
         let Some(cache) = host_go_module_cache() else {
             return;
         };
-        let (without, _) = workspace_exec_roots("", None, Path::new("/nonexistent"), false, false);
-        let (with, _) = workspace_exec_roots("", None, Path::new("/nonexistent"), true, false);
+        let (without, _) =
+            workspace_exec_roots("", None, Path::new("/nonexistent"), false, false, false);
+        let (with, _) =
+            workspace_exec_roots("", None, Path::new("/nonexistent"), true, false, false);
         assert!(!without.contains(&cache));
         assert!(with.contains(&cache));
     }
@@ -567,13 +609,36 @@ mod tests {
         if caches.is_empty() {
             return;
         }
-        let (without, _) = workspace_exec_roots("", None, Path::new("/nonexistent"), false, false);
-        let (with, _) = workspace_exec_roots("", None, Path::new("/nonexistent"), false, true);
+        let (without, _) =
+            workspace_exec_roots("", None, Path::new("/nonexistent"), false, false, false);
+        let (with, _) =
+            workspace_exec_roots("", None, Path::new("/nonexistent"), false, true, false);
         for (_, cache) in &caches {
             assert!(!without.contains(cache));
             assert!(with.contains(cache));
         }
         assert!(private_links(Path::new("/sandbox"), &without).is_empty());
         assert!(!private_links(Path::new("/sandbox"), &with).is_empty());
+    }
+
+    #[test]
+    fn the_maven_repository_is_an_executable_root_only_for_a_maven_run() {
+        // The repository holds the jars a build resolved, a plugin that the
+        // run executes included, so a workspace that builds no Maven project
+        // neither executes there nor gets a link that names it.
+        let Some(repository) = host_maven_repository() else {
+            return;
+        };
+        let (without, _) =
+            workspace_exec_roots("", None, Path::new("/nonexistent"), false, false, false);
+        let (with, _) =
+            workspace_exec_roots("", None, Path::new("/nonexistent"), false, false, true);
+        assert!(!without.contains(&repository));
+        assert!(with.contains(&repository));
+        let local = super::super::environment::maven_repository(Path::new("/sandbox"));
+        assert!(private_links(Path::new("/sandbox"), &with)
+            .iter()
+            .all(|(link, target)| link.starts_with(&local) && target.starts_with(&repository)));
+        assert!(private_links(Path::new("/sandbox"), &without).is_empty());
     }
 }

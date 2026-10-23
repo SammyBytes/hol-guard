@@ -40,6 +40,9 @@ const GO_MODULE_CACHE: &str = "go/pkg/mod";
 const CARGO_CACHES: &[&str] = &[".cargo/registry", ".cargo/git"];
 /// A rustup installation, relative to HOME.
 const RUSTUP_HOME: &str = ".rustup";
+/// Maven's local repository, relative to HOME. It holds the artifacts a build
+/// resolves; the run gets its own local repository with this one linked in.
+const MAVEN_REPOSITORY: &str = ".m2/repository";
 
 /// `canonical`, the resolved PATH entry, when it is a sealed tool directory
 /// of the caller's that a workspace run may read and execute from.
@@ -286,6 +289,18 @@ pub(super) fn cargo_caches(home: &Path) -> Vec<(&'static str, PathBuf)> {
 /// toolchain a build runs.
 pub(super) fn rustup_home(home: &Path) -> Option<PathBuf> {
     sealed_cache(home, RUSTUP_HOME)
+}
+
+/// Maven's local repository, holding the artifacts a build resolves. It sits
+/// below `~/.m2`, which also holds `settings.xml` and its server credentials;
+/// granting the repository on its own keeps those out of the run.
+pub(super) fn maven_repository(home: &Path) -> Option<PathBuf> {
+    sealed_cache(home, MAVEN_REPOSITORY)
+}
+
+/// [`maven_repository`] for this account's HOME from the password database.
+pub(in crate::restricted_pytest) fn host_maven_repository() -> Option<PathBuf> {
+    maven_repository(&host_home_directory()?)
 }
 
 /// [`go_module_cache`] for this account's HOME from the password database.

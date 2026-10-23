@@ -482,18 +482,20 @@ def test_an_environment_dump_is_reviewed_rather_than_refused(
 def test_jvm_build_goals_run_without_an_approval_prompt(
     gate_environment: tuple[BenignFixture, HookWorker],
 ) -> None:
-    """Compiling or testing a Java project is ordinary work, not a package fetch.
+    """Compiling or testing a Maven project is ordinary work, not a package fetch.
 
     The JVM package firewall owns ``mvn`` and ``gradle`` by executable name and
     carries no rule that tells a dependency operation from a lifecycle goal, so
-    every invocation but a bare ``--version`` queued a review row: ``mvn -q
-    test`` and ``./gradlew test`` both asked. A lifecycle goal reads the
-    dependency cache the project already resolved, and the workspace sandbox it
-    routes to instead has no network at all, so it cannot reach a registry.
-    The operations that fetch or publish artifacts keep the review.
+    every invocation but a bare ``--version`` queued a review row, ``mvn -q
+    test`` included. A Maven lifecycle goal now routes to the workspace sandbox
+    instead: it runs offline against a local repository of its own, linked to
+    the groups the host already fetched, so it compiles and tests without
+    reaching a registry. The goals that fetch or publish artifacts keep their
+    review, and so does Gradle, whose cache wants a writable home and takes
+    locks inside it, which the read-only link the sandbox grants cannot give.
     """
     fixture, worker = gate_environment
-    goals = ("mvn -q test", "mvn clean verify", "./mvnw test-compile", "gradle build", "./gradlew :app:test")
+    goals = ("mvn -q test", "mvn clean verify", "./mvnw test-compile", "mvn clean package -DskipTests")
     for index, command in enumerate(goals):
         case = GateCase(
             case_id=f"jvm-build-{index}@claude-code",
@@ -509,7 +511,14 @@ def test_jvm_build_goals_run_without_an_approval_prompt(
         description = _describe(case, result, approvals)
         assert approvals == 0, f"JVM build goal queued a review: {description}"
         assert _quiet_allow(result, approvals) or _contained(result), description
-    fetches = ("mvn dependency:copy-dependencies", "mvn deploy", "gradle --refresh-dependencies build")
+    fetches = (
+        "mvn dependency:copy-dependencies",
+        "mvn deploy",
+        "mvn -U test",
+        "gradle build",
+        "./gradlew :app:test",
+        "gradle --refresh-dependencies build",
+    )
     for index, command in enumerate(fetches):
         case = GateCase(
             case_id=f"jvm-fetch-{index}@claude-code",
