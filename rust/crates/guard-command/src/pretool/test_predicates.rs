@@ -1,0 +1,86 @@
+//! The `test` and `[` predicates that answer from their operands alone.
+//!
+//! `[ -z "$DEBUG" ] && echo quiet` and `[ "$NODE_ENV" = production ] && …`
+//! are how a script reads a variable it already has. The shell expands both
+//! operands before `test` starts, so the predicate compares two strings in
+//! memory and touches nothing: no file is opened, no directory is listed and
+//! no process is started. A comparison therefore needs none of the read
+//! bounds a file predicate needs, and holding one back only asks the user
+//! about a branch the script takes either way.
+//!
+//! An operand that is itself produced by a command substitution is a command
+//! of its own in the model and is judged there, so it cannot reach a verdict
+//! through this proof; the substitution spellings are refused here as well,
+//! because a word carrying one is not the plain string this proof stands for.
+
+/// Operators that compare two already-expanded operands. The numeric ones
+/// parse their operands as integers; neither form reads anything.
+const COMPARISONS: [&str; 9] = ["=", "==", "!=", "-eq", "-ne", "-lt", "-le", "-gt", "-ge"];
+
+/// The predicate itself, with a leading `!` removed. `[ ! -f .env ]` asks
+/// the same question of the same operands as `[ -f .env ]` and reads no
+/// more, so the negation changes which branch runs, not what is admitted.
+pub(super) fn without_negation(arguments: &[String]) -> &[String] {
+    match arguments.split_first() {
+        Some((first, rest)) if first == "!" => rest,
+        _ => arguments,
+    }
+}
+
+/// Whether `arguments` form a predicate that answers from its operands,
+/// optionally negated by a leading `!`.
+pub(super) fn answers_from_operands(arguments: &[String]) -> bool {
+    match without_negation(arguments) {
+        [word] => plain_operand(word),
+        [predicate, word] => matches!(predicate.as_str(), "-n" | "-z") && plain_operand(word),
+        [left, operator, right] => {
+            COMPARISONS.contains(&operator.as_str()) && plain_operand(left) && plain_operand(right)
+        }
+        _ => false,
+    }
+}
+
+/// A word the shell has already expanded to a plain string. A leading `-`
+/// would be read as a predicate rather than as an operand, and a command
+/// substitution runs a command this proof does not stand for.
+fn plain_operand(word: &str) -> bool {
+    !word.starts_with('-') && !word.contains('`') && !word.contains("$(")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::answers_from_operands;
+
+    fn arguments(words: &[&str]) -> Vec<String> {
+        words.iter().map(|word| (*word).to_string()).collect()
+    }
+
+    #[test]
+    fn admits_string_and_numeric_comparisons() {
+        for words in [
+            vec!["-z", "$DEBUG"],
+            vec!["-n", "$CI"],
+            vec!["$NODE_ENV", "=", "production"],
+            vec!["$NODE_ENV", "!=", "production"],
+            vec!["$COUNT", "-gt", "0"],
+            vec!["!", "-z", "$CI"],
+            vec!["$CI"],
+        ] {
+            assert!(answers_from_operands(&arguments(&words)), "{words:?}");
+        }
+    }
+
+    #[test]
+    fn refuses_file_predicates_and_substituted_operands() {
+        for words in [
+            vec!["-f", "README.md"],
+            vec!["-z", "$(cat /etc/shadow)"],
+            vec!["-z", "`cat /etc/shadow`"],
+            vec!["-z", "$DEBUG", "-a", "-f", ".env"],
+            vec!["$NODE_ENV", "-a", "production"],
+            vec![],
+        ] {
+            assert!(!answers_from_operands(&arguments(&words)), "{words:?}");
+        }
+    }
+}
