@@ -121,10 +121,12 @@ def test_only_the_marked_cases_may_pass_on_containment() -> None:
     assert marked == {
         "neg-cargo-check-locked-host-toolchain",
         # A missing name under a guarded root: the read keeps its review, and a
-        # contained run reaches neither the credential store nor the system
-        # directory, so nothing there is read and nothing reports whether it is
-        # there.
+        # contained run reaches none of the credential store, the key directory,
+        # the hidden home component or the system directory, so nothing there is
+        # read and nothing reports whether it is there.
         "neg-cat-missing-name-inside-a-credential-store",
+        "neg-cat-missing-name-inside-a-hidden-key-directory",
+        "neg-cat-missing-name-under-a-hidden-home-component",
         "neg-cat-missing-name-under-system-configuration",
         "neg-cat-missing-name-under-system-logs",
         # A filter whose grammar the read recognizer rejects: the operands stay inside the

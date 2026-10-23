@@ -11,13 +11,31 @@ fn weak_canonical_path(path: &std::path::Path) -> Option<std::path::PathBuf> {
     let mut missing: Vec<&std::ffi::OsStr> = Vec::new();
     let mut prefix = path;
     loop {
-        if let Ok(mut resolved) = std::fs::canonicalize(prefix) {
-            resolved.extend(missing.iter().rev());
-            return Some(resolved);
+        match std::fs::canonicalize(prefix) {
+            Ok(mut resolved) => {
+                resolved.extend(missing.iter().rev());
+                return Some(resolved);
+            }
+            // Only a component the kernel reports absent may be appended and
+            // the walk continued. Any other error leaves the rest of the path
+            // unresolved: a link inside it could name anywhere, so there is no
+            // spelling to screen and the read keeps its review.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return None,
         }
         missing.push(prefix.file_name()?);
         prefix = prefix.parent()?;
     }
+}
+
+/// Whether nothing is at `path`, as opposed to something this process may not
+/// look at. Any error other than `ENOENT` leaves what is there unknown, and an
+/// unknown file is not a missing one.
+fn is_absent(path: &std::path::Path) -> bool {
+    matches!(
+        std::fs::symlink_metadata(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound
+    )
 }
 
 /// A shell read of an absolute path with no file at it.
@@ -34,7 +52,7 @@ pub(super) fn missing_absolute_read_allowed(
     cwd: Option<&str>,
 ) -> bool {
     weak_canonical_path(path).is_some_and(|resolved| {
-        std::fs::symlink_metadata(&resolved).is_err()
+        is_absent(&resolved)
             && resolved_path_allowed_for_operation(&resolved, home_dir, cwd, false, true)
     })
 }
@@ -115,16 +133,36 @@ mod tests {
             cwd: workspace.to_str(),
             ..Default::default()
         };
-        for (command, proven) in [
-            (format!("cat {w}/absent-notes.md"), true),
-            (format!("head -5 {w}/absent/notes.md"), true),
+        // `(command, the read's segment, whether the whole command is proven)`.
+        // A planter runs before the read in some and after it in others: the
+        // shell plants the path either way before the read opens it, so the
+        // read's own segment must lose its proof in both orders.
+        for (command, read, proven) in [
+            (format!("cat {w}/absent-notes.md"), 0, true),
+            (format!("head -5 {w}/absent/notes.md"), 0, true),
             (
                 format!("ln -s {w}/present {w}/cfg && cat {w}/cfg/absent-notes.md"),
+                1,
                 false,
             ),
-            (format!("mkdir -p {w}/cfg && cat {w}/cfg/notes.md"), false),
+            (
+                format!("mkdir -p {w}/cfg && cat {w}/cfg/notes.md"),
+                1,
+                false,
+            ),
             (
                 format!("touch {w}/absent-notes.md && cat {w}/absent-notes.md"),
+                1,
+                false,
+            ),
+            (
+                format!("cat {w}/cfg/absent-notes.md; ln -s {w}/present {w}/cfg"),
+                0,
+                false,
+            ),
+            (
+                format!("cat {w}/absent-notes.md && touch {w}/absent-notes.md"),
+                0,
                 false,
             ),
         ] {
@@ -137,6 +175,36 @@ mod tests {
             .expect("command model");
             let covered = crate::pretool::benign_command_segments(&model, context);
             assert_eq!(covered.len() == model.segments.len(), proven, "{command}");
+            // Not merely fewer proofs than segments: the read itself is the
+            // segment that must keep its review when anything could plant it.
+            assert_eq!(covered.contains(&read), proven, "{command}");
+        }
+    }
+
+    /// A link whose destination cannot be traversed resolves to nothing the
+    /// screens can read. Reporting that as absence would let the read's own
+    /// spelling stand in for a destination nobody screened.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_whose_destination_cannot_be_traversed_keeps_the_review() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let (_root, home, workspace) = fixture();
+        let locked = workspace.join("locked");
+        std::fs::create_dir_all(locked.join("inner")).expect("inner directory");
+        symlink(locked.join("inner"), workspace.join("cfg")).expect("link");
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).expect("lock");
+        let blocked = std::fs::read_dir(&locked).is_err();
+        let allowed = missing_absolute_read_allowed(
+            &workspace.join("cfg").join("absent-notes.md"),
+            home.to_str(),
+            workspace.to_str(),
+        );
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).expect("unlock");
+        // A container that runs this as root traverses the directory anyway,
+        // and then the path is an ordinary missing name under the workspace.
+        if blocked {
+            assert!(!allowed);
         }
     }
 }
