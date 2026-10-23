@@ -88,11 +88,18 @@ fn an_offset_may_carry_seconds() {
         parse_attestation_timestamp("2026-10-23T12:00:00+05:30"),
         Some(NOON - 19_800_000_000)
     );
-    // CPython reads an offset with no whole seconds as UTC, fraction or not.
-    assert_eq!(
-        parse_attestation_timestamp("2026-10-23T12:00:00-00:00:00.000001"),
-        Some(NOON)
-    );
+    // A fraction of a second of offset is not an offset either. Interpreters
+    // disagree about what one means — the older reading dropped it and called
+    // the result UTC, the newer one honours it — so the shape refuses it and
+    // the string is no instant.
+    for spelling in [
+        "2026-10-23T12:00:00-00:00:00.000001",
+        "2026-10-23T12:00:00+00:00:00.999999",
+        "2026-10-23T12:00:00-00:00:01.000001",
+        "2026-10-23T12:00:00+05:30:15.500000",
+    ] {
+        assert_eq!(parse_attestation_timestamp(spelling), None, "{spelling}");
+    }
     // A whole day of offset is not an offset.
     assert_eq!(
         parse_attestation_timestamp("2026-10-23T12:00:00+24:00"),

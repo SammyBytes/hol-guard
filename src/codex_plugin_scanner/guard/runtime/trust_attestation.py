@@ -650,10 +650,17 @@ _ATTESTATION_SUBJECT_BINDING_FIELDS = frozenset(
 # reads ``24:00`` as the next midnight. The Rust port in
 # ``rust/crates/guard-command/src/attestation_timestamp.rs`` holds the same
 # shape, so every interpreter and the native runtime give one answer.
+#
+# A UTC offset carries no fraction here. Interpreters disagree about what one
+# means: the reader behind ``fromisoformat`` used to ask only whether the
+# offset's whole seconds were zero, so it read ``+00:00:00.999999`` as UTC
+# itself, and newer ones read it as a microsecond east. Neither RFC 3339 nor
+# ISO 8601 admits the spelling, so an attestation carrying one is no longer an
+# instant on either side rather than a different instant per interpreter.
 _ATTESTATION_TIMESTAMP_SHAPE = re.compile(
     r"\d{4}-\d{2}-\d{2}[Tt ]"
     r"(?:[01]\d|2[0-3]):\d{2}(?::\d{2}(?:\.(?:\d{6}|\d{3}))?)?"
-    r"[+-]\d{2}:\d{2}(?::\d{2}(?:\.\d{6})?)?",
+    r"[+-]\d{2}:\d{2}(?::\d{2})?",
     re.ASCII,
 )
 

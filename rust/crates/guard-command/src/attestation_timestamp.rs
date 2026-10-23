@@ -12,12 +12,19 @@
 //! `_ATTESTATION_TIMESTAMP_SHAPE`:
 //!
 //! ```text
-//! YYYY-MM-DD(T|t| )HH:MM[:SS[.fff|.ffffff]](+|-)HH:MM[:SS[.ffffff]]
+//! YYYY-MM-DD(T|t| )HH:MM[:SS[.fff|.ffffff]](+|-)HH:MM[:SS]
 //! ```
 //!
 //! after a trailing `Z` becomes `+00:00`, with the hour below 24. Every
 //! timestamp Guard writes has that shape. Inside it every supported
 //! interpreter reads the same instant, and `from_isoformat` computes it.
+//!
+//! An offset carries no fraction for the same reason. The reader behind
+//! `fromisoformat` used to ask only whether the offset's whole seconds were
+//! zero, so `+00:00:00.999999` was UTC itself; newer interpreters read it as a
+//! microsecond east. Neither RFC 3339 nor ISO 8601 admits the spelling, so the
+//! shape refuses it and both runtimes call it no instant at all, rather than a
+//! different instant per interpreter.
 //!
 //! Python strips the input with `str.strip`, which also removes the four
 //! ASCII separators U+001C..U+001F that `char::is_whitespace` keeps;
@@ -141,13 +148,9 @@ fn has_attestation_shape(value: &str) -> bool {
     if !offset {
         return false;
     }
-    if take_byte(bytes, &mut at, b":") {
-        if !take_digits(bytes, &mut at, 2) {
-            return false;
-        }
-        if take_byte(bytes, &mut at, b".") && !take_digits(bytes, &mut at, 6) {
-            return false;
-        }
+    // An offset carries no fraction: see the note on the module.
+    if take_byte(bytes, &mut at, b":") && !take_digits(bytes, &mut at, 2) {
+        return false;
     }
     at == bytes.len()
 }
@@ -346,9 +349,10 @@ fn parse_isoformat_time(tstr: &[u8]) -> Option<IsoTime> {
             return None;
         }
         let tz_comps = parse_hh_mm_ss_ff(tzstr)?;
-        // `tzinfo_from_isoformat_results` asks only whether the whole
-        // seconds are zero, so `-00:00:00.000001` is UTC, not a microsecond
-        // west of it.
+        // `tzinfo_from_isoformat_results` asks only whether the whole seconds
+        // are zero and drops the fraction, which is the reading interpreters
+        // have since changed. The shape admits no fraction to drop, so this
+        // agrees with every one of them.
         if tz_comps[..3].iter().all(|part| *part == 0) {
             offset_micros = Some(0);
         } else {

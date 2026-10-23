@@ -1979,11 +1979,11 @@
     },
     {
       "input": "2026-10-23T12:00+05:30:15.500000",
-      "epochMicroseconds": 1792736984500000
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23 12:00+05:30:15.500000",
-      "epochMicroseconds": 1792736984500000
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23T12:00+24:00",
@@ -2259,11 +2259,11 @@
     },
     {
       "input": "2026-10-23T12:00:00+05:30:15.500000",
-      "epochMicroseconds": 1792736984500000
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23 12:00:00+05:30:15.500000",
-      "epochMicroseconds": 1792736984500000
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23T12:00:00+24:00",
@@ -2819,11 +2819,11 @@
     },
     {
       "input": "2026-10-23T12:00:00.123456+05:30:15.500000",
-      "epochMicroseconds": 1792736984623456
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23 12:00:00.123456+05:30:15.500000",
-      "epochMicroseconds": 1792736984623456
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23T12:00:00.123456+24:00",
@@ -4079,11 +4079,11 @@
     },
     {
       "input": "2026-10-23T23:59:59.999999+05:30:15.500000",
-      "epochMicroseconds": 1792780184499999
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23 23:59:59.999999+05:30:15.500000",
-      "epochMicroseconds": 1792780184499999
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23T23:59:59.999999+24:00",
@@ -5007,7 +5007,7 @@
     },
     {
       "input": "2024-02-29T12:00:00+05:30:15.500000",
-      "epochMicroseconds": 1709188184500000
+      "epochMicroseconds": null
     },
     {
       "input": "2024-02-29T12:00:00+24:00",
@@ -5347,7 +5347,7 @@
     },
     {
       "input": "0001-01-01T12:00:00+05:30:15.500000",
-      "epochMicroseconds": -62135573415500000
+      "epochMicroseconds": null
     },
     {
       "input": "0001-01-01T12:00:00+24:00",
@@ -5415,7 +5415,7 @@
     },
     {
       "input": "9999-12-31T12:00:00+05:30:15.500000",
-      "epochMicroseconds": 253402237784500000
+      "epochMicroseconds": null
     },
     {
       "input": "9999-12-31T12:00:00+24:00",
@@ -6119,7 +6119,7 @@
     },
     {
       "input": "2026-10-23T12:00:00-23:59:59.999999",
-      "epochMicroseconds": 1792843199999999
+      "epochMicroseconds": null
     },
     {
       "input": "\u001c2026-10-23T12:00:00Z",
@@ -6147,15 +6147,15 @@
     },
     {
       "input": "2026-10-23T12:00:00-00:00:00.000001",
-      "epochMicroseconds": 1792756800000000
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23T12:00:00+00:00:00.999999",
-      "epochMicroseconds": 1792756800000000
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23T12:00:00-00:00:01.000001",
-      "epochMicroseconds": 1792756801000001
+      "epochMicroseconds": null
     },
     {
       "input": "2026-10-23T12:00:00.123+05:30",

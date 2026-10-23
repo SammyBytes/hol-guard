@@ -81,3 +81,58 @@ fn recorded_payloads_replay_under_their_recorded_key() {
         );
     }
 }
+
+/// Whether `input` ends in a UTC offset that carries a fraction of a second,
+/// as `[+-]HH:MM:SS.d+`.
+fn has_fractional_offset(input: &str) -> bool {
+    let Some(sign) = input.rfind(['+', '-']).filter(|at| *at >= 10) else {
+        return false;
+    };
+    let offset = &input[sign + 1..];
+    let Some((whole, fraction)) = offset.split_once('.') else {
+        return false;
+    };
+    let parts: Vec<&str> = whole.split(':').collect();
+    parts.len() == 3
+        && parts
+            .iter()
+            .all(|part| part.len() == 2 && part.bytes().all(|byte| byte.is_ascii_digit()))
+        && !fraction.is_empty()
+        && fraction.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+#[test]
+fn the_fixture_keeps_the_offsets_the_interpreters_read_differently() {
+    // The reader behind `fromisoformat` used to ask only whether an offset's
+    // whole seconds were zero and drop the fraction, so `+00:00:00.999999` was
+    // UTC itself; newer interpreters read it as a microsecond east. The shape
+    // refuses the spelling outright, so neither reading is ours to hold.
+    let vectors = vectors();
+    let cases = vectors["timestamps"].as_array().expect("timestamps array");
+    let fractional: Vec<&str> = cases
+        .iter()
+        .filter_map(|case| case["input"].as_str())
+        .filter(|input| has_fractional_offset(input))
+        .collect();
+    assert!(
+        fractional.len() >= 15,
+        "the fixture records too few fractional offsets: {}",
+        fractional.len()
+    );
+    for input in &fractional {
+        assert_eq!(
+            parse_attestation_timestamp(input),
+            None,
+            "{input:?} is not an instant"
+        );
+    }
+    for spelling in [
+        "2026-10-23T12:00:00-00:00:00.000001",
+        "2026-10-23T12:00:00+00:00:00.999999",
+    ] {
+        assert!(
+            fractional.contains(&spelling),
+            "{spelling} left the fixture"
+        );
+    }
+}
