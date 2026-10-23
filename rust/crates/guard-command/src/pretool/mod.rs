@@ -91,6 +91,7 @@ mod git_search_text;
 pub(crate) mod git_side_record_reads;
 pub(crate) mod git_stash_reads;
 pub(crate) mod git_tag_listing;
+pub(crate) mod recoverable_removal;
 mod repo_create_reason;
 mod root_removal;
 use git_reads::safe_git_arguments;
@@ -197,6 +198,7 @@ pub(crate) use script_content::{
     activation_script_text, sole_program_sources, sourced_program_sources, sourcing_bounded_sources,
 };
 pub(crate) use segment_proof::{benign_command_segments, without_stderr_merge};
+pub(crate) use trailing_group::unwrap as ungrouped_command_list;
 pub(crate) use worktree_add::new_checkout_route;
 pub(crate) use worktree_add::verified_leading_cd;
 
@@ -246,6 +248,12 @@ fn pretool_decision(
 
 pub(super) fn normalized_haystack(value: &str) -> String {
     value.to_ascii_lowercase().replace('\\', "/")
+}
+
+/// Whether `command` runs `rm -rf` on the filesystem root, a system
+/// directory, a home or a direct child of one.
+pub(crate) fn removes_a_root(command: &str) -> bool {
+    root_removal::removes_a_root(&normalized_haystack(command))
 }
 
 /// Floors no extension permission can settle: Guard self-protection, secret
@@ -816,9 +824,18 @@ pub(super) fn evaluate_pre_tool_with_execution_context(
     }
 }
 
-/// A trailing subshell group is its command list. Only an allow or a block
-/// for that list replaces the grouped review, so an approval still binds the
-/// exact text the agent sent.
+/// A trailing subshell group is its command list, so that list's decision is
+/// the group's. A review for the list replaces the grouped review too: the
+/// group's own text models no command at all, and a decision with no modeled
+/// command cannot be contained or settled by an extension permission, so
+/// `(cd web && npm run build)` went to the user while `cd web && npm run
+/// build` ran in the workspace sandbox. The ungrouped model carries the same
+/// commands, and later layers judge those rather than an unmodeled string.
+///
+/// An approval taken on the reviewed group therefore binds the command list
+/// the group runs, not the parenthesized spelling. That is the same identity
+/// an allow or a block for the list already carried, and the group runs
+/// exactly that list, so the two spellings settle together on purpose.
 fn ungrouped_decision(
     request: &CommandModelRequestV1,
     decision: PreToolDecisionV1,
@@ -835,7 +852,7 @@ fn ungrouped_decision(
         ..request.clone()
     };
     match evaluate_single_command(&ungrouped, home_dir, cwd, deadline, execution_environment) {
-        Ok(plain) if matches!(plain.minimum_action.as_str(), "allow" | "block") => plain,
+        Ok(plain) if matches!(plain.minimum_action.as_str(), "allow" | "review" | "block") => plain,
         _ => decision,
     }
 }
@@ -1040,6 +1057,14 @@ fn evaluate_single_command(
             })
     {
         return Ok(pretool_decision(model, "allow", reason_code, reason));
+    }
+    if recoverable_removal::exact_safe_command(&model, context, deadline, execution_environment) {
+        return Ok(pretool_decision(
+            model,
+            "allow",
+            "native_exact_safe_recoverable_removal",
+            "The Rust command authority proved every target of this recursive removal holds only committed, unmodified files in the session's Git work tree, so Git can restore it.",
+        ));
     }
     if worktree_maintenance::exact_safe_command(&model, context, deadline, execution_environment) {
         return Ok(pretool_decision(
