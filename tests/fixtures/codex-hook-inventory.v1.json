@@ -16,7 +16,8 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": []
     },
     {
       "name": "a hooks value that is not an event table",
@@ -35,7 +36,8 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_unsupported_event_shape: /home/agent/.codex/hooks.json in /home/agent/.codex/hooks.json. Codex hooks must be an event table. Repair the hook configuration before retrying install."
-      ]
+      ],
+      "records": []
     },
     {
       "name": "an event whose groups are not a list",
@@ -56,7 +58,8 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_unsupported_event_shape: PreToolUse in /home/agent/.codex/hooks.json. Each Codex hook event must contain a list of matcher groups. Repair the event shape before retrying install."
-      ]
+      ],
+      "records": []
     },
     {
       "name": "a group that is not an object",
@@ -77,7 +80,8 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_group: PreToolUse/group[0] in /home/agent/.codex/hooks.json. Each Codex hook matcher group must be an object. Repair the group before retrying install."
-      ]
+      ],
+      "records": []
     },
     {
       "name": "a group whose matcher is not a string",
@@ -106,6 +110,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_group: PreToolUse/group[0] in /home/agent/.codex/hooks.json. A Codex hook matcher and activation fields must use supported scalar types. Repair the group before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -136,6 +147,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_group: PreToolUse/group[0] in /home/agent/.codex/hooks.json. A Codex hook matcher and activation fields must use supported scalar types. Repair the group before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -162,7 +180,8 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_group: PreToolUse/group[0] in /home/agent/.codex/hooks.json. A Codex hook group's handlers must be a list. Repair the group before retrying install."
-      ]
+      ],
+      "records": []
     },
     {
       "name": "a group with no handlers key",
@@ -183,7 +202,8 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": []
     },
     {
       "name": "a handler that is not an object",
@@ -209,7 +229,8 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. Each Codex hook handler must be an object. Repair the handler before retrying install."
-      ]
+      ],
+      "records": []
     },
     {
       "name": "a command handler with no command",
@@ -237,6 +258,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex command hook must contain a non-empty string command. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -266,6 +294,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex command hook must contain a non-empty string command. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -295,6 +330,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_unknown_handler_type: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. Guard found an executable Codex hook type it cannot model. Remove or convert the handler to a supported command hook before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -325,6 +367,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex hook timeout must be a finite non-negative number. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -355,6 +404,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex hook timeout must be a finite non-negative number. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -387,6 +443,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex hook environment must be a string-keyed object. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -417,6 +480,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. Codex hook activation fields must be booleans. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -444,7 +514,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "a handler with no type but a command is still executable",
@@ -470,7 +547,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "a handler with neither type nor command is inert",
@@ -496,7 +580,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": false
+        }
+      ]
     },
     {
       "name": "a disabled group deactivates its handler",
@@ -524,7 +615,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": false,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "a disabled handler is inactive inside an active group",
@@ -552,7 +650,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": false,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "an integer and a float timeout are both kept",
@@ -585,7 +690,19 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        },
+        {
+          "coordinate": "PreToolUse/group[0]/handler[1]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "environment keys are sorted",
@@ -616,7 +733,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "an authenticated binding claims its handler",
@@ -654,7 +778,14 @@
         }
       ],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "a legacy binding claims its handler",
@@ -692,7 +823,14 @@
           }
         }
       ],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "a binding for a different matcher claims nothing",
@@ -730,7 +868,14 @@
         }
       ],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "the reserved toml hook state table is skipped",
@@ -756,14 +901,21 @@
         }
       },
       "source": {
-        "path": "/home/agent/.codex/hooks.json",
+        "path": "/home/agent/.codex/config.toml",
         "scope": "global",
         "format": "toml",
         "hooks_enabled": true
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "the same state table is an event shape in json",
@@ -786,7 +938,8 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_unsupported_event_shape: state in /home/agent/.codex/hooks.json. Each Codex hook event must contain a list of matcher groups. Repair the event shape before retrying install."
-      ]
+      ],
+      "records": []
     },
     {
       "name": "a state table whose hash is not a sha256 digest is an event shape",
@@ -800,7 +953,7 @@
         }
       },
       "source": {
-        "path": "/home/agent/.codex/hooks.json",
+        "path": "/home/agent/.codex/config.toml",
         "scope": "global",
         "format": "toml",
         "hooks_enabled": true
@@ -808,8 +961,9 @@
       "authenticated": [],
       "legacy": [],
       "warnings": [
-        "codex_hook_inventory_unsupported_event_shape: state in /home/agent/.codex/hooks.json. Each Codex hook event must contain a list of matcher groups. Repair the event shape before retrying install."
-      ]
+        "codex_hook_inventory_unsupported_event_shape: state in /home/agent/.codex/config.toml. Each Codex hook event must contain a list of matcher groups. Repair the event shape before retrying install."
+      ],
+      "records": []
     },
     {
       "name": "two events keep their own coordinates",
@@ -847,7 +1001,19 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        },
+        {
+          "coordinate": "PostToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "a source whose hooks are not enabled records that on each handler",
@@ -874,7 +1040,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
+      ]
     },
     {
       "name": "a group whose handlers key is null is skipped",
@@ -896,7 +1069,8 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": []
     },
     {
       "name": "an event with no matcher groups reports nothing",
@@ -913,7 +1087,8 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": []
     },
     {
       "name": "a group reports its matcher and its handler list separately",
@@ -940,7 +1115,8 @@
       "warnings": [
         "codex_hook_inventory_malformed_group: PreToolUse/group[0] in /home/agent/.codex/hooks.json. A Codex hook matcher and activation fields must use supported scalar types. Repair the group before retrying install.",
         "codex_hook_inventory_malformed_group: PreToolUse/group[0] in /home/agent/.codex/hooks.json. A Codex hook group's handlers must be a list. Repair the group before retrying install."
-      ]
+      ],
+      "records": []
     },
     {
       "name": "an executable handler whose command is not a string",
@@ -968,6 +1144,13 @@
       "legacy": [],
       "warnings": [
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex command hook must contain a non-empty string command. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -998,7 +1181,14 @@
       },
       "authenticated": [],
       "legacy": [],
-      "warnings": []
+      "warnings": [],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": false
+        }
+      ]
     },
     {
       "name": "one handler reports every shape issue it carries in order",
@@ -1036,6 +1226,13 @@
         "codex_hook_inventory_unknown_handler_type: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. Guard found an executable Codex hook type it cannot model. Remove or convert the handler to a supported command hook before retrying install.",
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex hook timeout must be a finite non-negative number. Repair the handler before retrying install.",
         "codex_hook_inventory_malformed_handler: PreToolUse/group[0]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex hook environment must be a string-keyed object. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[0]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     },
     {
@@ -1075,6 +1272,18 @@
       "warnings": [
         "codex_hook_inventory_malformed_group: PreToolUse/group[0] in /home/agent/.codex/hooks.json. Each Codex hook matcher group must be an object. Repair the group before retrying install.",
         "codex_hook_inventory_malformed_handler: PreToolUse/group[2]/handler[0] in /home/agent/.codex/hooks.json. An executable Codex command hook must contain a non-empty string command. Repair the handler before retrying install."
+      ],
+      "records": [
+        {
+          "coordinate": "PreToolUse/group[1]/handler[0]",
+          "active": true,
+          "executable": true
+        },
+        {
+          "coordinate": "PreToolUse/group[2]/handler[0]",
+          "active": true,
+          "executable": true
+        }
       ]
     }
   ]

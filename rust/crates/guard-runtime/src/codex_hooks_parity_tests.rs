@@ -3,9 +3,11 @@
 //! and detection reads this one, so the shapes each refuses, the coordinates it
 //! names and the repair wording it uses have to stay identical on both routes.
 //!
-//! The fixture pins issues only. A record carries the identity the resident
+//! The fixture pins the issues each shape produces and, for every record the
+//! walk keeps, its coordinate and the two flags that decide whether the hook
+//! runs. It records no identity: a record carries the identity the resident
 //! derives for it, which no fixture can replay, while the shape walk that
-//! produces these issues is ordinary code on both sides.
+//! produces these coordinates is ordinary code on both sides.
 
 use serde_json::Value;
 
@@ -62,5 +64,19 @@ fn recorded_shape_issues_still_describe_the_source() {
             .map(|warning| warning.as_str().expect("warning"))
             .collect();
         assert_eq!(inventory.warnings, expected, "{name}");
+
+        let recorded: Vec<Value> = inventory
+            .records
+            .iter()
+            .map(|record| {
+                serde_json::json!({
+                    "coordinate": record.coordinate(),
+                    "active": record.active,
+                    "executable": record.executable,
+                })
+            })
+            .collect();
+        let expected_records = case["records"].as_array().expect("records");
+        assert_eq!(&recorded, expected_records, "{name}");
     }
 }
