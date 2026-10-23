@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -11,6 +13,7 @@ from codex_plugin_scanner.guard.inventory_contract import (
     GuardAgentInventoryFinding,
     GuardAgentInventoryItem,
     GuardAgentInventorySnapshot,
+    _artifacts_with_unique_ids,
     fingerprint_mapping,
     fingerprint_path_tree,
     fingerprint_text,
@@ -912,6 +915,73 @@ def test_inventory_snapshot_keeps_distinct_entries_that_share_an_id(tmp_path: Pa
         "{home}/.zcode/cli/config.json",
         "{home}/.zcode/cli/setting.json",
     }
+
+
+def _docs_artifact(config_path: Path, command: str, artifact_id: str = "zcode:global:mcp:docs") -> GuardArtifact:
+    return GuardArtifact(
+        artifact_id=artifact_id,
+        name="docs",
+        harness="zcode",
+        artifact_type="mcp_server",
+        source_scope="global",
+        config_path=str(config_path),
+        command=command,
+    )
+
+
+def test_unique_ids_never_take_an_id_a_later_artifact_owns(tmp_path: Path) -> None:
+    setting = tmp_path / ".zcode" / "cli" / "setting.json"
+    suffix = fingerprint_text(redact_local_path(str(setting), home_dir=tmp_path))[:8]
+    artifacts = (
+        _docs_artifact(tmp_path / ".zcode" / "cli" / "config.json", "docs-mcp"),
+        _docs_artifact(setting, "notes-mcp"),
+        _docs_artifact(tmp_path / ".zcode" / "other.json", "other-mcp", f"zcode:global:mcp:docs#{suffix}"),
+    )
+
+    kept = _artifacts_with_unique_ids(artifacts, home_dir=tmp_path)
+    kept_ids = [cast(GuardArtifact, artifact).artifact_id for artifact in kept]
+
+    assert len(kept_ids) == 3
+    assert len(set(kept_ids)) == 3
+    assert kept_ids[1] == f"zcode:global:mcp:docs#{suffix}-2"
+    assert kept_ids[2] == f"zcode:global:mcp:docs#{suffix}"
+
+
+def test_unique_ids_keep_distinct_entries_that_are_not_dataclasses(tmp_path: Path) -> None:
+    artifacts = (
+        SimpleNamespace(artifact_id="docs", config_path=str(tmp_path / "a.json"), command="docs-mcp"),
+        SimpleNamespace(artifact_id="docs", config_path=str(tmp_path / "b.json"), command="notes-mcp"),
+        SimpleNamespace(artifact_id="docs", config_path=str(tmp_path / "c.json"), command="docs-mcp"),
+    )
+
+    kept = _artifacts_with_unique_ids(artifacts, home_dir=tmp_path)
+    kept_ids = [cast(SimpleNamespace, artifact).artifact_id for artifact in kept]
+
+    assert len(kept_ids) == 2
+    assert kept_ids[0] == "docs"
+    assert kept_ids[1].startswith("docs#")
+    assert artifacts[1].artifact_id == "docs"
+
+
+@dataclass(frozen=True)
+class _PathlessArtifact:
+    artifact_id: str
+    command: str
+
+
+def test_unique_ids_accept_dataclass_artifacts_without_a_config_path(tmp_path: Path) -> None:
+    artifacts = (
+        _PathlessArtifact("docs", "docs-mcp"),
+        _PathlessArtifact("docs", "docs-mcp"),
+        _PathlessArtifact("docs", "notes-mcp"),
+    )
+
+    kept = _artifacts_with_unique_ids(artifacts, home_dir=tmp_path)
+    kept_ids = [cast(_PathlessArtifact, artifact).artifact_id for artifact in kept]
+
+    assert len(kept_ids) == 2
+    assert kept_ids[0] == "docs"
+    assert kept_ids[1].startswith("docs#")
 
 
 def test_inventory_snapshot_serialization_keeps_evidence_authority(tmp_path: Path) -> None:

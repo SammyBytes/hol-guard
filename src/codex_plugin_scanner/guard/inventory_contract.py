@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy as copy
 import hashlib as hashlib
 import importlib as importlib
 import ipaddress as ipaddress
@@ -12,6 +13,7 @@ from collections.abc import Sequence as Sequence
 from dataclasses import asdict as asdict
 from dataclasses import dataclass as dataclass
 from dataclasses import field as field
+from dataclasses import fields as fields
 from dataclasses import is_dataclass as is_dataclass
 from dataclasses import replace as replace
 from datetime import datetime as datetime
@@ -270,10 +272,26 @@ def _scan_records(
 _ITEM_ID_MAX_LENGTH = 160
 
 
-def _artifact_without_config_path(artifact: object) -> object:
+def _artifact_with(artifact: object, **changes: str) -> object | None:
+    """Copy ``artifact`` with ``changes`` applied, or return None if it cannot take them."""
     if is_dataclass(artifact) and not isinstance(artifact, type):
-        return replace(artifact, config_path="")
-    return artifact
+        if not changes.keys() <= {item.name for item in fields(artifact)}:
+            return None
+        return replace(artifact, **changes)
+    try:
+        updated = copy.copy(artifact)
+        for name, value in changes.items():
+            setattr(updated, name, value)
+    except (AttributeError, TypeError):
+        return None
+    return updated
+
+
+def _artifact_without_config_path(artifact: object) -> object:
+    if not hasattr(artifact, "config_path"):
+        return artifact
+    stripped = _artifact_with(artifact, config_path="")
+    return artifact if stripped is None else stripped
 
 
 def _artifacts_with_unique_ids(artifacts: tuple[object, ...], *, home_dir: Path) -> tuple[object, ...]:
@@ -285,24 +303,23 @@ def _artifacts_with_unique_ids(artifacts: tuple[object, ...], *, home_dir: Path)
     harness would otherwise fail to sync. A copy that differs only in its
     config path is the same entry and is dropped. A different entry that happens
     to share the ID (two hooks at the same index in different files) is kept
-    under an ID suffixed with its config path's fingerprint.
+    under an ID suffixed with its config path's fingerprint. Every original ID
+    is reserved first, so a generated ID never takes one a later artifact owns.
     """
     kept: list[object] = []
     entries_by_id: dict[str, list[object]] = {}
-    used_ids: set[str] = set()
+    used_ids = {str(getattr(artifact, "artifact_id", "")) for artifact in artifacts}
     for artifact in artifacts:
         artifact_id = str(getattr(artifact, "artifact_id", ""))
-        if artifact_id not in used_ids:
-            kept.append(artifact)
-            used_ids.add(artifact_id)
-            entries_by_id.setdefault(artifact_id, []).append(_artifact_without_config_path(artifact))
-            continue
         entry = _artifact_without_config_path(artifact)
-        if entry in entries_by_id[artifact_id]:
+        entries = entries_by_id.setdefault(artifact_id, [])
+        if not entries:
+            entries.append(entry)
+            kept.append(artifact)
             continue
-        if not (is_dataclass(artifact) and not isinstance(artifact, type)):
+        if entry in entries:
             continue
-        entries_by_id[artifact_id].append(entry)
+        entries.append(entry)
         config_path = str(getattr(artifact, "config_path", ""))
         suffix = fingerprint_text(redact_local_path(config_path, home_dir=home_dir))[:8]
         candidate = f"{artifact_id[: _ITEM_ID_MAX_LENGTH - len(suffix) - 1]}#{suffix}"
@@ -311,8 +328,11 @@ def _artifacts_with_unique_ids(artifacts: tuple[object, ...], *, home_dir: Path)
             tail = f"{suffix}-{counter}"
             candidate = f"{artifact_id[: _ITEM_ID_MAX_LENGTH - len(tail) - 1]}#{tail}"
             counter += 1
+        renamed = _artifact_with(artifact, artifact_id=candidate)
+        if renamed is None:
+            continue
         used_ids.add(candidate)
-        kept.append(replace(artifact, artifact_id=candidate))
+        kept.append(renamed)
     return tuple(kept)
 
 
