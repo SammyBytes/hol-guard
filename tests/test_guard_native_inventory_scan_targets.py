@@ -8,6 +8,7 @@ the caller with nothing to scan rather than a selection made here.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -113,9 +114,7 @@ def test_an_mcp_artifact_ships_no_skill_root(monkeypatch: pytest.MonkeyPatch) ->
         metadata={"skill_root": "/w/skills"},
     )
     _ask(artifacts=(artifact,))
-    assert sent[0]["artifacts"] == [
-        {"artifact_type": "mcp_server", "config_path": "/w/.cursor/mcp.json"}
-    ]
+    assert sent[0]["artifacts"] == [{"artifact_type": "mcp_server", "config_path": "/w/.cursor/mcp.json"}]
 
 
 def test_an_artifact_the_selection_never_reads_is_not_carried(
@@ -187,6 +186,33 @@ def test_the_deadline_grows_with_the_detection_and_stops_at_the_ceiling(
     assert bridge._request_timeout_seconds(1_000_000) == 60.0
 
 
+def test_the_callers_budget_caps_the_deadline_and_never_reaches_zero() -> None:
+    assert bridge._request_timeout_seconds(0, 3.0) == 3.0
+    # A budget wider than the pass needs leaves the pass its own deadline.
+    assert bridge._request_timeout_seconds(0, 600.0) == 15.0
+    # A spent budget still asks with a real deadline: zero would put the socket
+    # in non-blocking mode rather than meaning "answer at once".
+    assert bridge._request_timeout_seconds(10, 0.0) == 0.001
+
+
+def test_the_deadline_sent_to_the_resident_is_the_one_the_caller_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deadlines: list[float] = []
+    monkeypatch.setattr(bridge, "_resolve_digest_home", lambda _home: Path("/tmp/scan-targets-home"))
+    monkeypatch.setattr(bridge, "ensure_resident_prerequisite", lambda _home: True)
+
+    def fake(*, request, timeout_seconds, **_kwargs):
+        deadlines.append(timeout_seconds)
+        return _empty(request)
+
+    monkeypatch.setattr(bridge, "_resident_request", fake)
+    monkeypatch.setattr(bridge, "_payload", lambda response, _request, _home: response)
+
+    _ask(timeout_seconds=2.5)
+    assert deadlines == [2.5]
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -198,10 +224,52 @@ def test_the_deadline_grows_with_the_detection_and_stops_at_the_ceiling(
         {"mcp_targets": [], "skill_roots": [None]},
     ],
 )
-def test_a_malformed_answer_is_no_selection_at_all(
-    monkeypatch: pytest.MonkeyPatch, payload: dict[str, object]
-) -> None:
+def test_a_malformed_answer_is_no_selection_at_all(monkeypatch: pytest.MonkeyPatch, payload: dict[str, object]) -> None:
     _resident(monkeypatch, lambda _request: payload)
+    with pytest.raises(bridge.InventoryScanTargetsUnavailableError):
+        _ask()
+
+
+def test_target_lists_this_client_cannot_read_count_against_the_resident(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``_payload`` has already counted the bound reply as a resident success.
+
+    Without this record a resident answering every pass with lists this client
+    refuses would keep clearing its failure streak while no pass ever gets an
+    inventory, so the circuit that exists for an unusable resident would never
+    open.
+    """
+
+    recorded: list[tuple[str, Path, str]] = []
+    monkeypatch.setattr(
+        bridge,
+        "native_runtime_status",
+        lambda: SimpleNamespace(identity=SimpleNamespace(sha256="abc123")),
+    )
+    monkeypatch.setattr(
+        bridge,
+        "native_record_resident_failure",
+        lambda digest, home, reason: recorded.append((digest, home, reason)),
+    )
+    _resident(monkeypatch, lambda _request: {"mcp_targets": "all", "skill_roots": []})
+
+    with pytest.raises(bridge.InventoryScanTargetsUnavailableError):
+        _ask()
+    assert recorded == [("abc123", Path("/tmp/scan-targets-home"), "native_inventory_scan_targets_payload")]
+
+
+def test_a_resident_with_no_identity_records_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(bridge, "native_runtime_status", lambda: SimpleNamespace(identity=None))
+    monkeypatch.setattr(
+        bridge,
+        "native_record_resident_failure",
+        lambda *_args, **_kwargs: pytest.fail("no identity to record against"),
+    )
+    _resident(monkeypatch, lambda _request: {"mcp_targets": "all", "skill_roots": []})
+
     with pytest.raises(bridge.InventoryScanTargetsUnavailableError):
         _ask()
 

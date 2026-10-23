@@ -51,13 +51,22 @@ def run_cisco_inventory_scans(
 ) -> tuple[CiscoInventoryRun, ...]:
     if mcp_mode == "off" and skill_mode == "off":
         return ()
+    # Choosing the targets is part of the pass the caller gave a budget to, so
+    # it is charged against that budget rather than taking a deadline of its
+    # own and still handing the scanners the whole of it.
+    pass_started = time.perf_counter()
     try:
-        targets = _scan_targets(harness=harness, context=context, detection=detection)
+        targets = _scan_targets(
+            harness=harness,
+            context=context,
+            detection=detection,
+            timeout_seconds=timeout_seconds,
+        )
     except InventoryScanTargetsUnavailableError:
         return _unavailable_runs(mcp_mode=mcp_mode, skill_mode=skill_mode)
 
     runs: list[CiscoInventoryRun] = []
-    remaining_timeout_seconds = timeout_seconds
+    remaining_timeout_seconds = _consume_timeout_budget(timeout_seconds, started_at=pass_started)
     if mcp_mode != "off":
         mcp_started = time.perf_counter()
         runs.extend(
@@ -82,7 +91,13 @@ def run_cisco_inventory_scans(
     return tuple(runs)
 
 
-def _scan_targets(*, harness: str, context: HarnessContext, detection: object) -> CiscoScanTargets:
+def _scan_targets(
+    *,
+    harness: str,
+    context: HarnessContext,
+    detection: object,
+    timeout_seconds: float | None = None,
+) -> CiscoScanTargets:
     """Ask the resident what this pass is allowed to read."""
 
     return native_inventory_scan_targets(
@@ -91,6 +106,7 @@ def _scan_targets(*, harness: str, context: HarnessContext, detection: object) -
         workspace_dir=context.workspace_dir,
         artifacts=tuple(getattr(detection, "artifacts", ())),
         guard_home=getattr(context, "guard_home", None),
+        timeout_seconds=timeout_seconds,
     )
 
 

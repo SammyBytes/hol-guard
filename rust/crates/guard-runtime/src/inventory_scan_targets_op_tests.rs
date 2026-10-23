@@ -1,4 +1,5 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -334,6 +335,75 @@ fn a_recorded_skill_root_holding_no_skills_falls_back_to_the_artifacts_own_path(
     );
 }
 
+/// A directory beside the workspace and the home, holding a skill a contained
+/// walk must never reach, and the skill inside the workspace that the artifact
+/// itself names.
+fn escape_fixture(fixture: &Fixture) -> (PathBuf, PathBuf, String) {
+    let outside = fixture
+        .workspace
+        .parent()
+        .expect("root")
+        .join("outside")
+        .join("skills");
+    write(&outside.join("stolen").join("SKILL.md"), "# stolen");
+    let skill = fixture.workspace.join("solo").join("SKILL.md");
+    write(&skill, "# solo");
+    (
+        outside,
+        fixture.workspace.join("solo"),
+        skill.to_string_lossy().into_owned(),
+    )
+}
+
+#[test]
+fn a_recorded_skill_root_climbing_out_of_its_base_is_left_unused() {
+    let fixture = fixture();
+    let (_outside, own, skill) = escape_fixture(&fixture);
+
+    let wire = request(
+        &fixture,
+        "claude_code",
+        vec![artifact(
+            "skill_file",
+            Some(&skill),
+            Some("../outside/skills"),
+        )],
+    );
+    assert_eq!(skill_roots(&wire), vec![own.to_string_lossy().into_owned()]);
+}
+
+#[test]
+fn an_absolute_recorded_skill_root_is_left_unused() {
+    let fixture = fixture();
+    let (outside, own, skill) = escape_fixture(&fixture);
+
+    let wire = request(
+        &fixture,
+        "claude_code",
+        vec![artifact(
+            "skill_file",
+            Some(&skill),
+            Some(&outside.to_string_lossy()),
+        )],
+    );
+    assert_eq!(skill_roots(&wire), vec![own.to_string_lossy().into_owned()]);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_recorded_skill_root_reached_through_a_symlink_out_of_its_base_is_left_unused() {
+    let fixture = fixture();
+    let (outside, own, skill) = escape_fixture(&fixture);
+    std::os::unix::fs::symlink(&outside, fixture.workspace.join("linked")).expect("symlink");
+
+    let wire = request(
+        &fixture,
+        "claude_code",
+        vec![artifact("skill_file", Some(&skill), Some("linked"))],
+    );
+    assert_eq!(skill_roots(&wire), vec![own.to_string_lossy().into_owned()]);
+}
+
 #[test]
 fn the_nearest_skills_directory_holding_skills_wins_over_the_skills_own_directory() {
     let fixture = fixture();
@@ -475,6 +545,7 @@ fn collections_are_reported_in_path_order_not_string_order() {
         cwd: cwd.as_path(),
         home: fixture.home.clone(),
         workspace: Some(fixture.workspace.clone()),
+        walked: RefCell::new(HashMap::new()),
         budget: Cell::new(INVENTORY_SCAN_TARGETS_MAX_VISITED_ENTRIES),
     };
     assert_eq!(
@@ -503,11 +574,61 @@ fn a_walk_past_the_requests_budget_is_refused_rather_than_truncated() {
         cwd: cwd.as_path(),
         home: fixture.home.clone(),
         workspace: Some(fixture.workspace.clone()),
+        walked: RefCell::new(HashMap::new()),
         budget: Cell::new(2),
     };
     assert_eq!(
         skill_dirs_under(&collection, &scan),
         Err("native_inventory_scan_targets_walk_too_large"),
+    );
+}
+
+#[test]
+fn one_collection_is_charged_against_the_budget_once_however_often_it_is_reached() {
+    let fixture = fixture();
+    let collection = fixture.workspace.join("skills");
+    for name in ["alpha", "beta", "gamma"] {
+        write(&collection.join(name).join("SKILL.md"), "# skill");
+    }
+
+    let cwd = fixture.workspace.clone();
+    let scan = Scan {
+        cwd: cwd.as_path(),
+        home: fixture.home.clone(),
+        workspace: Some(fixture.workspace.clone()),
+        walked: RefCell::new(HashMap::new()),
+        // Exactly what one walk of this collection visits, so a second walk
+        // that charged the budget again would have nothing left to spend.
+        budget: Cell::new(6),
+    };
+    let first = skill_dirs_under(&collection, &scan).expect("first walk");
+    assert_eq!(first.len(), 3);
+    assert_eq!(scan.budget.get(), 0);
+    assert_eq!(
+        skill_dirs_under(&collection, &scan).expect("second walk"),
+        first
+    );
+}
+
+#[test]
+fn every_skill_in_one_collection_names_that_collection_once() {
+    let fixture = fixture();
+    let collection = fixture.workspace.join("skills");
+    let mut artifacts = Vec::new();
+    for name in ["alpha", "beta", "gamma", "delta"] {
+        let document = collection.join(name).join("SKILL.md");
+        write(&document, "# skill");
+        artifacts.push(artifact(
+            "skill",
+            Some(&document.to_string_lossy()),
+            Some("skills"),
+        ));
+    }
+
+    let wire = request(&fixture, "claude-code", artifacts);
+    assert_eq!(
+        skill_roots(&wire),
+        vec![collection.to_string_lossy().into_owned()],
     );
 }
 

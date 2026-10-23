@@ -20,8 +20,8 @@
 //! Paths travel as the caller holds them and are resolved against the
 //! request's `cwd`, not the resident's own working directory.
 
-use std::cell::Cell;
-use std::collections::HashSet;
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -84,6 +84,14 @@ struct Scan<'a> {
     home: PathBuf,
     workspace: Option<PathBuf>,
     budget: Cell<usize>,
+    /// What each collection already walked holds, by its resolved path.
+    ///
+    /// One collection is reached once per skill that lives in it: the
+    /// `skill_root` probe and the walk up from the skill's own path both land
+    /// on the same directory. Charging the same entries again for every
+    /// artifact spends the request's budget as the square of an ordinary
+    /// install's skill count, so a shared answer is kept instead.
+    walked: RefCell<HashMap<String, Vec<String>>>,
 }
 
 impl Scan<'_> {
@@ -141,6 +149,7 @@ fn evaluate_request(request: &InventoryScanTargetsRequestV1) -> Result<Value, &'
         home: PathBuf::from(&request.home_dir),
         workspace: request.workspace_dir.as_deref().map(PathBuf::from),
         budget: Cell::new(INVENTORY_SCAN_TARGETS_MAX_VISITED_ENTRIES),
+        walked: RefCell::new(HashMap::new()),
     };
     Ok(json!({
         "mcp_targets": mcp_targets(request, &scan),
@@ -307,7 +316,9 @@ fn artifact_skill_root(
 ) -> Result<Option<PathBuf>, &'static str> {
     if let Some(skill_root) = artifact.skill_root.as_deref() {
         for base in scan.bases() {
-            let candidate = PathBuf::from(scan.resolve(&base.join(skill_root)));
+            let Some(candidate) = contained_skill_root(base, skill_root, scan) else {
+                continue;
+            };
             if !scan.is_dir(&candidate) {
                 continue;
             }
@@ -337,6 +348,24 @@ fn artifact_skill_root(
     Ok(None)
 }
 
+/// A recorded `skill_root` resolved under one base, or `None` when it names a
+/// directory outside it.
+///
+/// The value reaches the request through a detection's metadata, which the
+/// workspace's own files can write. An absolute root, or one that climbs out
+/// with `..`, or one reached through a symlink that leaves the base, would
+/// otherwise aim the skill scanner at any directory on the host: its files
+/// would be read into findings, and a root as wide as `/` would spend the
+/// whole walk budget and leave the pass reporting no inventory at all. A root
+/// that does not stay inside the base it was named against is left unused, and
+/// the artifact's own path decides the collection, which is where the skill
+/// was actually found.
+fn contained_skill_root(base: &Path, skill_root: &str, scan: &Scan<'_>) -> Option<PathBuf> {
+    let candidate = PathBuf::from(scan.resolve(&base.join(skill_root)));
+    relative_to(&candidate.to_string_lossy(), &scan.resolve(base))?;
+    Some(candidate)
+}
+
 /// `_skill_dirs_under`: `sorted({path.parent.resolve() for path in
 /// root.rglob("SKILL.md") if path.is_file()})`.
 ///
@@ -345,6 +374,16 @@ fn artifact_skill_root(
 /// `rglob` does too. Each visited entry is charged against the request's
 /// budget so one looping or enormous tree cannot hold the resident.
 fn skill_dirs_under(root: &Path, scan: &Scan<'_>) -> Result<Vec<String>, &'static str> {
+    let key = scan.resolve(root);
+    if let Some(walked) = scan.walked.borrow().get(&key) {
+        return Ok(walked.clone());
+    }
+    let walked = walk_skill_dirs(root, scan)?;
+    scan.walked.borrow_mut().insert(key, walked.clone());
+    Ok(walked)
+}
+
+fn walk_skill_dirs(root: &Path, scan: &Scan<'_>) -> Result<Vec<String>, &'static str> {
     if !scan.is_dir(root) {
         return Ok(Vec::new());
     }
