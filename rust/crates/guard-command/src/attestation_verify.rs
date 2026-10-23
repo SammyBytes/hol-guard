@@ -1,0 +1,126 @@
+//! Verify a trust attestation end to end.
+//!
+//! The modules beside this one each answer one question a verifier asks: the
+//! [envelope](crate::attestation_envelope) must be readable, the
+//! [payload](crate::attestation_payload) must be well formed under a verifier's
+//! rules, every [key-free check](crate::attestation_verification) must pass, and
+//! the [signature](crate::attestation_signature) must hold over the canonical
+//! bytes. This module runs them in the order Python's
+//! `verify_trust_attestation` runs them and returns the same replay identity,
+//! so a caller that reaches the end here has the answer Python would return and
+//! a caller that does not has the refusal Python would raise.
+//!
+//! Two refusals are this side's own wording rather than Python's, because
+//! Python does not word them at all:
+//!
+//! * A `publicKeyPem` that will not parse reaches `cryptography`'s loader
+//!   outside Python's `try`, so Python surfaces that library's own
+//!   deserialization `ValueError`. This side reports the loader's refusal,
+//!   `Trust attestation public key must be RSA or EC` — the same message Python
+//!   raises for a key that parses and is neither RSA nor EC. Reaching either
+//!   arm means the envelope carried a fingerprint over a PEM that is not a
+//!   usable public key, so both are refusals either way.
+//! * A `signature` that is not base64 reaches `base64.b64decode(validate=True)`
+//!   inside Python's `try`, which catches only `InvalidSignature`, so Python
+//!   surfaces `binascii.Error`'s own text. This side reports
+//!   `Trust attestation signature is not base64`.
+//!
+//! A caller that has to reproduce Python's exact text in those two cases cannot
+//! read it off this function.
+
+use base64ct::{Base64, Encoding};
+use serde_json::{Map, Value};
+
+use crate::attestation_envelope::{payload_with_signed_at, validated_trust_attestation_envelope};
+use crate::attestation_payload::{validate_attestation_payload, AttestationPayloadRules};
+use crate::attestation_signature::{load_attestation_public_key, verify_attestation_signature};
+use crate::attestation_verification::{
+    trust_attestation_under_signature, TrustAttestationVerificationKey,
+    TrustAttestationVerificationPolicy,
+};
+
+/// Why an attestation was refused, in the wording a verifier reports.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrustAttestationError(String);
+
+impl TrustAttestationError {
+    /// The refusal text, which is Python's own except for the two cases the
+    /// module documentation names.
+    #[must_use]
+    pub fn message(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for TrustAttestationError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for TrustAttestationError {}
+
+/// The rules a verifier holds a signed payload to.
+///
+/// Python passes these three literally at this call site rather than taking
+/// them from the policy, so they are fixed here too: an attestation that
+/// reaches a verifier has been signed, carries a nonce, and names what it is
+/// about.
+const VERIFIER_PAYLOAD_RULES: AttestationPayloadRules = AttestationPayloadRules {
+    require_signed_at: true,
+    require_nonce: true,
+    require_subject_bindings: true,
+};
+
+/// Check a trust attestation and return its replay identity.
+///
+/// `trusted_keys` of `None` accepts whatever key the envelope ships, which only
+/// a caller that already trusts the transport should pass. `claim` of `None`
+/// skips the claim-hash check, for a caller holding the envelope without the
+/// claim it was made over.
+///
+/// The returned replay key is the verifier-side identity Python returns, which
+/// a caller records so the same attestation cannot be presented twice.
+///
+/// # Errors
+///
+/// Returns the first refusal any step reports: an unreadable envelope, a
+/// payload that is not well formed, a claim, payload hash, fingerprint, key,
+/// timestamp, sequence, nonce or replay failure, a key that is not a usable
+/// public key, a signature that is not base64, or a signature that does not
+/// hold over the canonical payload.
+pub fn verify_trust_attestation(
+    payload: &Map<String, Value>,
+    envelope: &Map<String, Value>,
+    claim: Option<&Map<String, Value>>,
+    trusted_keys: Option<&[TrustAttestationVerificationKey]>,
+    policy: &TrustAttestationVerificationPolicy,
+) -> Result<String, TrustAttestationError> {
+    let read = validated_trust_attestation_envelope(envelope)
+        .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
+
+    let signed_payload = payload_with_signed_at(payload, envelope.get("signedAt"));
+    let validated = validate_attestation_payload(&signed_payload, VERIFIER_PAYLOAD_RULES)
+        .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
+
+    let under_signature =
+        trust_attestation_under_signature(&validated, &read, claim, trusted_keys, policy)
+            .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
+
+    let public_key = load_attestation_public_key(&read.public_key_pem)
+        .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
+    let Ok(signature) = Base64::decode_vec(&read.signature) else {
+        return Err(TrustAttestationError(
+            "Trust attestation signature is not base64".to_owned(),
+        ));
+    };
+    verify_attestation_signature(
+        &public_key,
+        &under_signature.canonical_payload,
+        &signature,
+        &read.signature_algorithm,
+    )
+    .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
+
+    Ok(under_signature.replay_key)
+}
