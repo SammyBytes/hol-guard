@@ -48,13 +48,14 @@ _MAX_REQUEST_BYTES = 4 * 1024 * 1024
 _EXACT_INT_MIN = -(2**63)
 _EXACT_INT_MAX = 2**64 - 1
 # The resident's JSON parser refuses a value nested past 32 levels, counting
-# every value and not only containers. The envelope spends two levels before a
-# definition starts -- the request object, its ``entries`` array, then the entry
-# object the definition hangs off -- so a definition's deepest value may sit 30
-# levels down, counting the definition mapping itself as the first. Measuring it
-# here names the config file that is too deep instead of letting the resident
-# refuse the whole frame and look unavailable.
-_MAX_DEFINITION_DEPTH = 30
+# every value and not only containers, with the transport frame at 0. Four
+# levels sit above a definition -- the frame, the request object, its
+# ``entries`` array and the entry object the definition hangs off -- so a
+# definition's deepest value may sit 29 levels down, counting the definition
+# mapping itself as the first. Measuring it here names the config file that is
+# too deep instead of letting the resident refuse the whole frame and look
+# unavailable.
+_MAX_DEFINITION_DEPTH = 29
 
 
 class CodexHookIdentityUnavailableError(RuntimeError):
