@@ -70,6 +70,7 @@ mod codex_output_inspection;
 mod codex_output_inspection_flow;
 mod codex_output_pathspecs;
 mod codex_output_post_tool;
+mod codex_output_post_tool_commands;
 mod codex_output_post_tool_copy;
 mod codex_output_post_tool_skips;
 mod codex_output_post_tool_sources;
@@ -103,6 +104,9 @@ mod command_operand_matchers;
 pub mod command_option_parsing;
 mod command_parse_surface;
 mod command_segment_parsing;
+pub mod command_shadow;
+#[cfg(test)]
+mod command_shadow_tests;
 pub mod command_shell_read_factors;
 mod command_specialized_matchers;
 mod command_structure;

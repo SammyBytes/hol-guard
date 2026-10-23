@@ -68,6 +68,7 @@ pub(crate) fn capabilities() -> RuntimeCapabilitiesV1 {
         crate::hook_direct::HOOK_DIRECT_CONTAINED_ROUTE_FEATURE.into(),
         crate::hook_direct::HOOK_DIRECT_PERMISSION_NOTICE_FEATURE.into(),
         crate::hook_direct::HOOK_DIRECT_SAVED_DECISION_FEATURE.into(),
+        crate::hook_direct::HOOK_DIRECT_CONNECTOR_NOTICE_FEATURE.into(),
         crate::hook_direct::HOOK_DIRECT_STRUCTURED_OUTPUT_FEATURE.into(),
         crate::policy_store::policy_store_direct_lane::HOOK_DIRECT_REVIEW_FACTS_FEATURE.into(),
         crate::hook_direct_evidence::HOOK_DIRECT_EVIDENCE_FEATURE.into(),
@@ -215,6 +216,7 @@ pub(crate) enum ResidentOperationV1 {
     HookEvidenceWriter(crate::hook_evidence_writer_op::HookEvidenceWriterRequestV1),
     ApprovalGate(ApprovalGateRequestV1),
     PackageIntentParse(PackageIntentParseRequestV1),
+    PackageIntentExtract(guard_contracts::PackageIntentExtractRequestV1),
     PackageRequestArtifact(PackageRequestArtifactRequestV1),
     SupplyChainEval(SupplyChainEvalRequestV1),
     ApplyStoredPackagePolicy(ApplyStoredPackagePolicyRequestV1),
@@ -319,6 +321,7 @@ pub(crate) enum ResidentOperationV1 {
     InventoryUrlRedaction(guard_contracts::InventoryUrlRedactionRequestV1),
     VerifiedReadPlan(guard_contracts::VerifiedReadPlanRequestV1),
     AibomReportSummaries(guard_contracts::AibomReportSummariesRequestV1),
+    RetryLineageCapture(guard_contracts::RetryLineageCaptureRequestV1),
     Health(Value),
     Shutdown(Value),
 }

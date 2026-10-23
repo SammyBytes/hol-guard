@@ -105,11 +105,13 @@ fn every_declared_bound_fits_one_resident_frame() {
         PACKAGE_AUTHORITY_MAX_BYTES,
         PACKAGE_CONTEXT_BUILD_MAX_BYTES,
         PACKAGE_EVALUATION_VIEW_MAX_REQUEST_BYTES,
+        PACKAGE_INTENT_EXTRACT_MAX_BYTES,
         POLICY_BUNDLE_AUTHORITY_MAX_BYTES,
         POLICY_DECISION_LOOKUP_MAX_BYTES,
         POLICY_DOCUMENT_DECISION_MAX_BYTES,
         POLICY_INTEGRITY_ROWS_MAX_BYTES,
         PROTECT_REQUEST_MAX_BYTES,
+        RETRY_LINEAGE_CAPTURE_MAX_REQUEST_BYTES,
         REVIEWED_INVOCATION_BINDINGS_MAX_BYTES,
         RUNNER_AUTHORITY_MAX_BYTES,
         RUNTIME_ARTIFACT_IDENTITY_MAX_REQUEST_BYTES,
@@ -129,7 +131,8 @@ fn every_declared_bound_fits_one_resident_frame() {
 #[test]
 fn every_declared_bound_is_named_above() {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let pinned = include_str!("request_bounds.rs");
+    // A Windows checkout may give this file CRLF line endings.
+    let pinned = include_str!("request_bounds.rs").replace("\r\n", "\n");
     let mut found = 0usize;
     for entry in fs::read_dir(&source).expect("contract sources") {
         let path = entry.expect("source entry").path();
