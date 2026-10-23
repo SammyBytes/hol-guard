@@ -89,6 +89,9 @@ runs:
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
+        scripts/ci/build_pytest_shard_plan.py \
+        scripts/ci/pytest_shard_resources.py \
+        tests/test_ci_pytest_shard_resources.py \
         scripts/ci/verify_native_command_program.py \
         scripts/core_command_build_inputs.py \
         scripts/native_directory_inventory.py \
@@ -162,6 +165,9 @@ runs:
         src/ \
         scripts/build_native_command_program.py \
         scripts/ci/run_projection_shard.py \
+        scripts/ci/build_pytest_shard_plan.py \
+        scripts/ci/pytest_shard_resources.py \
+        tests/test_ci_pytest_shard_resources.py \
         scripts/ci/verify_native_command_program.py \
         scripts/core_command_build_inputs.py \
         scripts/native_directory_inventory.py \
