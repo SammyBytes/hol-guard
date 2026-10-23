@@ -7,10 +7,9 @@
 //!
 //! Python reaches the same point through `cryptography`: it loads the PEM, it
 //! refuses anything that is not an RSA or EC key, and then it dispatches on the
-//! declared algorithm — RSA-PSS over SHA-256 with a maximum-length salt, or
-//! ECDSA over SHA-256 on P-256. A key that does not match the declared
-//! algorithm is refused before any verification happens, and every refusal here
-//! carries Python's wording.
+//! declared algorithm — RSA-PSS over SHA-256, or ECDSA over SHA-256 on P-256.
+//! A key that does not match the declared algorithm is refused before any
+//! verification happens, and every refusal here carries Python's wording.
 
 use base64ct::{Base64, Encoding};
 use ring::signature;
@@ -319,31 +318,118 @@ pub fn load_attestation_public_key(
     }
 }
 
-/// Verify RSA-PSS over SHA-256 with a maximum-length salt.
+/// XOR `out` with MGF1 over `seed`, the mask generation function PSS uses.
 ///
-/// Python signs and verifies with `padding.PSS.MAX_LENGTH`, which is the
-/// largest salt the modulus leaves room for: the encoded message is one bit
-/// shorter than the modulus, and the digest plus the trailing `0xbc` byte take
-/// the rest.
+/// RFC 8017 B.2.1: hash the seed followed by a four-byte big-endian counter,
+/// take as much of each digest as is still wanted, and count up.
+fn mgf1_xor_sha256(out: &mut [u8], seed: &[u8]) {
+    let mut counter: u32 = 0;
+    let mut written = 0usize;
+    while written < out.len() {
+        let mut hash = Sha256::new();
+        hash.update(seed);
+        hash.update(counter.to_be_bytes());
+        for byte in hash.finalize() {
+            if written == out.len() {
+                break;
+            }
+            out[written] ^= byte;
+            written += 1;
+        }
+        counter = counter.wrapping_add(1);
+    }
+}
+
+/// The salt length the encoded message names, if it names one.
+///
+/// This is the recovery OpenSSL performs for `RSA_PSS_SALTLEN_AUTO`: undo the
+/// public operation, unmask the data block, and read how far the `0x01`
+/// separator sits from its end. Nothing here authenticates anything — the
+/// caller hands the length to the library's verifier, which does — so a misread
+/// can only cost a signature its acceptance, never win one.
+fn rsa_pss_salt_len(public_key: &RsaPublicKey, signature: &[u8]) -> Option<usize> {
+    let key_len = public_key.size();
+    if signature.len() != key_len {
+        return None;
+    }
+    let value = BigUint::from_bytes_be(signature);
+    if &value >= public_key.n() {
+        return None;
+    }
+    let raw = value.modpow(public_key.e(), public_key.n()).to_bytes_be();
+    if raw.len() > key_len {
+        return None;
+    }
+    let mut padded = vec![0u8; key_len - raw.len()];
+    padded.extend_from_slice(&raw);
+
+    // The encoded message is one bit shorter than the modulus, so on a modulus
+    // whose length is a whole number of bytes it starts one byte in.
+    let hash_len = Sha256::output_size();
+    let encoded_bits = public_key.n().bits().checked_sub(1)?;
+    let encoded_len = encoded_bits.div_ceil(8);
+    if encoded_len < hash_len + 2 {
+        return None;
+    }
+    let encoded = padded.get(key_len.checked_sub(encoded_len)?..)?;
+    if encoded.last() != Some(&0xbc) {
+        return None;
+    }
+    let (masked, rest) = encoded.split_at(encoded_len - hash_len - 1);
+    let seed = rest.get(..hash_len)?;
+    let unused_bits = 8 * encoded_len - encoded_bits;
+    let leading_mask = 0xff_u8.checked_shl((8 - unused_bits) as u32).unwrap_or(0);
+    if *masked.first()? & leading_mask != 0 {
+        return None;
+    }
+
+    let mut data = masked.to_vec();
+    mgf1_xor_sha256(&mut data, seed);
+    data[0] &= 0xff >> unused_bits;
+    let separator = data.iter().position(|byte| *byte != 0x00)?;
+    if data[separator] != 0x01 {
+        return None;
+    }
+    Some(data.len() - separator - 1)
+}
+
+/// Verify RSA-PSS over SHA-256, under whichever salt length the signature used.
+///
+/// Python signs with `padding.PSS.MAX_LENGTH` — the largest salt the modulus
+/// leaves room for — but it *verifies* with it too, and on the verifying side
+/// OpenSSL reads `MAX_LENGTH` as "recover the salt length from the encoded
+/// message". So Python accepts a PSS-SHA-256 signature made under any salt
+/// length, including the salt-equals-digest length signers outside Python
+/// default to. A verifier that pinned the longest salt would refuse those.
+///
+/// The longest salt is tried first, because that is what Guard's own signer
+/// produces, and then the length the encoding itself names.
 fn verify_rsa_pss(
     public_key: &RsaPublicKey,
     canonical_payload: &[u8],
     signature: &[u8],
 ) -> Result<(), AttestationSignatureError> {
-    let modulus_bits = public_key.n().bits();
-    let encoded_message_len = modulus_bits.saturating_sub(1).div_ceil(8);
-    let Some(salt_len) = encoded_message_len.checked_sub(Sha256::output_size() + 2) else {
-        return refuse("Trust attestation signature verification failed");
-    };
-    let verifying_key =
-        RsaPssVerifyingKey::<Sha256>::new_with_salt_len(public_key.clone(), salt_len);
     let Ok(parsed) = RsaPssSignature::try_from(signature) else {
         return refuse("Trust attestation signature verification failed");
     };
-    match verifying_key.verify(canonical_payload, &parsed) {
-        Ok(()) => Ok(()),
-        Err(_) => refuse("Trust attestation signature verification failed"),
+    let verifies = |salt_len: usize| {
+        RsaPssVerifyingKey::<Sha256>::new_with_salt_len(public_key.clone(), salt_len)
+            .verify(canonical_payload, &parsed)
+            .is_ok()
+    };
+    let encoded_message_len = public_key.n().bits().saturating_sub(1).div_ceil(8);
+    let longest = encoded_message_len.checked_sub(Sha256::output_size() + 2);
+    if longest.is_some_and(verifies) {
+        return Ok(());
     }
+    // Only a signature the longest salt did not explain is worth the public
+    // operation the recovery costs.
+    let recovered =
+        rsa_pss_salt_len(public_key, signature).filter(|salt_len| Some(*salt_len) != longest);
+    if recovered.is_some_and(verifies) {
+        return Ok(());
+    }
+    refuse("Trust attestation signature verification failed")
 }
 
 /// Check an attestation's signature over the bytes the payload canonicalises to.

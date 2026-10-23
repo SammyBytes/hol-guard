@@ -62,3 +62,25 @@ def test_recorded_signature_decision_still_holds(case: dict[str, Any]) -> None:
 def test_the_fixture_keeps_recording_signatures_that_verify() -> None:
     accepted = [case["name"] for case in _cases() if case["expected"] == "ok"]
     assert len(accepted) >= 2, accepted
+
+
+def test_the_fixture_keeps_salt_lengths_other_than_the_longest() -> None:
+    """Python signs with the longest salt but accepts any length on verify.
+
+    ``padding.PSS.MAX_LENGTH`` means "as long as the modulus allows" when
+    signing and "whatever the encoding says" when verifying, so a signer that
+    is not this one -- salt-equals-digest is the common default -- still
+    verifies here. A verifier that only knew the longest salt would refuse
+    these, so the fixture has to keep carrying them.
+    """
+
+    accepted = {case["name"] for case in _cases() if case["expected"] == "ok"}
+    for name in (
+        "rsa-2048-salt-equals-digest",
+        "rsa-2048-salt-zero",
+        "rsa-2048-salt-sixteen",
+        "rsa-3072-salt-equals-digest",
+    ):
+        assert name in accepted, name
+    refused = {case["name"] for case in _cases() if case["expected"] != "ok"}
+    assert "rsa-2048-salt-equals-digest-wrong-payload" in refused, refused
