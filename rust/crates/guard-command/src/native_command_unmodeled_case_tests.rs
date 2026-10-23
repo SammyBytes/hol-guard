@@ -74,3 +74,55 @@ fn quoting_does_not_move_a_label() {
         "case x in      ; echo a;; esac"
     );
 }
+
+/// The construct's keywords have to be its own. `case` and `in` written as
+/// arguments open nothing, and a `#` comment runs to the end of its line, so
+/// neither the keywords nor a `)` a comment holds takes a label. Without
+/// either rule the one word the shell builds at run time would have been
+/// blanked away.
+#[test]
+fn words_outside_the_construct_open_no_label() {
+    for text in [
+        "echo case in; /usr/bin/pyth?n3 -c 'import os' # )",
+        "echo case in /bin/b?sh -c id )",
+        "ls # case in x)",
+    ] {
+        assert_eq!(without_case_labels(text), text, "{text}");
+    }
+}
+
+/// A comment inside a real construct is still only a comment: the labels go
+/// and the clause body keeps every word it had.
+#[test]
+fn a_comment_in_a_clause_keeps_the_body() {
+    assert_eq!(
+        without_case_labels("case $MODE in a) /usr/bin/pyth?n3 -c 'ok';; esac # )"),
+        "case $MODE in  ; /usr/bin/pyth?n3 -c 'ok';; esac # )"
+    );
+}
+
+/// A span holding a command separator is a run of commands rather than a
+/// pattern, so the text keeps the refusal it had.
+#[test]
+fn a_span_holding_a_separator_is_not_a_label() {
+    for text in [
+        "case x in a; b) echo a;; esac",
+        "case x in a && b) echo a;; esac",
+    ] {
+        assert_eq!(without_case_labels(text), text, "{text}");
+    }
+}
+
+/// The keyword still opens a construct wherever the shell reads a command,
+/// which is what the separator and the shell prefixes before it decide.
+#[test]
+fn a_construct_after_a_separator_still_opens() {
+    assert_eq!(
+        without_case_labels("pwd && case $MODE in a) echo a;; *) echo b;; esac"),
+        "pwd && case $MODE in  ; echo a;;  ; echo b;; esac"
+    );
+    assert_eq!(
+        without_case_labels("if true; then case $MODE in a) echo a;; esac; fi"),
+        "if true; then case $MODE in  ; echo a;; esac; fi"
+    );
+}

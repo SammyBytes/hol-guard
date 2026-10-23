@@ -12,6 +12,13 @@
 //! text may open a subshell, a function body or an extglob rather than a label
 //! list, and a label holding an expansion, a substitution or a redirect could
 //! name something of its own; either keeps the refusal it had.
+//!
+//! The words have to be the construct's own. `case` and `in` are keywords only
+//! where the shell reads a command, so `echo case in` opens nothing, and a `#`
+//! comment runs to the end of its line, so neither the keywords nor the `)` a
+//! comment holds take a label. Without both, `echo case in; /usr/bin/pyth?n3
+//! -c 'import os' # )` would have blanked away the one word the shell builds
+//! at run time and handed the command the review card it was refused.
 
 #[derive(Clone, Copy, PartialEq)]
 enum Quote {
@@ -34,13 +41,14 @@ pub(super) fn without_case_labels(text: &str) -> String {
     let mut awaiting_in = false;
     let mut label: Option<usize> = None;
     let mut word: Option<usize> = None;
+    let mut command_position = true;
     let mut index = 0usize;
     while index <= characters.len() {
         let current = characters.get(index).copied();
         let boundary = match (quote, current) {
             (Quote::None, None) => true,
             (Quote::None, Some(character)) => {
-                character.is_whitespace() || matches!(character, ';' | ')')
+                character.is_whitespace() || matches!(character, ';' | ')' | '&' | '|')
             }
             _ => false,
         };
@@ -48,7 +56,7 @@ pub(super) fn without_case_labels(text: &str) -> String {
             if let Some(start) = word.take() {
                 let keyword: String = characters[start..index].iter().collect();
                 match keyword.as_str() {
-                    "case" => {
+                    "case" if command_position => {
                         open += 1;
                         awaiting_in = true;
                     }
@@ -62,6 +70,9 @@ pub(super) fn without_case_labels(text: &str) -> String {
                     }
                     _ => {}
                 }
+                // Only a word the shell itself reads before a command keeps
+                // the next word in command position.
+                command_position = super::SHELL_PREFIXES.contains(&keyword.as_str());
             }
         } else if current.is_some_and(|character| !character.is_whitespace()) && word.is_none() {
             word = Some(index);
@@ -82,15 +93,26 @@ pub(super) fn without_case_labels(text: &str) -> String {
                 '\\' => index += 1,
                 '\'' => quote = Quote::Single,
                 '"' => quote = Quote::Double,
+                // A comment runs to the end of its line. The shell reads no
+                // keyword and no `)` inside one, so neither may take a label.
+                '#' if word == Some(index) => {
+                    word = None;
+                    index = characters[index..]
+                        .iter()
+                        .position(|character| *character == '\n')
+                        .map_or(characters.len() - 1, |offset| index + offset - 1);
+                }
                 ')' => {
                     if let Some(start) = label.take() {
                         if !take_label(&mut blanked, &characters, start, index) {
                             return text.to_owned();
                         }
                     }
+                    command_position = true;
                 }
-                ';' => {
-                    if open > 0 && characters.get(index + 1) == Some(&';') {
+                ';' | '&' | '|' | '\n' => {
+                    command_position = true;
+                    if current == ';' && open > 0 && characters.get(index + 1) == Some(&';') {
                         index += 1;
                         label = Some(index + 1);
                     }
@@ -109,11 +131,13 @@ pub(super) fn without_case_labels(text: &str) -> String {
 /// reads only the first word of each command it finds.
 ///
 /// A label is left alone, and the whole text with it, when it holds anything
-/// the shell could read as more than a pattern.
+/// the shell could read as more than a pattern. A pattern never holds a
+/// command separator or a comment, so a span that does is a run of commands
+/// that only looks like one.
 fn take_label(blanked: &mut [char], characters: &[char], start: usize, end: usize) -> bool {
     if characters[start..end]
         .iter()
-        .any(|character| matches!(character, '$' | '`' | '<' | '>'))
+        .any(|character| matches!(character, '$' | '`' | '<' | '>' | ';' | '&' | '#' | '\n'))
     {
         return false;
     }

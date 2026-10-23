@@ -1287,13 +1287,26 @@ fn saves_job_pid(word: &str) -> bool {
 /// movement left `while IFS= read -r line; do ...; done < list.txt` blocked
 /// outright with no approval left to give it, while the same loop without the
 /// prefix reached review. A name the shell or loader itself reads keeps its
-/// signal: emptying `PATH` is a change of its own.
+/// signal: emptying `PATH` is a change of its own, and so is emptying a name
+/// that decides which files a pattern reaches or which options the shell runs
+/// under. `GLOBIGNORE` is read as glob-changing wherever it is set, so an
+/// empty one has to keep the same signal here rather than slipping past as a
+/// prefix that carries nothing.
 fn assigns_nothing(word: &str) -> bool {
     word.split_once('=').is_some_and(|(name, value)| {
         matches!(value, "" | "''" | "\"\"")
             && !matches!(
                 name,
-                "PATH" | "HOME" | "CDPATH" | "ENV" | "BASH_ENV" | "PS4" | "PROMPT_COMMAND"
+                "PATH"
+                    | "HOME"
+                    | "CDPATH"
+                    | "ENV"
+                    | "BASH_ENV"
+                    | "PS4"
+                    | "PROMPT_COMMAND"
+                    | "GLOBIGNORE"
+                    | "SHELLOPTS"
+                    | "BASHOPTS"
             )
             && !name.starts_with("LD_")
             && !name.starts_with("DYLD_")

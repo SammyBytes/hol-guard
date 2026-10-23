@@ -698,6 +698,15 @@ fn a_case_clause_that_can_start_a_program_keeps_the_failure() {
         "case $MODE in a) echo a;; *) $CMD;; esac",
         // An assignment that carries a value is still data movement.
         "while IFS=: read -r name rest; do echo one; done < list.txt",
+        // Emptying a name that decides which files a pattern reaches is a
+        // change of its own: the same reader spelled with `IFS=` is review.
+        "GLOBIGNORE= read -r first < list.txt",
+        "SHELLOPTS= read -r first < list.txt",
+        // `case` and `in` written as arguments open no construct, and the `)`
+        // a comment holds ends no label, so the word the shell builds at run
+        // time is still there to be refused.
+        "echo case in; /usr/bin/pyth?n3 -c 'import os' # )",
+        "echo case in /bin/b?sh -c id )",
     ] {
         assert_eq!(decision(&controls, command).1, FAILED, "{command}");
     }
