@@ -235,6 +235,10 @@ pub(super) fn prepare(
     if !crate::connector_setup::is_non_recognition(reason_code) {
         return Ok(None);
     }
+    // A daemon whose drain cannot raise the setup notice keeps the review.
+    if context.binding.connector_setup_notice != Some(true) {
+        return Err(defer);
+    }
     let cause = first_blocked_cause(reason_code).ok_or(defer)?;
     let payload = context.recorded_payload;
     // `Path.resolve` raises on an embedded NUL, which the daemon does not catch.

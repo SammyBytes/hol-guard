@@ -58,6 +58,9 @@ pub(crate) const HOOK_DIRECT_PERMISSION_NOTICE_FEATURE: &str = "hook-direct-perm
 /// The resident answers a reviewed `PreToolUse` from a saved exact-action
 /// decision when the binding carries what the daemon reads it with.
 pub(crate) const HOOK_DIRECT_SAVED_DECISION_FEATURE: &str = "hook-direct-saved-decision-v1";
+/// The resident queues a connector-setup review itself when the binding says
+/// the daemon's evidence drain raises its desktop setup notice.
+pub(crate) const HOOK_DIRECT_CONNECTOR_NOTICE_FEATURE: &str = "hook-direct-connector-notice-v1";
 /// The resident takes the bound managed-policy view, resolves an Oh My Pi
 /// `PostToolUse`'s structured output mediation from it, and answers the hook
 /// with the mediation the daemon would have attached.

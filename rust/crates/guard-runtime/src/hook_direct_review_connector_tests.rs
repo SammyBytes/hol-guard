@@ -570,3 +570,48 @@ fn a_lookup_the_resident_cannot_spell_as_the_daemon_defers() {
         ));
     });
 }
+
+#[cfg(unix)]
+#[test]
+fn a_daemon_whose_drain_raises_no_setup_notice_keeps_the_review() {
+    let mut binding = super::super::super::tests::binding();
+    binding.connector_setup_notice = None;
+    let workspace = super::super::super::tests::workspace("connector-unbound");
+    let payload = json!({
+        "tool_name": "Bash",
+        "tool_input": {"command": "acme sync"},
+        "cwd": workspace,
+    });
+    let payload = payload.as_object().unwrap().clone();
+    let context = Context {
+        harness: "omp",
+        payload: &payload,
+        recorded_payload: &payload,
+        workspace: &workspace,
+        home_dir: "/home/user",
+        guard_home: "/guard-home",
+        binding: &binding,
+        hint: None,
+    };
+    let review = json!({"reason_code": "native_command_review_required"});
+    assert!(matches!(
+        prepare(
+            &context,
+            review.as_object().unwrap(),
+            &environment(),
+            "oauth"
+        ),
+        Err(HookDirectDefer::ReviewQueue)
+    ));
+    // An ordinary review never needed the notice.
+    let ordinary = json!({"reason_code": "native_command_sensitive_access"});
+    assert!(prepare(
+        &context,
+        ordinary.as_object().unwrap(),
+        &environment(),
+        "oauth"
+    )
+    .unwrap()
+    .is_none());
+    std::fs::remove_dir_all(&workspace).ok();
+}
