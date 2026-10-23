@@ -12,6 +12,8 @@ from collections.abc import Sequence as Sequence
 from dataclasses import asdict as asdict
 from dataclasses import dataclass as dataclass
 from dataclasses import field as field
+from dataclasses import is_dataclass as is_dataclass
+from dataclasses import replace as replace
 from datetime import datetime as datetime
 from datetime import timezone as timezone
 from pathlib import Path as Path
@@ -265,18 +267,53 @@ def _scan_records(
         raise InventoryScanFindingsUnavailableError from None
 
 
-def _first_item_per_id(items: list[GuardAgentInventoryItem]) -> tuple[GuardAgentInventoryItem, ...]:
-    """Keep the first item for each item ID.
+_ITEM_ID_MAX_LENGTH = 160
 
-    A harness can read the same entry from more than one config file (ZCode's
-    Desktop ``config.json`` and CLI ``setting.json``), which yields two items
-    with one ID. Guard Cloud rejects a snapshot whose item IDs repeat, so the
-    whole harness would otherwise fail to sync.
+
+def _artifact_without_config_path(artifact: object) -> object:
+    if is_dataclass(artifact) and not isinstance(artifact, type):
+        return replace(artifact, config_path="")
+    return artifact
+
+
+def _artifacts_with_unique_ids(artifacts: tuple[object, ...], *, home_dir: Path) -> tuple[object, ...]:
+    """Give every artifact its own ID before items are built from them.
+
+    A harness can read the same entry from more than one config file (Z Code's
+    ``config.json`` and ``setting.json``), which yields two artifacts with one
+    ID. Guard Cloud rejects a snapshot whose item IDs repeat, so the whole
+    harness would otherwise fail to sync. A copy that differs only in its
+    config path is the same entry and is dropped. A different entry that happens
+    to share the ID (two hooks at the same index in different files) is kept
+    under an ID suffixed with its config path's fingerprint.
     """
-    unique: dict[str, GuardAgentInventoryItem] = {}
-    for item in items:
-        unique.setdefault(item.item_id, item)
-    return tuple(unique.values())
+    kept: list[object] = []
+    entries_by_id: dict[str, list[object]] = {}
+    used_ids: set[str] = set()
+    for artifact in artifacts:
+        artifact_id = str(getattr(artifact, "artifact_id", ""))
+        if artifact_id not in used_ids:
+            kept.append(artifact)
+            used_ids.add(artifact_id)
+            entries_by_id.setdefault(artifact_id, []).append(_artifact_without_config_path(artifact))
+            continue
+        entry = _artifact_without_config_path(artifact)
+        if entry in entries_by_id[artifact_id]:
+            continue
+        if not (is_dataclass(artifact) and not isinstance(artifact, type)):
+            continue
+        entries_by_id[artifact_id].append(entry)
+        config_path = str(getattr(artifact, "config_path", ""))
+        suffix = fingerprint_text(redact_local_path(config_path, home_dir=home_dir))[:8]
+        candidate = f"{artifact_id[: _ITEM_ID_MAX_LENGTH - len(suffix) - 1]}#{suffix}"
+        counter = 2
+        while candidate in used_ids:
+            tail = f"{suffix}-{counter}"
+            candidate = f"{artifact_id[: _ITEM_ID_MAX_LENGTH - len(tail) - 1]}#{tail}"
+            counter += 1
+        used_ids.add(candidate)
+        kept.append(replace(artifact, artifact_id=candidate))
+    return tuple(kept)
 
 
 @_native_url.redaction_pass()
@@ -304,6 +341,7 @@ def inventory_snapshot_from_detection(
             workspace_dir=workspace_dir,
         )
     )
+    artifact_tuple = _artifacts_with_unique_ids(artifact_tuple, home_dir=home_dir)
     _prefetch_export_redactions(artifact_tuple, cisco_runs, home_dir=home_dir, workspace_dir=workspace_dir)
     source_evidence = native_inventory_source_evidence(
         [
@@ -367,7 +405,7 @@ def inventory_snapshot_from_detection(
         )
         for path in config_paths
     )
-    item_tuple = _first_item_per_id(items)
+    item_tuple = tuple(items)
     scan_findings, scanner_sources = _scan_records(
         cisco_runs,
         harness=harness,
