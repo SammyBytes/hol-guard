@@ -16,6 +16,8 @@ from uuid import uuid4
 
 from .native_context import ensure_resident_prerequisite
 from .native_execution import _resident_request
+from .native_runtime import native_runtime_status
+from .native_runtime_resilience import native_record_resident_failure
 from .native_store_policy import _payload
 
 LOCAL_CLI_HELP_PARSE_FEATURE = "local-cli-help-parse-v1"
@@ -67,15 +69,33 @@ def native_local_cli_help_commands(
         return None
     commands = payload.get("commands")
     if not isinstance(commands, list):
-        return None
+        return _unusable(home)
     read: list[dict[str, object]] = []
     for entry in commands:
         if not isinstance(entry, dict) or any(field not in entry for field in _FIELDS):
-            return None
+            return _unusable(home)
         row = {field: entry[field] for field in _FIELDS}
         if any(not isinstance(row[field], str) for field in _FIELDS[:4]):
-            return None
+            return _unusable(home)
         if not isinstance(row["parent_id"], (str, type(None))):
-            return None
+            return _unusable(home)
         read.append(row)
     return tuple(read)
+
+
+def _unusable(guard_home: Path) -> None:
+    """Record the failure ``_payload`` could not see, and discover nothing.
+
+    ``_payload`` counts a bound ``ok`` reply as a healthy answer as soon as its
+    payload is a dict, which is before the commands inside it are read. A
+    resident that answers every request with rows this bridge discards would
+    otherwise keep a clean streak while discovering nothing, so the failure is
+    recorded here, where the rows are actually checked.
+    """
+
+    identity = native_runtime_status().identity
+    if identity is not None:
+        native_record_resident_failure(
+            identity.sha256, guard_home, reason="native_local_cli_help_parse_payload"
+        )
+    return None

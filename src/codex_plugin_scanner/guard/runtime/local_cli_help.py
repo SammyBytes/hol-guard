@@ -31,7 +31,7 @@ def parse_cli_help_text(
     parent_id: str | None = None,
     invocation: Sequence[str] = (),
     guard_home: Path | None = None,
-) -> tuple[LocalCliCommand, ...]:
+) -> tuple[LocalCliCommand, ...] | None:
     """Extract first-level commands from typical CLI --help output.
 
     ``invocation`` is the program and parent command path (for example
@@ -42,7 +42,13 @@ def parse_cli_help_text(
 
     The reading itself is the resident's, in ``rust/.../local_cli_help.rs``.
     Help text is whatever a third-party program printed, so nothing here parses
-    it. A resident that cannot answer leaves the CLI's commands undiscovered.
+    it.
+
+    Returns the commands the resident read, or ``None`` when it could not
+    answer. The two are not the same thing and the caller reports them
+    differently: a CLI whose help names no subcommands really did name none,
+    while a resident that never answered has read nothing at all, and telling
+    the operator the CLI listed no subcommands would be a guess.
     """
 
     from ..config import resolve_guard_home
@@ -57,9 +63,9 @@ def parse_cli_help_text(
             invocation=tuple(invocation),
         )
     except Exception:
-        return ()
+        return None
     if rows is None:
-        return ()
+        return None
     return tuple(
         LocalCliCommand(
             command_id=str(row["command_id"]),
@@ -123,21 +129,31 @@ def discover_local_cli_commands(
     argv: Sequence[str],
     *,
     runner: Callable[[Sequence[str]], str] | None = None,
+    guard_home: Path | None = None,
 ) -> tuple[tuple[LocalCliCommand, ...], HelpStatus]:
-    """Run --help and merge discovered commands onto the default catalog."""
+    """Run --help and merge discovered commands onto the default catalog.
+
+    ``guard_home`` is the home whose resident reads the help text. A daemon
+    serving a non-default home must pass its own, or the parse goes to a
+    resident it does not own.
+    """
 
     probe: Callable[[Sequence[str]], str] = runner if runner is not None else run_cli_help
     output = str(probe(tuple(argv)))
-    discovered = parse_cli_help_text(output, invocation=(identity.name,))
+    empty: tuple[LocalCliCommand, ...] = ()
     if output.strip() == "":
-        status: HelpStatus = "failed"
-    elif not discovered:
-        status = "empty"
-    else:
-        status = "ok"
-        if len(discovered) <= _MAX_NESTED_PROBES:
-            discovered = _with_nested_commands(tuple(argv), discovered, probe, program=identity.name)
-    return merge_discovered_commands(identity.name, discovered), status
+        # The probe printed nothing, so there is nothing to send anywhere.
+        return merge_discovered_commands(identity.name, empty), "failed"
+    discovered = parse_cli_help_text(output, invocation=(identity.name,), guard_home=guard_home)
+    if discovered is None:
+        return merge_discovered_commands(identity.name, empty), "failed"
+    if not discovered:
+        return merge_discovered_commands(identity.name, empty), "empty"
+    if len(discovered) <= _MAX_NESTED_PROBES:
+        discovered = _with_nested_commands(
+            tuple(argv), discovered, probe, program=identity.name, guard_home=guard_home
+        )
+    return merge_discovered_commands(identity.name, discovered), "ok"
 
 
 def run_cli_help(argv: Sequence[str]) -> str:
@@ -206,6 +222,7 @@ def _with_nested_commands(
     probe: Callable[[Sequence[str]], str],
     *,
     program: str,
+    guard_home: Path | None = None,
 ) -> tuple[LocalCliCommand, ...]:
     nested: list[LocalCliCommand] = list(discovered)
     seen = {command.command_id for command in nested}
@@ -214,7 +231,17 @@ def _with_nested_commands(
         if command.parent_id is not None:
             continue
         child_output = probe((*prefix, command.name, "--help"))
-        for child in parse_cli_help_text(child_output, invocation=(program, command.name)):
+        if child_output.strip() == "":
+            continue
+        children = parse_cli_help_text(
+            child_output, invocation=(program, command.name), guard_home=guard_home
+        )
+        if children is None:
+            # The resident stopped answering. Every remaining child would wait
+            # out its own timeout for the same silence, so stop probing and
+            # keep what the top-level parse already found.
+            break
+        for child in children:
             child_id = f"{command.command_id}.{child.command_id}"
             if child_id in seen or not _COMMAND_NAME.fullmatch(child.command_id):
                 continue

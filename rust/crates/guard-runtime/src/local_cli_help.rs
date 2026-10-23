@@ -15,7 +15,8 @@ use std::sync::LazyLock;
 
 use guard_contracts::{
     LocalCliHelpCommandV1, LocalCliHelpParseRequestV1, LocalCliHelpParseResultV1,
-    LOCAL_CLI_HELP_PARSE_MAX_BYTES, LOCAL_CLI_HELP_PARSE_RESULT_SCHEMA,
+    LOCAL_CLI_HELP_PARSE_MAX_BYTES, LOCAL_CLI_HELP_PARSE_REQUEST_SCHEMA,
+    LOCAL_CLI_HELP_PARSE_RESULT_SCHEMA,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -28,6 +29,11 @@ use crate::package_authority_op::request_digest_with_limit;
 pub(crate) fn evaluate_local_cli_help_parse_request(
     request: &LocalCliHelpParseRequestV1,
 ) -> Result<Vec<u8>, String> {
+    // A request under another schema is not this op's to answer. Binding a v1
+    // result to it would tell the caller its own contract was honoured.
+    if request.schema != LOCAL_CLI_HELP_PARSE_REQUEST_SCHEMA {
+        return Err("native_local_cli_help_parse_schema_mismatch".to_owned());
+    }
     let request_sha256 = request_digest_with_limit(request, LOCAL_CLI_HELP_PARSE_MAX_BYTES)
         .map_err(|_| "native_local_cli_help_parse_too_large".to_owned())?;
     let commands: Vec<LocalCliHelpCommandV1> = parse_cli_help_text(
@@ -424,6 +430,28 @@ mod tests {
                 "case {name} disagrees with Python"
             );
         }
+    }
+
+    #[test]
+    fn a_request_under_another_schema_is_refused() {
+        let request = LocalCliHelpParseRequestV1 {
+            schema: "guard-local-cli-help-parse-request.v2".to_owned(),
+            request_id: "local-cli-help-parse-test".to_owned(),
+            text: "Commands:\n  build  Build it\n".to_owned(),
+            parent_id: None,
+            invocation: Vec::new(),
+        };
+        assert_eq!(
+            evaluate_local_cli_help_parse_request(&request),
+            Err("native_local_cli_help_parse_schema_mismatch".to_owned())
+        );
+
+        // The same request under the declared schema still answers.
+        let request = LocalCliHelpParseRequestV1 {
+            schema: LOCAL_CLI_HELP_PARSE_REQUEST_SCHEMA.to_owned(),
+            ..request
+        };
+        assert!(evaluate_local_cli_help_parse_request(&request).is_ok());
     }
 
     #[test]
