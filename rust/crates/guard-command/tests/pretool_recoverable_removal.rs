@@ -1,8 +1,8 @@
 #![cfg(unix)]
 
 //! A recursive `rm` in the session's Git work tree runs without approval when
-//! every target holds only committed or ignored files. Anything Git could not
-//! bring back keeps the approval.
+//! every target holds only committed, unmodified files. Anything Git could
+//! not bring back, ignored files included, keeps the approval.
 
 use crate::pretool_git_session_ops::{git, session, Session};
 
@@ -21,8 +21,8 @@ fn fixture(label: &str) -> Session {
 }
 
 /// The command runs without asking: the recoverable-removal proof allows it,
-/// or, on macOS, the workspace sandbox already contains a removal of missing
-/// or ignored targets.
+/// or, on macOS, the workspace sandbox already contains a removal of a
+/// missing target.
 fn unattended(result: &guard_contracts::PreToolResultV1) -> bool {
     let decided = (result.minimum_action.as_str(), result.reason_code.as_str());
     decided == ("allow", PROVEN)
@@ -35,11 +35,9 @@ fn allowed(session: &Session, command: &str) -> bool {
 }
 
 #[test]
-fn committed_and_ignored_targets_run_without_approval() {
+fn committed_targets_run_without_approval() {
     let session = fixture("recoverable-allow");
     for command in [
-        "rm -rf node_modules",
-        "rm -rf ./node_modules/pkg",
         "rm -rf docs",
         "rm -r docs/guide src",
         "rm -Rfv -- docs",
@@ -76,12 +74,50 @@ fn work_git_cannot_restore_keeps_the_approval() {
     std::fs::write(primary.join("src/lib.rs"), "fn main() { edited(); }\n").unwrap();
     std::fs::write(primary.join("docs/guide/new.md"), "new\n").unwrap();
     std::os::unix::fs::symlink(primary.join("docs"), primary.join("docs-link")).unwrap();
+    std::fs::write(primary.join("node_modules/pkg/index.js"), "x\n").unwrap();
+    std::fs::create_dir_all(primary.join("config")).unwrap();
+    std::fs::write(primary.join("config/app.toml"), "a = 1\n").unwrap();
+    std::fs::create_dir_all(primary.join("vendor/lib")).unwrap();
+    std::fs::write(
+        primary.join(".gitignore"),
+        "node_modules/\nconfig/.env\nvendor/\n",
+    )
+    .unwrap();
+    for directory in ["assumed", "skipped"] {
+        std::fs::create_dir_all(primary.join(directory)).unwrap();
+        std::fs::write(primary.join(directory).join("a.txt"), "a\n").unwrap();
+        git(&session.home, primary, &["add", directory]);
+    }
+    git(&session.home, primary, &["add", ".gitignore", "config"]);
+    git(&session.home, primary, &["commit", "--quiet", "-m", "more"]);
+    std::fs::write(primary.join("config/.env"), "TOKEN=x\n").unwrap();
+    git(
+        &session.home,
+        &primary.join("vendor/lib"),
+        &["init", "--quiet", "-b", "main"],
+    );
+    for (directory, flag) in [
+        ("assumed", "--assume-unchanged"),
+        ("skipped", "--skip-worktree"),
+    ] {
+        let file = format!("{directory}/a.txt");
+        git(&session.home, primary, &["update-index", flag, &file]);
+        std::fs::write(primary.join(&file), "edited\n").unwrap();
+    }
     for command in [
         // Untracked, modified and partly untracked trees.
         "rm -rf scratch",
         "rm -rf src",
         "rm -rf docs",
         "rm -rf node_modules scratch",
+        // Ignored files, an ignored nested repository and index entries
+        // whose working files Git does not compare.
+        "rm -rf node_modules",
+        "rm -rf ./node_modules/pkg",
+        "rm -rf config",
+        "rm -rf vendor",
+        "rm -rf assumed",
+        "rm -rf skipped",
         // The work tree itself, its Git directory and paths outside it.
         "rm -rf .",
         "rm -rf .git",

@@ -136,13 +136,18 @@ fn inner(
                     break;
                 }
                 remaining_launcher_children[0] -= 1;
-                factors.extend(inner(
-                    &child,
-                    None,
-                    &[],
-                    depth + 1,
-                    remaining_launcher_children,
-                ));
+                let mut child_factors =
+                    inner(&child, None, &[], depth + 1, remaining_launcher_children);
+                // xargs appends the paths it reads after the operands the
+                // command shows, so its removal can reach a root none names.
+                if executable == "xargs" {
+                    for child_factor in &mut child_factors {
+                        if child_factor.reason_code == "critical.destructive-filesystem" {
+                            child_factor.basis.action_floor = GuardAction::Block;
+                        }
+                    }
+                }
+                factors.extend(child_factors);
             }
         } else if !launcher_children.is_empty() {
             factors.push(factor(

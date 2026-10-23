@@ -1053,7 +1053,7 @@ fn evaluate_single_command(
             model,
             "allow",
             "native_exact_safe_recoverable_removal",
-            "The Rust command authority proved every target of this recursive removal is committed or ignored in the session's Git work tree, so Git can restore it.",
+            "The Rust command authority proved every target of this recursive removal holds only committed, unmodified files in the session's Git work tree, so Git can restore it.",
         ));
     }
     if worktree_maintenance::exact_safe_command(&model, context, deadline, execution_environment) {

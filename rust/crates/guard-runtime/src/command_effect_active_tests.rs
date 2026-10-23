@@ -195,6 +195,10 @@ fn recursive_removal_asks_unless_git_can_restore_it() {
             .env("HOME", &home)
             .env("GIT_CONFIG_NOSYSTEM", "1")
             .env_remove("XDG_CONFIG_HOME")
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_COMMON_DIR")
             .args(arguments)
             .status()
             .unwrap();
@@ -240,7 +244,8 @@ fn recursive_removal_asks_unless_git_can_restore_it() {
     };
     assert_eq!(decide("rm -rf docs"), "allow");
     assert_eq!(decide("rm -rf scratch"), "review");
-    assert_eq!(decide("rm -rf ./stale-lab-dir/../scratch"), "review");
+    // A `..` step can climb out of the work tree, so the floor blocks it.
+    assert_eq!(decide("rm -rf ./stale-lab-dir/../scratch"), "block");
     assert_eq!(decide("rm -rf /"), "block");
     std::fs::remove_dir_all(&base).unwrap();
 }

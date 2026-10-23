@@ -255,13 +255,23 @@ fn remove_targets(arguments: &[String]) -> Vec<&String> {
 
 /// The removal names no target the command shows: `xargs` or `find -exec`
 /// supplies them, or an expansion the shell has not run yet. Whether one of
-/// them is a root cannot be read.
+/// them is a root cannot be read. A brace list, `.`, a `..` step or a glob in
+/// the first component can likewise reach a root or the home from wherever
+/// the session stands.
 fn hidden_remove_targets(arguments: &[String]) -> bool {
     let targets = remove_targets(arguments);
     targets.is_empty()
-        || targets
-            .iter()
-            .any(|target| target.contains("{}") || target.contains(['$', '`']))
+        || targets.iter().any(|target| {
+            let mut components = target
+                .split(['/', '\\'])
+                .filter(|part| !part.is_empty() && *part != ".");
+            target.contains(['{', '$', '`'])
+                || target.trim_end_matches(['/', '\\']) == "."
+                || target.split(['/', '\\']).any(|part| part == "..")
+                || components
+                    .next()
+                    .is_some_and(|first| first.contains(['*', '?', '[']))
+        })
 }
 
 /// `_destructive_graphql` (:321).

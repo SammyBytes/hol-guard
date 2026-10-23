@@ -2,11 +2,13 @@
 //!
 //! A recursive removal asks for approval because it can take uncommitted
 //! work with it. Inside the session's own Git work tree, a target that holds
-//! only committed files and files Git ignores loses nothing: `git restore`
-//! returns the committed files and ignored output is rebuilt. Such a removal
-//! needs no approval. An untracked or modified file, a staged change, a
-//! nested repository, a dirty submodule, the work tree itself or its `.git`
-//! directory keeps the approval, as does any target Git was not asked about.
+//! only committed, unmodified files loses nothing: `git restore` returns
+//! them. Such a removal needs no approval. An untracked, ignored or modified
+//! file, a staged change, an index entry marked assume-unchanged or
+//! skip-worktree, a nested repository, a dirty submodule, the work tree
+//! itself or its `.git` directory keeps the approval, as does any target Git
+//! was not asked about. Ignored files count because Git cannot restore them:
+//! they may be secrets, local data or another repository.
 
 use super::git_session_probe::Probe;
 use super::PathContext;
@@ -102,27 +104,50 @@ fn target(operand: &str, cwd: &Path, root: &Path) -> Option<PathBuf> {
 }
 
 /// Git reports nothing under `target` that is not committed: no untracked,
-/// modified, staged or deleted file and no dirty submodule. Ignored files are
-/// left out of the report on purpose.
+/// ignored, modified, staged or deleted file and no dirty submodule. An
+/// ignored directory is reported whole, whatever it holds.
 fn committed(probe: &Probe, target: &Path) -> bool {
     let Some(target) = target.to_str() else {
         return false;
     };
+    trusted_index(probe, target)
+        && probe
+            .output(&[
+                "--literal-pathspecs",
+                "--no-optional-locks",
+                "--no-pager",
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+                "--ignored=traditional",
+                "--ignore-submodules=none",
+                "--",
+                target,
+            ])
+            .is_some_and(|report| report.is_empty())
+}
+
+/// No index entry under `target` tells Git to skip its working file, so the
+/// status report covers every tracked file. `ls-files -v` tags an
+/// assume-unchanged entry in lower case and a skip-worktree entry `S`.
+fn trusted_index(probe: &Probe, target: &str) -> bool {
     probe
         .output(&[
             "--literal-pathspecs",
             "--no-optional-locks",
-            "--no-pager",
-            "status",
-            "--porcelain=v1",
+            "ls-files",
+            "-v",
             "-z",
-            "--untracked-files=all",
-            "--ignored=no",
-            "--ignore-submodules=none",
             "--",
             target,
         ])
-        .is_some_and(|report| report.is_empty())
+        .is_some_and(|listing| {
+            listing
+                .split(|byte| *byte == 0)
+                .filter(|entry| !entry.is_empty())
+                .all(|entry| entry.first() == Some(&b'H'))
+        })
 }
 
 /// Whether `segment` is a recursive `rm` of targets Git can restore, in the

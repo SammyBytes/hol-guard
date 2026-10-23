@@ -549,15 +549,8 @@ fn only_an_expired_deadline_gets_the_try_again_reason() {
 #[test]
 fn recursive_removal_floor_asks_unless_it_removes_a_root() {
     let floor = |command: &str| {
-        let model = crate::parse_command(&crate::CommandModelRequestV1 {
-            command: command.into(),
-            dialect: "posix".into(),
-            transport: "shell_string".into(),
-            extraction_provenance: "guard-shell".into(),
-        })
-        .unwrap();
         crate::command_critical_floors::command_critical_floor_factors(
-            &crate::canonical_command::CanonicalCommand::from_v1(&model),
+            &crate::critical_floor_context::parse_floor_command(command, None, None),
             None,
             &[],
         )
@@ -569,6 +562,7 @@ fn recursive_removal_floor_asks_unless_it_removes_a_root() {
         "rm -rf ./stale-lab-dir",
         "rm -rf build node_modules",
         "rm -rf /srv/app/releases/old",
+        "rm -rf dist/*",
     ] {
         assert_eq!(
             floor(command),
@@ -585,6 +579,17 @@ fn recursive_removal_floor_asks_unless_it_removes_a_root() {
         "rm -rf ~/Documents",
         "rm -rf $HOME",
         "rm -rf \"$TARGET\"",
+        // From the session's directory these can reach the home or a root.
+        "rm -rf {/,/etc}",
+        "rm -rf .",
+        "rm -rf ./",
+        "rm -rf ..",
+        "rm -rf ../*",
+        "rm -rf *",
+        "rm -rf ./*",
+        // xargs appends the paths it reads after the visible operands.
+        "echo / | xargs rm -rf x",
+        "xargs rm -rf BUILD",
     ] {
         assert_eq!(
             floor(command),

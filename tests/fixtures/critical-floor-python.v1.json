@@ -82,7 +82,7 @@
       "legacy_assertion": "block"
     },
     {
-      "action": "review",
+      "action": "block",
       "command": "xargs rm -rf BUILD",
       "legacy_assertion": "block"
     },

@@ -53,7 +53,7 @@ def _scrub_hook_detail(value: object) -> object:
     if isinstance(value, str):
         return _safe_hook_diagnostic(value)
     if isinstance(value, Mapping):
-        return {key: _scrub_hook_detail(item) for key, item in value.items()}
+        return {_scrub_hook_detail(key): _scrub_hook_detail(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_scrub_hook_detail(item) for item in value]
     return value
