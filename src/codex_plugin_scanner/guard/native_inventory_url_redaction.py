@@ -65,10 +65,26 @@ def redaction_pass() -> Iterator[None]:
         _PASS_ANSWERS.reset(token)
 
 
-def prefetch(urls: Iterable[str], hosts: Iterable[str] = (), *, guard_home: Path | None = None) -> None:
-    """Answer every URL redaction and host classification of a pass in batches.
+def prefetch(
+    urls: Iterable[str],
+    hosts: Iterable[str] = (),
+    *,
+    paths: Iterable[str] = (),
+    commands: Iterable[str] = (),
+    home_dir: Path | None = None,
+    workspace_dir: Path | None = None,
+    guard_home: Path | None = None,
+) -> None:
+    """Answer every redaction an export will ask for, in batched requests.
 
-    Outside a pass there is nowhere to keep the answers, so this does nothing.
+    A snapshot redacts far more paths and command strings than URLs: every
+    string in an artifact's metadata is a path until it proves to be a URL.
+    Left to the per-value calls below, each distinct one would be its own
+    round trip, so they are collected here with the URLs and asked together.
+
+    ``paths`` and ``commands`` need the roots their answers depend on, and are
+    ignored without a ``home_dir``. Outside a pass there is nowhere to keep
+    the answers, so this does nothing.
     """
 
     cache = _PASS_ANSWERS.get()
@@ -76,14 +92,21 @@ def prefetch(urls: Iterable[str], hosts: Iterable[str] = (), *, guard_home: Path
         return
     tasks: list[dict[str, object]] = []
     seen: set[_TaskKey] = set()
+
+    def collect(task: dict[str, object]) -> None:
+        key = _task_key(task)
+        if key in cache or key in seen:
+            return
+        seen.add(key)
+        tasks.append(task)
+
     for kind, values in (("redact_url", urls), ("classify_endpoint_host", hosts)):
         for value in values:
-            task: dict[str, object] = {"kind": kind, "value": value}
-            key = _task_key(task)
-            if key in cache or key in seen:
-                continue
-            seen.add(key)
-            tasks.append(task)
+            collect({"kind": kind, "value": value})
+    if home_dir is not None:
+        for kind, values in (("redact_known_path", paths), ("redact_command_value", commands)):
+            for value in values:
+                collect(_rooted(kind, value, home_dir, workspace_dir))
     for chunk in _chunks(tasks):
         for task, answer in zip(chunk, _answers(chunk, guard_home=guard_home), strict=True):
             cache[_task_key(task)] = answer
@@ -144,8 +167,25 @@ def _rooted(kind: str, value: str, home_dir: Path, workspace_dir: Path | None) -
         "value": value,
         "home_dir": str(home_dir),
         "workspace_dir": None if workspace_dir is None else str(workspace_dir),
-        "cwd": os.getcwd(),
+        "cwd": _cwd(),
     }
+
+
+def _cwd() -> str:
+    """The directory a relative value in the task is resolved against.
+
+    ``os.getcwd()`` raises once the process's own directory has been deleted,
+    and an export that reaches this for a value it never needed a root for
+    would abort on its first metadata string. An absolute value does not need
+    one, and a relative value whose root is gone is the unresolvable path the
+    caller already exports as a bare file name, so the empty root travels and
+    the resident answers with that same bare name.
+    """
+
+    try:
+        return os.getcwd()
+    except OSError:
+        return ""
 
 
 def _task_key(task: dict[str, object]) -> _TaskKey:

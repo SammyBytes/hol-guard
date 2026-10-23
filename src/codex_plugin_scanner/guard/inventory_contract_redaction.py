@@ -43,37 +43,69 @@ def classify_endpoint_host(value: str | None) -> str:
     return _native_url.classify_endpoint_host(value)
 
 
-def _prefetch_artifact_urls(artifacts: tuple[object, ...]) -> None:
-    """Answer every URL an export of these artifacts redacts in batched requests.
+def _prefetch_artifact_redactions(
+    artifacts: tuple[object, ...],
+    *,
+    home_dir: Path,
+    workspace_dir: Path | None,
+) -> None:
+    """Answer every redaction an export of these artifacts makes, in batches.
 
     The per-value redaction below then reads the pass's answers instead of
-    asking the resident once per string. A value this walk misses is still
-    redacted; it only costs its own request. A command string is one such
-    value: the resident redacts the whole command in a single task, so the
-    pass caches it by the command rather than by the URLs inside it.
+    asking the resident once per string. Paths dominate that count: every
+    metadata string that is not a URL is offered to the resident as a path, so
+    batching only the URLs left the walk one round trip per string.
+
+    A value this walk misses is still redacted; it only costs its own request.
     """
     urls: list[str] = []
     hosts: list[str] = []
+    paths: list[str] = []
+    commands: list[str] = []
     for artifact in artifacts:
         url = getattr(artifact, "url", None)
         if isinstance(url, str) and url:
             urls.append(url)
             hosts.append(url)
-        _collect_metadata_urls(getattr(artifact, "metadata", None), urls)
-    _native_url.prefetch(urls, hosts)
+        config_path = getattr(artifact, "config_path", None)
+        if isinstance(config_path, str) and config_path:
+            paths.append(config_path)
+        command = getattr(artifact, "command", None)
+        if isinstance(command, str) and command:
+            commands.append(command)
+        _collect_metadata_values(getattr(artifact, "metadata", None), urls, paths)
+    _native_url.prefetch(
+        urls,
+        hosts,
+        paths=paths,
+        commands=commands,
+        home_dir=home_dir,
+        workspace_dir=workspace_dir,
+    )
 
 
-def _collect_metadata_urls(value: object, urls: list[str]) -> None:
-    """Gather the strings ``_sanitize_paths`` will redact as URLs."""
-    if isinstance(value, dict):
+def _collect_metadata_values(value: object, urls: list[str], paths: list[str]) -> None:
+    """Gather the strings ``_sanitize_paths`` will redact, by how it redacts them.
+
+    This mirrors that walk exactly, including the sensitive keys it replaces
+    without asking: a value gathered here that the walk never reaches would be
+    a request made for nothing, and one it reaches but this misses is the
+    unbatched round trip this exists to avoid.
+    """
+    if isinstance(value, Path):
+        paths.append(str(value))
+    elif isinstance(value, dict):
         for key, item in value.items():
             if not _SENSITIVE_KEY_RE.search(str(key)):
-                _collect_metadata_urls(item, urls)
+                _collect_metadata_values(item, urls, paths)
     elif isinstance(value, (list, tuple)):
         for item in value:
-            _collect_metadata_urls(item, urls)
-    elif isinstance(value, str) and "://" in value:
-        urls.append(value)
+            _collect_metadata_values(item, urls, paths)
+    elif isinstance(value, str):
+        if "://" in value:
+            urls.append(value)
+        else:
+            paths.append(value)
 
 
 def _safe_source_detail(run: object) -> str:
