@@ -33,6 +33,7 @@ pub mod effect_decision_parity;
 pub mod fd_execution_boundaries;
 pub mod guard_attestation_envelope_parity;
 pub mod guard_attestation_payload_parity;
+pub mod guard_attestation_signature_parity;
 pub mod guard_attestation_verification_parity;
 pub mod guard_evidence_hash_parity;
 pub mod guard_trust_claim_parity;
