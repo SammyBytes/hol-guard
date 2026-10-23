@@ -39,6 +39,9 @@ _BOOTSTRAP = (
     "from codex_plugin_scanner.cli import main;raise SystemExit(main(sys.argv[1:]))"
 )
 _PLACEHOLDERS = frozenset({"{{workspace}}", "{{home}}"})
+_PLACEHOLDER = re.compile(r"(\{\{(?:workspace|home|fixture)\}\})")
+# Codex on Windows runs a command through PowerShell or Git Bash and shows that envelope.
+_SHELL = re.compile(r'"[^"]*\\(?:pwsh|powershell|bash)\.exe" (?:-Command|-lc|-c) "(.*)"', re.IGNORECASE | re.DOTALL)
 _REQUEST_SCHEMA = "guard-contained-test-request.v1"
 
 
@@ -118,6 +121,18 @@ def request_proofs(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     return proofs
 
 
+def _environment_site_packages(python: str) -> str:
+    """The ``Lib/site-packages`` of the environment that owns ``python``.
+
+    The Windows Gauntlet installs the wheel under test into one environment, so
+    the package root the bootstrap imports must be that interpreter's own.
+    """
+    root = python.rsplit("/", 1)[0]
+    if root.rsplit("/", 1)[-1].casefold() == "scripts":
+        root = root.rsplit("/", 1)[0]
+    return f"{root}/Lib/site-packages"
+
+
 def sink_argv(command: object) -> tuple[list[str] | None, str | None]:
     """The canonical sink argv in a redacted ``PostToolUse`` command, with the bootstrap folded."""
     if not isinstance(command, str):
@@ -135,6 +150,7 @@ def sink_argv(command: object) -> tuple[list[str] | None, str | None]:
         or _PYTHON.fullmatch(argv[0]) is None
         or argv[1:4] != ["-I", "-c", _BOOTSTRAP]
         or _SITE_PACKAGES.fullmatch(argv[4]) is None
+        or argv[4].casefold() != _environment_site_packages(argv[0]).casefold()
         or argv[5:9] != ["guard", "execute-contained-test", "--harness", "codex"]
     ):
         return None, "contained wrapper is not the Windows Guard sink"
@@ -175,9 +191,13 @@ def routed_calls(expectation: str, case: dict[str, Any]) -> tuple[set[str], tupl
             continue
         reviewed = (row.get("payload") or {}).get("tool_input")
         post = [r for r in rows if _event(r) == "PostToolUse" and _call_id(r) == call_id]
-        wrapper = ((post[0].get("payload") or {}).get("tool_input") or {}).get("command") if len(post) == 1 else None
-        if not isinstance(wrapper, str) or "execute-contained-test" not in wrapper:
+        commands = [((r.get("payload") or {}).get("tool_input") or {}).get("command") for r in post]
+        attempted = [c for c in commands if isinstance(c, str) and "execute-contained-test" in c]
+        if not attempted:
             continue
+        if len(post) != 1:
+            return set(), ("harness-error", "contained route has more than one post observation")
+        wrapper = attempted[0]
         error = _binding_error(call_id, reviewed, post[0], wrapper, proofs, calls)
         if error:
             return set(), error
@@ -208,18 +228,41 @@ def _binding_error(
     matches = [p for p in proofs if isinstance(p, dict) and p.get("tool_call_id") == call_id]
     if len(matches) != 1 or matches[0].get("request_sha256") != argv[16]:
         return "harness-error", "contained request digest differs from the input Guard reviewed"
+    shown = _shown_wrapper(wrapper)
     ran = [
         call
         for call in calls
-        if isinstance(call, dict)
-        and isinstance(call.get("args"), dict)
-        and argv[16] in str(call["args"].get("command"))
+        if isinstance(call, dict) and isinstance(call.get("args"), dict) and _runs(call["args"].get("command"), shown)
     ]
     if len(ran) != 1:
         return "harness-error", "the transcript does not show one run of the contained wrapper"
     if ran[0].get("is_error") is not False:
         return "false-positive", "Guard's contained run of ordinary work failed"
     return None
+
+
+def _shown_wrapper(wrapper: str) -> re.Pattern[str]:
+    """The wrapper as the transcript shows it: the case's real paths in place of placeholders."""
+    parts = _PLACEHOLDER.split(wrapper)
+    pattern = []
+    for index, part in enumerate(parts):
+        if index % 2 == 0:
+            pattern.append(re.escape(part))
+        elif parts[index - 1].endswith("'"):
+            pattern.append(r"[^'\n]+")
+        else:
+            pattern.append(r"'[^'\n]+'")
+    return re.compile("".join(pattern))
+
+
+def _runs(command: object, shown: re.Pattern[str]) -> bool:
+    """Whether a transcript command is exactly the wrapper, alone or inside its shell envelope."""
+    if not isinstance(command, str):
+        return False
+    envelope = _SHELL.fullmatch(command)
+    # Codex shows the command's backslashes escaped.
+    inner = (envelope.group(1) if envelope else command).replace("\\\\", "\\")
+    return shown.fullmatch(inner) is not None
 
 
 def is_routed_deny(row: Any, bound: set[str]) -> bool:

@@ -69,6 +69,17 @@ def _wrapper(digest: str, guard_home: str = "{{fixture}}\\guard-home") -> str:
     return " ".join([PYTHON, *words, "'--home'", "{{home}}"])
 
 
+def _shown(wrapper: str) -> str:
+    """The wrapper as Codex's transcript shows it: real paths, backslashes escaped."""
+    case = "C:\\Users\\tester\\w\\r1\\case-7"
+    real = (
+        wrapper.replace("{{fixture}}", case)
+        .replace("{{workspace}}", f"'{case}\\home\\project'")
+        .replace("{{home}}", f"'{case}\\home'")
+    )
+    return f'"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "{real.replace(chr(92), chr(92) * 2)}"'
+
+
 def _post(wrapper: str) -> dict:
     return {
         "route_harness": "codex",
@@ -94,7 +105,7 @@ def _case(tmp_path: Path, *, digest: str | None = None, is_error: bool = False, 
         "guard_rows": [pre, _post(wrapper)],
         "contained_request_proofs": proofs,
         "transcript": {
-            "calls": [{**call, "args": {"command": f'"pwsh.exe" -Command "{wrapper}"'}, "result": "report: 8 files"}],
+            "calls": [{**call, "args": {"command": _shown(wrapper)}, "result": "report: 8 files"}],
             "terminal": True,
             "failed": False,
         },
@@ -110,8 +121,11 @@ def _case(tmp_path: Path, *, digest: str | None = None, is_error: bool = False, 
     }
 
 
-def test_a_bound_route_is_the_contained_success_shape(tmp_path: Path) -> None:
+@pytest.mark.parametrize("shell", ['PowerShell\\\\7\\\\pwsh.exe" -Command', 'Git\\\\usr\\\\bin\\\\bash.exe" -lc'])
+def test_a_bound_route_is_the_contained_success_shape(tmp_path: Path, shell: str) -> None:
     case = _case(tmp_path)
+    call = case["transcript"]["calls"][0]
+    call["args"]["command"] = call["args"]["command"].replace('PowerShell\\\\7\\\\pwsh.exe" -Command', shell)
     assert routed_calls("allow", case) == ({CALL_ID}, None)
     result = assess_harness_case(SCENARIO, case)
     assert (result["outcome"], result["interruptions"]["events"]) == ("pass", [])
@@ -157,6 +171,26 @@ def test_a_deny_that_never_ran_the_sink_stays_a_stop(tmp_path: Path) -> None:
     assert assess_harness_case(SCENARIO, case)["reason"] == f"Guard stopped ordinary work ({REASON})"
 
 
+def test_another_command_naming_the_digest_is_no_proof(tmp_path: Path) -> None:
+    case = _case(tmp_path)
+    call = case["transcript"]["calls"][0]
+    digest = sink_argv(case["guard_rows"][1]["payload"]["tool_input"]["command"])[0][16]  # type: ignore[index]
+    call["args"]["command"] = f"Write-Output {digest}; {call['args']['command']}"
+    assert routed_calls("allow", case)[1] == (
+        "harness-error",
+        "the transcript does not show one run of the contained wrapper",
+    )
+
+
+def test_two_post_observations_for_a_route_are_ambiguous(tmp_path: Path) -> None:
+    case = _case(tmp_path)
+    case["guard_rows"].append(case["guard_rows"][1])
+    assert routed_calls("allow", case) == (
+        set(),
+        ("harness-error", "contained route has more than one post observation"),
+    )
+
+
 def test_only_allow_cases_and_codex_open_the_route(tmp_path: Path) -> None:
     case = _case(tmp_path)
     assert routed_calls("block", case) == (set(), None)
@@ -171,6 +205,10 @@ def test_only_allow_cases_and_codex_open_the_route(tmp_path: Path) -> None:
         (_wrapper("a" * 64).replace("hol-guard-contained-test-", "x-"), "request path is not adapter-owned"),
         (_wrapper("a" * 64).replace(" '-I'", " -I"), "not canonical"),
         (_wrapper("a" * 64) + " '--extra'", "not the Windows Guard sink"),
+        (
+            _wrapper("a" * 64).replace(SITE, "C:/Users/tester/other/.venv/Lib/site-packages"),
+            "not the Windows Guard sink",
+        ),
     ],
 )
 def test_only_the_canonical_sink_argv_binds(wrapper: str, error: str) -> None:
