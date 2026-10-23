@@ -409,7 +409,9 @@ fn outside_the_workspace(target: &str, context: PathContext<'_>) -> bool {
     ) else {
         return false;
     };
-    let candidate = canonical_through_existing(&candidate);
+    let Some(candidate) = canonical_through_existing(&candidate) else {
+        return false;
+    };
     let workspace = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
     !candidate.starts_with(&workspace)
 }
@@ -422,13 +424,21 @@ fn outside_the_workspace(target: &str, context: PathContext<'_>) -> bool {
 /// Windows temp directory canonicalizes to a verbatim path. Read that way,
 /// `cp seed.sh run.sh && . ./run.sh` sourced a file "outside the workspace"
 /// and lost the failure a file this command writes keeps.
-fn canonical_through_existing(path: &Path) -> PathBuf {
-    path.ancestors()
-        .find_map(|ancestor| {
-            let canonical = std::fs::canonicalize(ancestor).ok()?;
-            Some(canonical.join(path.strip_prefix(ancestor).ok()?))
-        })
-        .unwrap_or_else(|| path.to_path_buf())
+///
+/// `None` when nothing resolves or the missing part climbs with `..`: once the
+/// command creates those directories, a climb from behind a link can land back
+/// in the workspace, so where it ends is not known here.
+fn canonical_through_existing(path: &Path) -> Option<PathBuf> {
+    let (canonical, missing) = path.ancestors().find_map(|ancestor| {
+        Some((
+            std::fs::canonicalize(ancestor).ok()?,
+            path.strip_prefix(ancestor).ok()?,
+        ))
+    })?;
+    missing
+        .components()
+        .all(|component| matches!(component, std::path::Component::Normal(_)))
+        .then(|| canonical.join(missing))
 }
 
 /// Whether no segment other than the shell's `source` builtin runs words of
