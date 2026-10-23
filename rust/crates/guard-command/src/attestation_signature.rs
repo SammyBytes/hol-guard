@@ -14,12 +14,10 @@
 
 use base64ct::{Base64, Encoding};
 use ring::signature;
-use rsa::pkcs1::DecodeRsaPublicKey;
-use rsa::pkcs8::DecodePublicKey;
 use rsa::pss::{Signature as RsaPssSignature, VerifyingKey as RsaPssVerifyingKey};
 use rsa::signature::Verifier;
 use rsa::traits::PublicKeyParts;
-use rsa::RsaPublicKey;
+use rsa::{BigUint, RsaPublicKey};
 use sha2::{Digest, Sha256};
 
 use crate::attestation_envelope::{
@@ -33,6 +31,23 @@ const OID_RSA_ENCRYPTION: &[u8] = &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x
 const OID_EC_PUBLIC_KEY: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01];
 /// `1.2.840.10045.3.1.7` — the P-256 (secp256r1) named curve.
 const OID_PRIME256V1: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
+/// The DER encoding of ASN.1 `NULL`, the parameters an RSA key's algorithm
+/// identifier carries.
+const DER_NULL: &[u8] = &[0x05, 0x00];
+
+/// The largest RSA modulus a key may carry. OpenSSL, which Python's
+/// `cryptography` verifies with, stops at the same size
+/// (`OPENSSL_RSA_MAX_MODULUS_BITS`); the `rsa` crate's own default is 4096,
+/// which would refuse an RSA-8192 key Python accepts.
+const RSA_MAX_MODULUS_BITS: usize = 16384;
+
+/// P-256's field prime, `2^256 - 2^224 + 2^192 + 2^96 - 1`.
+const P256_FIELD_PRIME_HEX: &[u8] =
+    b"ffffffff00000001000000000000000000000000ffffffffffffffffffffffff";
+/// P-256's curve constant `b` in `y^2 = x^3 - 3x + b`.
+const P256_CURVE_B_HEX: &[u8] = b"5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b";
+/// The width of one P-256 coordinate.
+const P256_COORDINATE_LEN: usize = 32;
 
 /// Why a signature was refused, in the wording Python uses.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,8 +76,8 @@ fn refuse<T>(message: &str) -> Result<T, AttestationSignatureError> {
 ///
 /// Python keeps `RSAPublicKey` and `EllipticCurvePublicKey` and refuses
 /// everything else, so the two shapes it accepts are the only ones here. The
-/// EC arm holds the uncompressed point exactly as the SPKI carried it, which is
-/// the form `ring` verifies against.
+/// EC arm holds a point already checked to lie on the curve, rewritten in the
+/// uncompressed form `ring` verifies against whatever form the SPKI used.
 #[derive(Debug, Clone)]
 pub enum AttestationPublicKey {
     /// An RSA key, for `rsa-pss-sha256`.
@@ -149,6 +164,87 @@ fn pem_body(pem: &str) -> Option<(String, Vec<u8>)> {
     None
 }
 
+/// Build an RSA key from a PKCS#1 `RSAPublicKey` body.
+///
+/// The `rsa` crate's own decoders cap the modulus at 4096 bits, so the modulus
+/// and exponent are read out here and the key is built against OpenSSL's cap
+/// instead.
+fn rsa_key_from_pkcs1(der: &[u8]) -> Option<AttestationPublicKey> {
+    let key = rsa::pkcs1::RsaPublicKey::try_from(der).ok()?;
+    let modulus = BigUint::from_bytes_be(key.modulus.as_bytes());
+    let exponent = BigUint::from_bytes_be(key.public_exponent.as_bytes());
+    RsaPublicKey::new_with_max_size(modulus, exponent, RSA_MAX_MODULUS_BITS)
+        .ok()
+        .map(|key| AttestationPublicKey::Rsa(Box::new(key)))
+}
+
+fn is_odd(value: &BigUint) -> bool {
+    value.to_bytes_be().last().is_some_and(|byte| byte & 1 == 1)
+}
+
+fn push_coordinate(point: &mut Vec<u8>, coordinate: &BigUint) {
+    let bytes = coordinate.to_bytes_be();
+    point.resize(point.len() + P256_COORDINATE_LEN - bytes.len(), 0);
+    point.extend_from_slice(&bytes);
+}
+
+/// Decode a P-256 point the way OpenSSL does when Python loads the key.
+///
+/// OpenSSL accepts the uncompressed (`0x04`), compressed (`0x02`/`0x03`) and
+/// hybrid (`0x06`/`0x07`) encodings, and refuses a point that is off the
+/// curve, has a coordinate outside the field, or is the point at infinity.
+/// `ring` only verifies against the uncompressed form, so an accepted point is
+/// returned in that form.
+fn p256_uncompressed_point(encoded: &[u8]) -> Option<Vec<u8>> {
+    let field_prime = BigUint::parse_bytes(P256_FIELD_PRIME_HEX, 16)?;
+    let curve_b = BigUint::parse_bytes(P256_CURVE_B_HEX, 16)?;
+    let (&form, coordinates) = encoded.split_first()?;
+    let x = BigUint::from_bytes_be(coordinates.get(..P256_COORDINATE_LEN)?);
+    if x >= field_prime {
+        return None;
+    }
+    // y^2 = x^3 - 3x + b, with 3p added first so the subtraction cannot go
+    // below zero.
+    let three = BigUint::from(3u32);
+    let y_squared = (&x * &x * &x + &curve_b + &three * &field_prime - &three * &x) % &field_prime;
+    let y = match form {
+        0x02 | 0x03 if coordinates.len() == P256_COORDINATE_LEN => {
+            // The field prime is 3 mod 4, so a square root, when one exists,
+            // is y^2 raised to (p + 1) / 4.
+            let exponent = (&field_prime + BigUint::from(1u32)) >> 2;
+            let root = y_squared.modpow(&exponent, &field_prime);
+            if (&root * &root) % &field_prime != y_squared {
+                return None;
+            }
+            if is_odd(&root) == (form == 0x03) {
+                root
+            } else if root == BigUint::from(0u32) {
+                return None;
+            } else {
+                &field_prime - &root
+            }
+        }
+        0x04 | 0x06 | 0x07 if coordinates.len() == 2 * P256_COORDINATE_LEN => {
+            let y = BigUint::from_bytes_be(&coordinates[P256_COORDINATE_LEN..]);
+            if y >= field_prime || (&y * &y) % &field_prime != y_squared {
+                return None;
+            }
+            // A hybrid encoding repeats y's parity in its first byte, and
+            // OpenSSL refuses one whose parity disagrees with y.
+            if form != 0x04 && is_odd(&y) != (form == 0x07) {
+                return None;
+            }
+            y
+        }
+        _ => return None,
+    };
+    let mut point = Vec::with_capacity(1 + 2 * P256_COORDINATE_LEN);
+    point.push(0x04);
+    push_coordinate(&mut point, &x);
+    push_coordinate(&mut point, &y);
+    Some(point)
+}
+
 /// Read a SubjectPublicKeyInfo and say which key it carries.
 fn public_key_from_spki(der: &[u8]) -> Option<AttestationPublicKey> {
     let outer = read_only_der(der)?;
@@ -174,18 +270,27 @@ fn public_key_from_spki(der: &[u8]) -> Option<AttestationPublicKey> {
         return None;
     }
     if oid.contents == OID_RSA_ENCRYPTION {
-        return RsaPublicKey::from_public_key_der(der)
-            .ok()
-            .map(|key| AttestationPublicKey::Rsa(Box::new(key)));
+        // Python loads an RSA key whose parameters are NULL or left out, and
+        // refuses anything else there.
+        if !oid.rest.is_empty() && oid.rest != DER_NULL {
+            return None;
+        }
+        return rsa_key_from_pkcs1(key_bytes);
     }
     if oid.contents != OID_EC_PUBLIC_KEY {
         return None;
     }
+    // The curve is the algorithm identifier's last element. Explicit curve
+    // parameters are refused outright: Python only loads the few that spell
+    // out a named curve, and refusing the rest keeps this side the stricter.
     let parameters = read_der(oid.rest)?;
-    if parameters.tag != 0x06 || parameters.contents != OID_PRIME256V1 {
+    if parameters.tag != 0x06 || !parameters.rest.is_empty() {
+        return None;
+    }
+    if parameters.contents != OID_PRIME256V1 {
         return Some(AttestationPublicKey::EcOtherCurve);
     }
-    Some(AttestationPublicKey::EcP256(key_bytes.to_vec()))
+    p256_uncompressed_point(key_bytes).map(AttestationPublicKey::EcP256)
 }
 
 /// Load the public key a trust attestation advertises.
@@ -200,9 +305,9 @@ pub fn load_attestation_public_key(
         return refuse("Trust attestation public key must be RSA or EC");
     };
     if label == "RSA PUBLIC KEY" {
-        return match RsaPublicKey::from_pkcs1_der(&der) {
-            Ok(key) => Ok(AttestationPublicKey::Rsa(Box::new(key))),
-            Err(_) => refuse("Trust attestation public key must be RSA or EC"),
+        return match rsa_key_from_pkcs1(&der) {
+            Some(key) => Ok(key),
+            None => refuse("Trust attestation public key must be RSA or EC"),
         };
     }
     if label != "PUBLIC KEY" {
