@@ -456,6 +456,30 @@ impl CompiledNativeCommandControls {
     }
 }
 
+/// Whether a trailing `&` is all that hides a nested executor.
+///
+/// The scan stops at the first construct it cannot model, and the background
+/// job wins that race: `eval "$PAYLOAD" &` is a background job to the parser
+/// and an `eval` to the shell. Read without the `&` it is the nested executor
+/// the arm below refuses unless the text names the program it runs, so
+/// backgrounding must not be the thing that admits it.
+fn backgrounded_nested_executor(
+    normalized: &str,
+    context: crate::pretool::PathContext<'_>,
+) -> bool {
+    let Some(foreground) = crate::pretool::foreground_job(normalized) else {
+        return false;
+    };
+    let structured = crate::critical_floor_context::parse_floor_command(
+        foreground,
+        context.cwd.map(std::path::Path::new),
+        context.home_dir.map(std::path::Path::new),
+    );
+    structured.uncertainty_reason.as_deref() == Some("nested_command_executor_not_yet_supported")
+        && !named_xargs_pipeline(foreground)
+        && !named_find_exec(foreground)
+}
+
 /// A pipeline whose only data movement is a pipe into an `xargs` that names
 /// the program it runs. A pipe into a shell, `curl url | sh`, is not one.
 fn named_xargs_pipeline(text: &str) -> bool {
@@ -575,6 +599,7 @@ fn reviewable_structure(
             let literal = unquoted_literal(normalized);
             !background_pipeline(normalized)
                 && (!moves_data(&literal) || literal_redirects_only(normalized))
+                && !backgrounded_nested_executor(normalized, context)
         }
         Some("compound_shell_not_yet_supported") => {
             let literal = unquoted_literal(normalized);

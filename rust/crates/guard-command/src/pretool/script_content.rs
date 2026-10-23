@@ -162,7 +162,7 @@ fn structure(
 /// (`&&`), separates jobs, or belongs to a redirect such as `2>&1`, and none
 /// of those is answered by dropping it, so only a single trailing one is read
 /// this way.
-fn foreground_job(text: &str) -> Option<&str> {
+pub(crate) fn foreground_job(text: &str) -> Option<&str> {
     let body = text.trim_end().strip_suffix('&')?.trim_end();
     (!body.is_empty() && !body.contains('&')).then_some(body)
 }
