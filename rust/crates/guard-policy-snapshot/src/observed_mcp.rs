@@ -88,7 +88,9 @@ pub fn observed_mcp_tool_action<'a>(
         return Some(action.as_str());
     }
     let namespace = mcp_tool_namespace(tool)?;
-    actions.get(&format!("{harness}:{namespace}*")).map(String::as_str)
+    actions
+        .get(&format!("{harness}:{namespace}*"))
+        .map(String::as_str)
 }
 
 pub(crate) fn validate_mcp_provider_actions(actions: &BTreeMap<String, String>) -> bool {
@@ -190,7 +192,10 @@ mod tests {
 
         let actions = BTreeMap::from([(format!("omp:{tool}"), "block".into())]);
         assert!(validate_mcp_tool_actions(&actions));
-        assert_eq!(observed_mcp_tool_action(&actions, "omp", tool), Some("block"));
+        assert_eq!(
+            observed_mcp_tool_action(&actions, "omp", tool),
+            Some("block")
+        );
     }
 
     #[test]
@@ -225,10 +230,7 @@ mod tests {
     fn an_exact_choice_is_read_before_the_connector_wildcard() {
         let actions = BTreeMap::from([
             ("omp:mcp__truenas-pilot__*".into(), "block".into()),
-            (
-                "omp:mcp__truenas-pilot__status".into(),
-                "allow".into(),
-            ),
+            ("omp:mcp__truenas-pilot__status".into(), "allow".into()),
         ]);
         assert_eq!(
             observed_mcp_tool_action(&actions, "omp", "mcp__truenas-pilot__status"),
