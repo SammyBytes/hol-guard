@@ -485,17 +485,29 @@ fn backgrounded_nested_executor(normalized: &str) -> bool {
     if named_xargs_pipeline(foreground) || named_find_exec(foreground) {
         return false;
     }
-    let Some(program) = command_position_program(foreground) else {
-        return false;
-    };
-    if matches!(
-        program.as_str(),
-        "." | "eval" | "exec" | "parallel" | "source" | "xargs"
-    ) {
+    // Only one command of the foreground text has to be the executor, and it
+    // need not be the first: `cd src; eval "$CMD" &` and `true || xargs sh &`
+    // each put it behind a separator a background job is allowed to carry, and
+    // `"eval" "$CMD" &` spells its name in quotes the shell takes off. Every
+    // command position is read, with the quotes and the directory stripped, so
+    // none of them reaches the floor below on the strength of its first word.
+    let literal = unquoted_literal(foreground);
+    let programs: Vec<String> = command_words(&literal)
+        .filter(|word| !is_assignment(word))
+        .map(executor_name)
+        .collect();
+    if programs.iter().any(|program| {
+        matches!(
+            program.as_str(),
+            "." | "eval" | "exec" | "parallel" | "source" | "xargs"
+        )
+    }) {
         return true;
     }
-    matches!(program.as_str(), "find" | "fd")
-        && unquoted_literal(foreground).split_whitespace().any(|word| {
+    programs
+        .iter()
+        .any(|program| matches!(program.as_str(), "find" | "fd"))
+        && literal.split_whitespace().any(|word| {
             matches!(word, "-exec" | "-execdir" | "-ok" | "-okdir" | "-x" | "-X")
                 || word == "--exec"
                 || word.starts_with("--exec=")
@@ -503,23 +515,18 @@ fn backgrounded_nested_executor(normalized: &str) -> bool {
         })
 }
 
-/// The program a simple command puts in command position, without the
-/// assignments and shell keywords that can stand in front of it, and without
-/// the directory and image extension the shell resolves away.
-fn command_position_program(text: &str) -> Option<String> {
-    let literal = unquoted_literal(text);
-    let word = literal
-        .split_whitespace()
-        .find(|word| !is_assignment(word) && !SHELL_PREFIXES.contains(word))?;
-    let base = word.rsplit(['/', '\\']).next().unwrap_or(word);
+/// The program a command-position word names, without the directory, the
+/// image extension and the quotes the shell takes off before it resolves the
+/// name: `"eval"`, `'ev'al` and `/bin/eval` are each that program.
+fn executor_name(word: &str) -> String {
+    let word = word.replace('"', "");
+    let base = word.rsplit(['/', '\\']).next().unwrap_or(&word);
     let lowered = base.to_ascii_lowercase();
-    Some(
-        lowered
-            .strip_suffix(".exe")
-            .or_else(|| lowered.strip_suffix(".cmd"))
-            .unwrap_or(&lowered)
-            .to_owned(),
-    )
+    lowered
+        .strip_suffix(".exe")
+        .or_else(|| lowered.strip_suffix(".cmd"))
+        .unwrap_or(&lowered)
+        .to_owned()
 }
 
 /// A pipeline whose only data movement is a pipe into an `xargs` that names

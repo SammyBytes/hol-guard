@@ -564,3 +564,26 @@ fn a_prefix_admits_nothing_its_own_grammar_cannot_count_past() {
         assert_eq!(result.reason_code, reason, "{command}");
     }
 }
+
+/// A nested executor keeps the hard failure wherever it stands in the
+/// foreground text. The scan reads every command position, not the first, so
+/// a `cd` in front of it, an `||` beside it, or quotes around its own name
+/// take nothing away.
+#[test]
+fn backgrounding_hides_a_nested_executor_in_no_command_position() {
+    let (home, project) = verified_context();
+    let binding = binding_with_layers(serde_json::json!([]));
+    for command in [
+        "cd src; eval \"$CMD\" &",
+        "true || xargs sh &",
+        "\"eval\" \"$CMD\" &",
+        "/bin/eval \"$CMD\" &",
+    ] {
+        let result = evaluate_in(&binding, command, home.path(), &project);
+        assert_eq!(result.minimum_action, "block", "{command}");
+        assert_eq!(
+            result.reason_code, "native_command_extension_evaluation_failed",
+            "{command}"
+        );
+    }
+}
