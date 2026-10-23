@@ -507,6 +507,11 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
             ResidentOperationV1::HookArtifactFacts(request) => {
                 crate::hook_artifact_facts_op::evaluate_hook_artifact_facts_request(&request)
             }
+            ResidentOperationV1::InventoryItemClassification(request) => {
+                crate::inventory_item_classification_op::evaluate_inventory_item_classification_request(
+                    &request,
+                )
+            }
             ResidentOperationV1::InventorySnapshotDigest(request) => {
                 crate::inventory_snapshot_digest_op::evaluate_inventory_snapshot_digest_request(
                     &request,
@@ -688,6 +693,9 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
             }
             ResidentOperationV1::VerifiedReadDecision(request) => {
                 crate::verified_read_decision_op::evaluate_verified_read_decision(&request)
+            }
+            ResidentOperationV1::InventoryUrlRedaction(request) => {
+                crate::inventory_url_redaction_op::evaluate_inventory_url_redaction(&request)
             }
             ResidentOperationV1::VerifiedReadPlan(request) => {
                 crate::verified_read_plan_op::evaluate_verified_read_plan(&request)

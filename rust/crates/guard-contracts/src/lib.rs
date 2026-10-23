@@ -260,12 +260,16 @@ mod verified_read_decision;
 pub use verified_read_decision::*;
 mod verified_read_plan;
 pub use verified_read_plan::*;
+mod inventory_item_classification;
+pub use inventory_item_classification::*;
 mod inventory_source_evidence;
 pub use inventory_source_evidence::*;
 mod inventory_snapshot_digest;
 pub use inventory_snapshot_digest::*;
 mod command_pack_record;
 pub use command_pack_record::*;
+mod inventory_url_redaction;
+pub use inventory_url_redaction::*;
 
 pub const NATIVE_PROTOCOL_VERSION: u16 = 1;
 pub const GUARD_HOOK_ENVELOPE_V2_SCHEMA: &str = "guard-hook-envelope.v2";

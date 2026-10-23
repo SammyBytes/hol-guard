@@ -250,6 +250,48 @@ evidence; it no longer recomputes the view or compares verdicts. A head the
 resident cannot read, or one whose managed policy has moved, refuses the
 migration with no Python fallback.
 
+The inventory URL redaction now comes from the resident.
+`inventory_url_redaction_op` answers a batch of tasks through
+`inventory_redaction::redact_url`, `redact_headers` and
+`classify_endpoint_host`, the grammar Rust already owned: which query keys and
+header names are credential-bearing, how CPython's `urlsplit` treats a
+half-bracketed netloc or a port it cannot read, and which hosts count as
+loopback or private. Python held a second copy of all of it, which is a second
+place an export could be declared safe. It now sends each endpoint string or
+header name list and returns the answer the reply carries, one per task and in
+order. A reply that is unbound, incomplete or shaped so the caller cannot read
+it fails the redaction closed and records the resident as failing; there is no
+Python fallback redaction. The retired bodies live on only as
+`scripts/ci/inventory_url_reference.py`, the CPython oracle that records the
+parity corpus the port is pinned against — asking the runtime for that corpus
+would pin it against itself.
+
+The same op now also redacts an exported command string and an exported path.
+`redact_command_value` and `redact_known_path` in
+`guard_command::inventory_path_redaction` already carried both, pinned by
+`inventory_path_parity.json`: the four substitutions that take a command's
+URLs, absolute paths, bearer header, `key=value` secrets and `--flag value`
+secrets out of an export, and the home-then-workspace-then-file-name labelling
+a path gets. A task carries the home, workspace and working directories its
+answer depends on, because the resident resolves a relative path against its
+own process directory and not the caller's. One consequence worth stating: a
+command string is now one task rather than one task per URL inside it, so the
+export's prefetch walk no longer pulls URLs out of commands — the pass caches
+the whole command instead.
+
+The contributed MCP grammar now settles in the resident. A configured
+`direct-command` launcher is reduced to its portable executable basename there,
+and a `remote-http` endpoint is normalized, bounded and checked against the
+host, port, path and query rules that decide whether a contribution may launch
+at all (`cli_runtime_support`, `contributed_mcp_url.rs`,
+`contributed_mcp_decision.rs`). Endpoint identity is still the normalized URL
+with its query removed, so a URL whose query the resident rejects has no launch
+identity. Python asks for one answer per configured string and keeps none of
+the character tables, percent-decoding or hostname rules it used to carry; a
+value that is not a string is refused before the call rather than repaired.
+None of this is an approval or an executable authentication; it selects
+which packaged catalog entry a contribution matches.
+
 Which bounded read an admitted argv names is decided in the resident
 (`verified-read-plan-v1`, `guard-command/src/verified_read_plan.rs` behind
 `verified_read_plan_op.rs`). It owns the whole grammar: that the executable is a
@@ -327,6 +369,26 @@ frozensets other modules import for their own vocabulary, but the two decisions
 are gone from this side and the retirement ledger names the locals they used so
 a second reading cannot grow back. The home directory is resolved here and sent
 as text, so the answer never depends on the resident's own environment.
+
+Classifying one inventory artifact is the resident's too
+(`inventory-item-classification-v1`, in `inventory_item_classification_op.rs`
+over `guard-command/src/inventory_item_metadata.rs`). One call carries the whole
+artifact set and answers, per entry, the item kind its type maps onto, the
+content hash it settles on, the capability set and risk level its metadata
+earns, and the edits that bind a skill's document evidence or drop a directory
+hash nothing proved. The answer is edits — the keys to remove and the pairs to
+write — rather than a rebuilt map, so the caller keeps its own insertion order
+and an exported snapshot does not churn. The kind rides back from
+`inventory-source-evidence-v2`, the first question asked about an artifact,
+because the caller needs it to enrich metadata before it can ask anything else.
+The version marks the entry shape: a v2 client sends no kind of its own, and a
+v1 resident refuses an entry that leaves the field out, so the client asks for
+v2 and treats a resident that only advertises v1 as unavailable. The runtime
+keeps advertising v1 as well, because a client built before the change still
+sends its own kind and the resident ignores it. Python computed all of this; the copies are gone, the ownership
+contract names the symbols so they cannot return, and
+`scripts/ci/inventory_item_metadata_reference.py` keeps the retired CPython only
+to regenerate the parity corpus the port is pinned to.
 
 ## Harness route inventory
 
