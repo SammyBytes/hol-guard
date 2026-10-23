@@ -282,7 +282,7 @@ pub(super) fn exact_safe_segment_with_context(
                 && super::directory_targets::drive_targets_quoted(segment)
         }
         "pwd" | "true" | "echo" | "printf" | "which" | "whoami" | "uname" => {
-            super::glob_words::printed_globs_listable(segment, context)
+            super::glob_words::printed_globs_listable(model, segment, context)
         }
         "unset" | "set" => super::inert_environment::safe_shell_setting(basename, segment),
         "type" | "command" => {
@@ -338,7 +338,7 @@ pub(super) fn exact_safe_segment_with_context(
         "stat" => super::metadata_reads::safe_stat_arguments(&segment.arguments, context),
         "dirname" | "basename" => {
             super::path_word_reads::safe_path_word_arguments(basename, &segment.arguments)
-                && super::glob_words::printed_globs_listable(segment, context)
+                && super::glob_words::printed_globs_listable(model, segment, context)
         }
         "readlink" | "realpath" => super::path_word_reads::safe_resolved_path_arguments(
             basename,

@@ -74,6 +74,11 @@ fn printed_and_bound_credential_globs_keep_review() {
             "which ~/.aws/*",
             "basename ~/.aws/*",
             "dirname ~/.aws/*",
+            "P=*; echo ~/.aws/$P",
+            "P=cred*; echo ~/.aws/$P",
+            "P=*; echo ~/.config/gh/$P",
+            "P=*; printf '%s\\n' ~/.aws/$P",
+            "echo ${X:-~/.aws/*}",
         ] {
             assert_ne!(
                 action(&home, harness, command),
@@ -96,6 +101,7 @@ fn project_globs_and_quoted_words_still_print() {
         "echo '*' \\? \"$?\"",
         "echo $?",
         "P=~/.ssh/id_rsa; echo $P",
+        "echo ok # /tmp/*",
     ] {
         assert_eq!(action(&home, "codex", command), "allow", "{command}");
     }
