@@ -668,9 +668,16 @@ fn observe_keeps_credential_block_but_does_not_enforce_policy_only_floor() {
     assert_eq!(intrinsic.observed_policy_action.as_deref(), Some("block"));
     assert!(intrinsic.observe_mode);
 
-    // It never hands credential-shaped output to the model. The edge reviews
-    // output with observe off, so the join sees the scanner's own denial.
-    for code in ["source_secret_match", "output_secret_match"] {
+    // It never hands output that may carry a credential to the model. The
+    // edge reviews output with observe off, so the join sees the scanner's
+    // own denial.
+    for code in [
+        "source_secret_match",
+        "output_secret_match",
+        "sensitive_path",
+        "scanner_budget_exhausted",
+        "output_too_large",
+    ] {
         let credential = apply_post_tool_policy(
             &observed_snapshot,
             &request,
@@ -742,7 +749,11 @@ fn harness_watch_keeps_credential_output_from_the_model() {
         "tool_response": "redacted"
     }));
     request.harness = "omp".into();
-    for code in ["output_secret_match", "source_secret_match"] {
+    for code in [
+        "output_secret_match",
+        "source_secret_match",
+        "sensitive_path",
+    ] {
         let watched = watched_post_tool(
             &snapshot(policy("allow")),
             &request,

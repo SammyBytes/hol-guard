@@ -6,8 +6,15 @@ use crate::bash_post_delivery::VerifiedBashDelivery;
 #[path = "policy_enforcement_post_action.rs"]
 mod post_action;
 
-/// Native scanner verdicts for output that matched credential-shaped text.
-const CREDENTIAL_OUTPUT_CODES: [&str; 2] = ["output_secret_match", "source_secret_match"];
+/// Native scanner denials that Watch keeps: output that matched
+/// credential-shaped text, read a sensitive path, or was never fully scanned.
+const WATCH_KEPT_DENIAL_CODES: [&str; 5] = [
+    "output_secret_match",
+    "source_secret_match",
+    "sensitive_path",
+    "scanner_budget_exhausted",
+    "output_too_large",
+];
 
 fn plain_inline_output(payload: &Value) -> bool {
     match payload.get("tool_response") {
@@ -132,10 +139,10 @@ pub(crate) fn apply_post_tool_policy_with_delivery(
             response.reviewed_output_sha256 = canonical_digest;
             return Ok(response);
         }
-        // The action has already run, so withholding credential-shaped text
-        // from the model stops nothing. Watch records every other verdict.
+        // The action has already run, so withholding output that may carry a
+        // credential stops nothing. Watch records every other verdict.
         if response.decision == "deny"
-            && CREDENTIAL_OUTPUT_CODES.contains(&response.reason_code.as_str())
+            && WATCH_KEPT_DENIAL_CODES.contains(&response.reason_code.as_str())
         {
             return Ok(response);
         }
