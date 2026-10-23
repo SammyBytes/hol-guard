@@ -59,8 +59,18 @@ fn split_execution_segments_inner(
                     quote = Quote::None;
                 } else if current == '\\' {
                     escaped = true;
+                } else if current == '$' && chars.get(index + 1) == Some(&'(') {
+                    // Arithmetic runs no command, inside a double quote as
+                    // much as outside it: the text spells a number, so the
+                    // word carries on past where it closes.
+                    match arithmetic_close(&chars, index) {
+                        Some(close) => {
+                            index = close + 1;
+                            continue;
+                        }
+                        None => return Err("command_substitution_not_yet_supported"),
+                    }
                 } else if current == '`'
-                    || (current == '$' && chars.get(index + 1) == Some(&'('))
                     || (current == '$'
                         && chars.get(index + 1) == Some(&'{')
                         && chars
@@ -90,7 +100,14 @@ fn split_execution_segments_inner(
             '\\' => escaped = true,
             '`' => return Err("command_substitution_not_yet_supported"),
             '$' if chars.get(index + 1) == Some(&'(') => {
-                return Err("command_substitution_not_yet_supported");
+                // `$(( … ))` evaluates arithmetic; nothing in it runs.
+                match arithmetic_close(&chars, index) {
+                    Some(close) => {
+                        index = close + 1;
+                        continue;
+                    }
+                    None => return Err("command_substitution_not_yet_supported"),
+                }
             }
             '$' if chars.get(index + 1) == Some(&'{') => {
                 return Err("parameter_expansion_not_yet_supported");
@@ -398,9 +415,63 @@ pub(super) fn push_segment(
     Ok(())
 }
 
+/// The value an arithmetic expansion stands for once the parser has read it.
+/// Arithmetic only ever spells a number, so the word it sits in carries one.
+/// It is the count every program accepts: `-j0` and `-n 0` are errors to the
+/// programs that take them, and a stand-in must not read as one.
+pub(crate) const ARITHMETIC_VALUE: &str = "1";
+
+/// The second `)` of the `))` that closes the arithmetic expansion opening at
+/// `start`, the `$` of a `$((`, or `None` when the shell would read the text as
+/// a substitution around a subshell instead.
+///
+/// `$((` opens arithmetic when the body closes on two parentheses of its own:
+/// `$(( (a + b) * c ))` is a number in every shell, and `$((a))` is one even
+/// when `a` is a word arithmetic cannot read, because the shell fails the
+/// expansion rather than running anything. When the first close lands anywhere
+/// else the shell has closed a subshell instead, so `$((cat id) | sh)` runs
+/// `cat` and `sh` in bash and zsh and is a syntax error in dash; either way it
+/// is not arithmetic. A nested substitution or a backtick inside the body runs
+/// a command of its own, so it is not read here.
+pub(crate) fn arithmetic_close(chars: &[char], start: usize) -> Option<usize> {
+    if chars.get(start + 1) != Some(&'(') || chars.get(start + 2) != Some(&'(') {
+        return None;
+    }
+    let (mut single, mut double, mut escaped) = (false, false, false);
+    let mut depth = 1usize;
+    for (index, &character) in chars.iter().enumerate().skip(start + 3) {
+        if single {
+            single = character != '\'';
+        } else if escaped {
+            escaped = false;
+        } else {
+            match character {
+                '\\' => escaped = true,
+                '\'' if !double => single = true,
+                '"' => double = !double,
+                '`' => return None,
+                '$' if chars.get(index + 1) == Some(&'(') => return None,
+                '(' if !double => depth += 1,
+                ')' if !double => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return (chars.get(index + 1) == Some(&')')).then_some(index + 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 #[path = "parser_segments_ansi_c_tests.rs"]
 mod ansi_c_tests;
+
+#[cfg(test)]
+#[path = "parser_segments_arithmetic_tests.rs"]
+mod arithmetic_tests;
 
 #[cfg(test)]
 #[path = "parser_segments_windows_escape_tests.rs"]

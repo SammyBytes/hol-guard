@@ -20,9 +20,6 @@ use super::{is_assignment, named_words, INTERPRETERS, SHELL_PREFIXES};
 /// Stands in for a bounded substitution's output: one ordinary word.
 const OUTPUT: &str = "guard_substituted_output";
 
-/// Stands in for an arithmetic expansion's output: one number.
-const ARITHMETIC: &str = "0";
-
 /// Lookups the lookup reader proves on its own. One it left in place names a
 /// word it could not prove is an operand.
 const LOOKUPS: &[&str] = &["command", "which", "type", "whence", "where", "hash"];
@@ -85,7 +82,7 @@ pub(super) fn bounded_substitutions(text: &str) -> Option<BoundedSubstitutions> 
             // not close on a `))` of its own, so `$((count + 1))` is a number
             // and `$((cat id) | sh)` is a pipeline.
             let arithmetic = match chars.get(index + 2) {
-                Some(&'(') => Some(arithmetic_close(&chars, index + 3)?),
+                Some(&'(') => Some(crate::parser_segments::arithmetic_close(&chars, index)?),
                 _ => None,
             };
             if redirect_target {
@@ -122,7 +119,7 @@ pub(super) fn bounded_substitutions(text: &str) -> Option<BoundedSubstitutions> 
             // Arithmetic prints a number and reaches no program of its own,
             // so it leaves the owner set the rest of the text names.
             let (close, printed) = match arithmetic {
-                Some(close) => (close, ARITHMETIC),
+                Some(close) => (close, crate::parser_segments::ARITHMETIC_VALUE),
                 None => {
                     let close = closing_parenthesis(&chars, index + 2)?;
                     let inner: String = chars[index + 2..close].iter().collect();
@@ -199,47 +196,6 @@ pub(super) fn bounded_substitutions(text: &str) -> Option<BoundedSubstitutions> 
         text: out,
         programs,
     })
-}
-
-/// The second `)` of the `))` that closes an arithmetic expansion whose body
-/// starts at `start`, or `None` when the shell would read the text as a
-/// substitution around a subshell instead.
-///
-/// `$((` opens arithmetic when the body closes on two parentheses of its own:
-/// `$(( (a + b) * c ))` is a number in every shell, and `$((a))` is one even
-/// when `a` is a word arithmetic cannot read, because the shell fails the
-/// expansion rather than running anything. When the first close lands anywhere
-/// else the shell has closed a subshell instead, so `$((cat id) | sh)` runs
-/// `cat` and `sh` in bash and zsh and is a syntax error in dash; either way it
-/// is not arithmetic. A nested substitution or a backtick inside the body runs
-/// a command of its own, so it is not read here.
-fn arithmetic_close(chars: &[char], start: usize) -> Option<usize> {
-    let (mut single, mut double, mut escaped) = (false, false, false);
-    let mut depth = 1usize;
-    for (index, &character) in chars.iter().enumerate().skip(start) {
-        if single {
-            single = character != '\'';
-        } else if escaped {
-            escaped = false;
-        } else {
-            match character {
-                '\\' => escaped = true,
-                '\'' if !double => single = true,
-                '"' => double = !double,
-                '`' => return None,
-                '$' if chars.get(index + 1) == Some(&'(') => return None,
-                '(' if !double => depth += 1,
-                ')' if !double => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return (chars.get(index + 1) == Some(&')')).then_some(index + 1);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    None
 }
 
 /// The `)` that closes a substitution opened just before `start`. A nested

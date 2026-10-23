@@ -156,10 +156,10 @@ fn an_arithmetic_expansion_prints_a_number_and_runs_no_program() {
     // behind it, while the same command with the number written out modelled
     // exactly.
     let bounded = bounded_substitutions("make -j$((2 * 2)) all").unwrap();
-    assert_eq!(bounded.text, "make -j0 all");
+    assert_eq!(bounded.text, "make -j1 all");
     assert!(bounded.programs.is_empty());
     let bounded = bounded_substitutions("sleep $(( (attempt + 1) * 2 ))").unwrap();
-    assert_eq!(bounded.text, "sleep 0");
+    assert_eq!(bounded.text, "sleep 1");
     assert!(bounded.programs.is_empty());
     // Arithmetic beside a substitution leaves that substitution's owners as
     // they were.
