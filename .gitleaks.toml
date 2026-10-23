@@ -293,6 +293,13 @@ regexes = [
   '''^sk\-live\-0123456789abcdef0123456789abcdef$''',
 ]
 
+[[rules.allowlists]]
+description = "SHA-256 digests of public contribution files recorded in authoring record.json, not credentials"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''(?:^|/)contributions/authoring/[^/]+/record\.json$''']
+regexes = ['''^[0-9a-f]{64}$''']
+
 [[rules]]
 id = "github-pat"
 
