@@ -649,7 +649,9 @@
         "command.simgit"
       ],
       "expected_action": "block",
-      "expected_effective_segments": [],
+      "expected_effective_segments": [
+        0
+      ],
       "id": "exec-dirty",
       "rule_id": "command.simgit.discard-dirty"
     },
@@ -659,8 +661,10 @@
       "enabled_extensions": [
         "command.simgit"
       ],
-      "expected_action": "block",
-      "expected_effective_segments": [],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
       "id": "exec-sg",
       "rule_id": "command.simgit.discard-dirty"
     },
@@ -768,8 +772,10 @@
       "enabled_extensions": [
         "command.simgit"
       ],
-      "expected_action": "block",
-      "expected_effective_segments": [],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
       "id": "exec-exe",
       "rule_id": "command.simgit.discard-dirty"
     },

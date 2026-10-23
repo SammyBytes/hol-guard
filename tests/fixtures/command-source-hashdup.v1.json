@@ -11112,7 +11112,9 @@
         "command.hashdup"
       ],
       "expected_action": "block",
-      "expected_effective_segments": [],
+      "expected_effective_segments": [
+        0
+      ],
       "id": "hashdup-exec-delete",
       "rule_id": "command.hashdup.delete"
     },

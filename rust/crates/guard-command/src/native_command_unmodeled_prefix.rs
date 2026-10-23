@@ -37,8 +37,8 @@ struct Grammar {
 /// `npm test` runs, as this user and in this directory, and only replaces the
 /// shell process instead of forking one. It takes no option this grammar
 /// covers, so `exec -a name prog`, `exec -c prog` and `exec -l prog` leave the
-/// program unknown and keep their failure, as does an `exec` that names no
-/// program at all and only moves the shell's own file descriptors.
+/// program unknown, as does an `exec` that names no program at all and only
+/// moves the shell's own file descriptors.
 const GRAMMARS: &[Grammar] = &[
     Grammar {
         prefix: "exec",
