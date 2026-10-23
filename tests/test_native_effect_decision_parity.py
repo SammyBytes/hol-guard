@@ -27,7 +27,9 @@ from codex_plugin_scanner.guard.runtime.effect_contract import ProofRoute
 from codex_plugin_scanner.guard.runtime.effect_decision import (
     _REASON_CODE,
     _REFERENCE,
+    EFFECT_DECISION_SCHEMA_VERSION,
     DecisionFactorSource,
+    DecisionReason,
     FinalDisposition,
 )
 
@@ -49,6 +51,22 @@ def _cases() -> list[dict[str, Any]]:
     return cases
 
 
+def _assert_reason_is_the_recorded_one(reason: DecisionReason, recorded: dict[str, Any], key: str) -> None:
+    """Every field the resident sends, read back and compared.
+
+    `DecisionReason` carries five fields and the execution path reads all of
+    them, so comparing a subset would let the parse return a different reason
+    while this file stayed green. The references are `None` throughout the
+    recorded corpus today; comparing them is what notices when they stop being.
+    """
+
+    assert reason.source.value == recorded["source"], (key, recorded)
+    assert reason.reason_code == recorded["reason_code"], (key, recorded)
+    assert reason.action_floor == recorded["action_floor"], (key, recorded)
+    assert reason.segment_ref == recorded["segment_ref"], (key, recorded)
+    assert reason.operation_ref == recorded["operation_ref"], (key, recorded)
+
+
 @pytest.mark.parametrize("case", _cases(), ids=lambda case: f"case-{case['case']}")
 def test_the_recorded_native_decision_parses_back(case: dict[str, Any]) -> None:
     """What Rust emits is what the execution path can read."""
@@ -58,12 +76,17 @@ def test_the_recorded_native_decision_parses_back(case: dict[str, Any]) -> None:
     assert decision.action == expected["action"]
     assert decision.disposition.value == expected["disposition"]
     assert {route.value for route in decision.proof_routes} == set(expected["proof_routes"])
-    assert len(decision.reasons) == len(expected["reasons"])
-    assert len(decision.controlling_reasons) == len(expected["controlling_reasons"])
-    for reason, recorded in zip(decision.reasons, expected["reasons"], strict=True):
-        assert reason.source.value == recorded["source"]
-        assert reason.reason_code == recorded["reason_code"]
-        assert reason.action_floor == recorded["action_floor"]
+    # `_effect_decision` does not read the payload's version: the dataclass
+    # default fills it, so the parsed decision always carries Python's own
+    # constant. Pinning the recorded version against that constant is what
+    # catches a resident that moves the contract out from under this parse.
+    assert decision.schema_version == EFFECT_DECISION_SCHEMA_VERSION
+    assert expected["schema_version"] == EFFECT_DECISION_SCHEMA_VERSION
+    for key in ("reasons", "controlling_reasons"):
+        parsed: tuple[DecisionReason, ...] = getattr(decision, key)
+        assert len(parsed) == len(expected[key]), key
+        for reason, recorded in zip(parsed, expected[key], strict=True):
+            _assert_reason_is_the_recorded_one(reason, recorded, key)
 
 
 def _recorded_reasons() -> list[dict[str, Any]]:
@@ -90,6 +113,21 @@ def test_every_recorded_identifier_passes_pythons_own_grammar() -> None:
             value = reason.get(field)
             if value is not None:
                 assert _REFERENCE.fullmatch(value) is not None, reason
+
+
+def test_the_corpus_records_no_reference_yet() -> None:
+    """Both reference fields are null throughout the corpus, so say so.
+
+    The replay compares them, which keeps the parse honest the moment a
+    reference does arrive. Until then the comparison is `None` against `None`,
+    and this is what makes that visible rather than quietly reassuring. Delete
+    this test when a case records a reference -- it fails first.
+    """
+
+    reasons = _recorded_reasons()
+    assert reasons, "the corpus records no reasons"
+    assert all(reason["segment_ref"] is None for reason in reasons)
+    assert all(reason["operation_ref"] is None for reason in reasons)
 
 
 def test_the_corpus_covers_the_vocabulary_it_claims_to() -> None:
