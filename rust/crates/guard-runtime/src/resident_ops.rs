@@ -681,6 +681,9 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
             ResidentOperationV1::VerifiedReadDecision(request) => {
                 crate::verified_read_decision_op::evaluate_verified_read_decision(&request)
             }
+            ResidentOperationV1::InventoryUrlRedaction(request) => {
+                crate::inventory_url_redaction_op::evaluate_inventory_url_redaction(&request)
+            }
             #[cfg(not(unix))]
             ResidentOperationV1::ContainedNodeExecute(_)
             | ResidentOperationV1::ContainedTypescriptExecute(_)
