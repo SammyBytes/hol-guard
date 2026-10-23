@@ -341,6 +341,30 @@ pub(crate) fn observed_mcp_tool_actions(connection: &Connection) -> StoreResult<
     Ok(Value::Object(actions))
 }
 
+/// Two flattened names can land on one selector: the connector `mcp__a__`
+/// joined to a tool `b_c`, and the connector `mcp__a-b__` joined to a tool
+/// `c`, both read as `omp:mcp__a_b_c`. A qualified name could not collide
+/// this way, because it carries the boundary itself. The runtime cannot tell
+/// the two tools apart either, so the selector keeps the strictest choice any
+/// connector made for it rather than whichever connector compiled last.
+fn record_action(actions: &mut Map<String, Value>, selector: String, state: &str) {
+    fn strictness(state: &str) -> u8 {
+        match state {
+            "block" => 3,
+            "review" => 2,
+            "allow" => 1,
+            _ => 0,
+        }
+    }
+    let kept = actions
+        .get(&selector)
+        .and_then(Value::as_str)
+        .is_some_and(|recorded| strictness(recorded) >= strictness(state));
+    if !kept {
+        actions.insert(selector, Value::from(state));
+    }
+}
+
 fn compile_item(
     connection: &Connection,
     item: &Row,
@@ -376,7 +400,7 @@ fn compile_item(
     };
     let namespace_block = format!("{harness}:{namespace}*");
     if state.as_deref() == Some("blocked") {
-        actions.insert(namespace_block, Value::from("block"));
+        record_action(actions, namespace_block, "block");
         block_catalogued_flattened_tools(
             connection,
             &grant_cli_id,
@@ -389,7 +413,7 @@ fn compile_item(
     }
     let states = local_cli_grants::command_states(connection, &grant_cli_id)?;
     if states.get(OTHER_COMMAND_ID).map(String::as_str) == Some("block") {
-        actions.insert(namespace_block, Value::from("block"));
+        record_action(actions, namespace_block, "block");
     }
     for (command_id, usage) in command_catalog(connection, &grant_cli_id)? {
         if command_id == OTHER_COMMAND_ID {
@@ -406,10 +430,7 @@ fn compile_item(
         if let Some(state @ ("allow" | "review" | "block")) =
             states.get(&command_id).map(String::as_str)
         {
-            actions.insert(
-                format!("{harness}:{}", tool.qualified_name),
-                Value::from(state),
-            );
+            record_action(actions, format!("{harness}:{}", tool.qualified_name), state);
         }
     }
     Ok(())
@@ -439,9 +460,10 @@ fn block_catalogued_flattened_tools(
         if tool.command_id() != command_id {
             continue;
         }
-        actions.insert(
+        record_action(
+            actions,
             format!("{harness}:{}", tool.qualified_name),
-            Value::from("block"),
+            "block",
         );
     }
     Ok(())
