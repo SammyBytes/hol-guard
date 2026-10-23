@@ -24,9 +24,10 @@ pub(super) use read_globs::glob_file_matches;
 
 pub(super) fn safe_file_predicate_arguments(
     arguments: &[String],
+    text: &str,
     context: super::PathContext<'_>,
 ) -> bool {
-    if test_predicates::answers_from_operands(arguments) {
+    if test_predicates::answers_from_operands(arguments, text) {
         return true;
     }
     let [predicate, target] = test_predicates::without_negation(arguments) else {
