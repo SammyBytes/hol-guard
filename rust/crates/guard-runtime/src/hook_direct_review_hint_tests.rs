@@ -118,18 +118,18 @@ fn without_a_scope_the_review_keeps_its_coverage() {
     let result = paused(&controls, DOCKER);
     let payload = json!({"tool_name": "Bash", "tool_input": {"command": DOCKER}});
     let payload = payload.as_object().unwrap();
-    for candidate in [true, false] {
-        let hint = queue_hint(None, payload, "/", "", &result, candidate);
-        assert_eq!(hint["schema"], "guard.extension-coverage-hint.v1");
-        assert_eq!(
-            hint["segments"][0]["extension_ids"],
-            json!(["command.container-runtime"])
-        );
-    }
+    let hint = coverage_hint(&result);
+    assert_eq!(hint["schema"], "guard.extension-coverage-hint.v1");
+    assert_eq!(
+        hint["segments"][0]["extension_ids"],
+        json!(["command.container-runtime"])
+    );
+    let request = json!({"extension_allow_hint": hint});
+    assert_eq!(
+        settled(None, payload, "/", "", &result, request.clone()),
+        request
+    );
     let mut unobserved = result;
     unobserved.remove("command_extensions");
-    assert_eq!(
-        queue_hint(None, payload, "/", "", &unobserved, false),
-        Value::Null
-    );
+    assert_eq!(coverage_hint(&unobserved), Value::Null);
 }

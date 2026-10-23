@@ -370,14 +370,7 @@ pub(super) fn finish(
         "first_seen_guard_version": null,
         "last_seen_guard_version": null,
         "continuation_snapshot": null,
-        "extension_allow_hint": super::review_hint::queue_hint(
-            input.hint,
-            input.payload,
-            input.workspace,
-            input.home_dir,
-            result,
-            candidate,
-        ),
+        "extension_allow_hint": super::review_hint::coverage_hint(result),
     }))
 }
 

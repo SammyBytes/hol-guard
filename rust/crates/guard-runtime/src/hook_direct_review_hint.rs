@@ -10,8 +10,9 @@
 //! evidence under the admitted snapshot, and only when that review is exactly
 //! the one that paused (same observations, same effective controls, same
 //! action and reason) does the counterfactual run, inside the same command
-//! authority lease. The hint is advisory: any failure leaves it out and never
-//! changes the review.
+//! authority lease. The allow hint runs only once the review is certain to be
+//! queued here, right before the store write. The hint is advisory: any
+//! failure leaves it out and never changes the review.
 
 use std::time::{Duration, Instant};
 
@@ -25,7 +26,8 @@ use guard_contracts::{
 use serde_json::{Map, Value};
 
 use super::query::pre_tool_command;
-use super::HintScope;
+use super::review_request::allow_hint_candidate;
+use super::{Context, HintScope};
 use crate::hook_direct::EXECUTION_ENVIRONMENT_FIELD;
 use crate::oneshot::PreToolRequestV1;
 
@@ -38,23 +40,48 @@ const MIN_BUDGET: Duration = Duration::from_millis(150);
 const MAX_SLACK: Duration = Duration::from_secs(2);
 const MAX_ASK: Duration = Duration::from_secs(5);
 
-/// The `extension_allow_hint` value for the queued request.
-pub(super) fn queue_hint(
+/// The `extension_allow_hint` value a request is built with: the coverage
+/// hint alone. The allow hint is added by [`settle`] once nothing but the
+/// store write is left, so a review the daemon takes back has not spent the
+/// hook's budget on it.
+pub(super) fn coverage_hint(result: &Object) -> Value {
+    crate::extension_coverage_hint::compute(result).unwrap_or(Value::Null)
+}
+
+/// `request` with the allow hint added for a hint candidate, right before it
+/// is written.
+pub(super) fn settle(context: &Context<'_>, result: &Object, request: Value) -> Value {
+    settled(
+        context.hint,
+        context.recorded_payload,
+        context.workspace,
+        context.home_dir,
+        result,
+        request,
+    )
+}
+
+fn settled(
     scope: Option<&HintScope<'_>>,
     payload: &Map<String, Value>,
     workspace: &str,
     home_dir: &str,
     result: &Object,
-    candidate: bool,
+    mut request: Value,
 ) -> Value {
-    let allow = scope
-        .filter(|_| candidate)
-        .and_then(|scope| allow_hint(scope, payload, workspace, home_dir, result));
-    crate::extension_coverage_hint::with_coverage(
-        allow,
+    let Some(scope) = scope.filter(|_| allow_hint_candidate(payload, result) == Some(true)) else {
+        return request;
+    };
+    let Some(allow) = allow_hint(scope, payload, workspace, home_dir, result) else {
+        return request;
+    };
+    if let Some(hint) = crate::extension_coverage_hint::with_coverage(
+        Some(allow),
         crate::extension_coverage_hint::compute(result),
-    )
-    .unwrap_or(Value::Null)
+    ) {
+        request["extension_allow_hint"] = hint;
+    }
+    request
 }
 
 /// The time left before the safety margin, if any.
@@ -121,7 +148,12 @@ fn hint_under(
     if !same_review(result, &fresh) {
         return Ok(None);
     }
-    let Some(budget) = remaining(deadline).map(reduction_budget) else {
+    // The fresh review used part of the budget; the counterfactual needs the
+    // same floor the hint started with.
+    let Some(budget) = remaining(deadline)
+        .filter(|left| *left >= MIN_BUDGET)
+        .map(reduction_budget)
+    else {
         return Ok(None);
     };
     let request = ExtensionAllowHintRequestV1 {
