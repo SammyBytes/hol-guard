@@ -38,6 +38,7 @@ from .case_worker import SubprocessCaseWorker
 from .catalog import CATALOG, WATCH_COMMAND, WATCH_PROMPT, Scenario, catalog_digest, load_catalog
 from .cleanup import cleanup_case_resources
 from .contained_core import request_proofs
+from .decision_coverage import profile_coverage
 from .evidence import assess_case, sha256_bytes
 from .extension_adapters import configure_extension_permission_denial, extension_adapter
 from .fixtures import (
@@ -562,7 +563,12 @@ def run_suite(
             [scenario.id for scenario in selected if scenario.id in completed],
             superseded=output / "superseded",
         )
-        report["case_coverage"] = case_coverage(selected, catalog, completed)
+        report["case_coverage"] = {
+            **case_coverage(selected, catalog, completed),
+            # Which cases reached the decisions they were written for, so a profile
+            # states the coverage it actually drove rather than the coverage it selected.
+            "decision_paths": profile_coverage(selected, completed),
+        }
         report["case_retries"] = retries.history
         print(json.dumps({"scenario": scenario.id, **case["assessment"]}), flush=True)
         (output / "summary.json").write_text(json.dumps(report, indent=2) + "\n")

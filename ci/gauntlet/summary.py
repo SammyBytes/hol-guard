@@ -41,6 +41,25 @@ def inference_usage(case_dir: Path, case_ids: Iterable[str], superseded: Path | 
     return {**totals, "rounds": rounds, "rounds_with_usage": rounds_with_usage}
 
 
+def _decision_lines(coverage: dict[str, Any]) -> list[str]:
+    """State the declared Guard decisions this run reached, and the ones it did not.
+
+    A case that declares nothing is left out: its pass says the model did ordinary
+    work and Guard stayed quiet, which is the whole claim it makes.
+    """
+    declaring = coverage.get("declaring_cases") or []
+    if not declaring:
+        return []
+    unexercised = coverage.get("unexercised_cases") or []
+    lines = [f"Declared decisions reached: {len(declaring) - len(unexercised)} of {len(declaring)} declaring cases"]
+    lines.extend(
+        f"Declared decision not reached: {row['id']} ({', '.join(row['missing'])})"
+        for row in unexercised
+        if isinstance(row, dict)
+    )
+    return lines
+
+
 def render_summary_markdown(report: dict[str, Any], binding: dict[str, Any], build_sha: str, version: str) -> str:
     """Render the public summary; it depends only on report contents, never completion order."""
     usage = report.get("inference_usage")
@@ -58,6 +77,7 @@ def render_summary_markdown(report: dict[str, Any], binding: dict[str, Any], bui
                 f"({coverage['catalog_cases']} in catalog)"
             ]
             + ([f"Never executed: {', '.join(coverage['unexecuted_cases'])}"] if coverage["unexecuted_cases"] else [])
+            + _decision_lines(coverage.get("decision_paths") or {})
             if (coverage := report.get("case_coverage"))
             else []
         ),
