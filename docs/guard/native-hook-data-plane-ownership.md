@@ -266,6 +266,20 @@ Python fallback redaction. The retired bodies live on only as
 parity corpus the port is pinned against — asking the runtime for that corpus
 would pin it against itself.
 
+Which bounded read an admitted argv names is decided in the resident
+(`verified-read-plan-v1`, `guard-command/src/verified_read_plan.rs` behind
+`verified_read_plan_op.rs`). It owns the whole grammar: that the executable is a
+bare name inside the verified-read cohort, which operation each name spells, the
+head and tail line bound and every spelling of it, the quiet-flag and range form
+`sed` is held to, the thousand-line ceiling both carry, and that a target is a
+static relative path with no dynamic shell character in it. The answer is one
+plan — an operation id, an optional target and a selection naming the lines to
+show — so Python reads the argv nowhere. This side opens the target under the
+repository, where the secret-path, symlink and identity checks live, and slices
+the text the plan selected. A refusal names the rule it broke for the
+diagnostics record; the read ends either way. Without a plan there is no read
+and no Python grammar to fall back on: the command returns to ordinary review.
+
 The AIBOM report summaries now come from the resident.
 `aibom_report_summaries_op` counts an inventory report's layers, its trust
 coverage and its drift through `aibom_reporting::summarize_aibom_layers`, the
@@ -303,6 +317,17 @@ second copy of that grammar after the port and no longer calls it; the copy is
 removed and the retirement ledger names its symbols so they cannot return. What
 stays on this side is the vocabulary the answer is read with and the filesystem
 identity this process captures for it, which needs the descriptors it holds.
+
+The skill-doc path grammar and the `fd` exec-argument reading now answer from
+the resident over `cli_runtime_support`
+(`guard-command/src/false_positive_rules.rs`): whether a `skill://` name or a
+`~`-rooted path lands inside a known skill-doc root without a symlink escaping
+it, and whether an `fd` argument asks for `--exec` either outright or buried
+in a short-flag cluster that no option-value flag swallows first. Python keeps the
+frozensets other modules import for their own vocabulary, but the two decisions
+are gone from this side and the retirement ledger names the locals they used so
+a second reading cannot grow back. The home directory is resolved here and sent
+as text, so the answer never depends on the resident's own environment.
 
 ## Harness route inventory
 
