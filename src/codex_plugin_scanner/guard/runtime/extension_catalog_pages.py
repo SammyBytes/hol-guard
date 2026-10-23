@@ -96,8 +96,8 @@ class PreparedCatalogView:
             yield json.loads(self.request_bytes("page", ordinal))["page"]
 
     def legacy(self):
-        with self.pinned():
-            return native_call(self.guard_home, action="legacy", token=self.token)["catalog"]
+        # The native read holds the cache lock itself, so no transfer lease is taken.
+        return native_call(self.guard_home, action="legacy", token=self.token)["catalog"]
 
     @contextmanager
     def pinned(self):

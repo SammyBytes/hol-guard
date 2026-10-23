@@ -169,6 +169,12 @@ fn reuse_returns_the_published_view_for_the_same_observation_only() {
         .join(first["token"].as_str().unwrap());
     fs::write(view.join("0.json"), b"{}").unwrap();
     assert_eq!(reuse(&later), json!({}));
+    // ...and preparing it replaces the damaged copy.
+    assert_eq!(prepare(home.path(), 166), first);
+    assert_eq!(reuse(&later), first);
+    let elsewhere = self::home();
+    let request = json!({"action":"reuse","guard_home":elsewhere.path(),"observation":later});
+    assert_eq!(evaluate(&request)["error"], "catalog_invalid");
     let mut invalid = observation(home.path());
     invalid.discovery_root = "not-a-digest".into();
     assert_eq!(

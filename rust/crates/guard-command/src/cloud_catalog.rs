@@ -319,6 +319,12 @@ pub fn evaluate(request: &Value) -> Value {
             let observation: Observation = serde_json::from_value(request["observation"].clone())
                 .map_err(|_| Error::Invalid)?;
             observation.validate()?;
+            // The resident binds the request's home; reuse must read only that one.
+            if request["guard_home"].as_str().map(Path::new)
+                != Some(observation.guard_home.as_path())
+            {
+                return Err(Error::Invalid);
+            }
             return cache::reuse(&observation);
         }
         if action == "begin" {
