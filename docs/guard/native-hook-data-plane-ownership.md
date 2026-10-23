@@ -161,7 +161,27 @@ a fixed floor): `compute_extension_allow_hint`, the resident's
 state the same rule, the resident stays authoritative, and the recorded vectors in
 `rust/crates/guard-runtime/testdata/hook_direct_review/` pin the resident and
 daemon copies together. The settle proofs and the counterfactual that verifies a
-hint before it is stored are Rust-owned.
+hint before it is stored are Rust-owned. A review the direct hook lane queues
+itself stores its hints without a daemon round trip:
+`rust/crates/guard-runtime/src/hook_direct_review_hint.rs` repeats the review
+with extension evidence under the admitted snapshot, inside one command
+authority lease, and asks `extension_allow_hint_op` only when that review
+matches the one that paused. The coverage hint
+(`rust/crates/guard-runtime/src/extension_coverage_hint.rs`, mirroring
+`extension_coverage_hint.py`) rides on every queued review an extension
+observed.
+
+A review due only to non-recognition of a command that launches a local CLI
+this device has not set up is a connector-setup review, and the direct hook lane
+queues it as well (`rust/crates/guard-runtime/src/hook_direct_review_connector.rs`).
+It asks the `local_cli_hook` resident op for the connector, as
+`native_review_setup_connector` does, stores the row under the connector's
+`queue_group_id` with the connector-setup hint in place of the extension hints,
+shows the agent the `connector_setup_reason` text, and records the connector's
+setup context. The resident cannot raise a desktop notice, so it hands the stored
+request id and the CLI name to the evidence drain, which raises the notice from
+the stored row. Any lookup the resident cannot spell exactly as the daemon would,
+and any failed lookup, leaves the review to the daemon.
 
 The recommendation shown with a pending review is that stored hint re-checked
 on every read, and the resident owns it too. The
