@@ -216,12 +216,15 @@ pub fn substitute_sensitive_values(value: &str) -> String {
         offsets.push((folded_char.0, original.0));
     }
     offsets.push((folded.len(), value.len()));
+    // The map is built by walking the folded text once, so its folded offsets
+    // are already strictly increasing and a search can halve its way in. Walking
+    // it for every match end instead costs a pass over the whole text per match,
+    // which is the shape that turns a long finding full of dotted or dotless
+    // `i`s into quadratic work on the redaction path.
     let original_offset = |folded_offset: usize| -> usize {
         offsets
-            .iter()
-            .find(|(candidate, _)| *candidate == folded_offset)
-            .map(|(_, original)| *original)
-            .unwrap_or(value.len())
+            .binary_search_by_key(&folded_offset, |(candidate, _)| *candidate)
+            .map_or(value.len(), |index| offsets[index].1)
     };
     let mut out = String::with_capacity(value.len());
     let mut cursor = 0usize;

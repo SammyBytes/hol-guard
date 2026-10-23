@@ -306,6 +306,62 @@ fn an_oversized_request_is_refused() {
     );
 }
 
+/// A run carrying `count` distinct findings, each as wordy as the redactor
+/// will let a finding be.
+fn wordy_run(count: usize) -> Value {
+    let filler = "sentence ".repeat(80);
+    let raw: Vec<Value> = (0..count)
+        .map(|index| {
+            let title = format!("Tool poisoning {index} {filler}");
+            let description = format!("A tool rewrites the agent's instructions. {filler}");
+            json!({
+                "rule_id": format!("MCP-{index:05}"),
+                "title": title,
+                "description": description,
+                "file_path": "/home/operator/.claude/mcp.json",
+                "line_number": index,
+                "severity": "high",
+            })
+        })
+        .collect();
+    let mut run = scanner_run("enabled", raw);
+    run["message"] = json!(format!("scan complete {filler}"));
+    run
+}
+
+#[test]
+fn a_scan_whose_answer_will_not_fit_is_refused_by_name() {
+    // The run and item caps bound the request, not the answer: a run's message
+    // rides in the evidence of every finding it produced, so a single run well
+    // inside those caps can describe more bytes coming back than one reply
+    // carries. The op says which scan was too large to answer rather than
+    // leaving the frame boundary to report an undeliverable reply as a runtime
+    // that stopped responding.
+    let wire = request(vec![wordy_run(2048)], vec![]);
+    let encoded =
+        evaluate_inventory_scan_findings_request(&parse(&wire)).expect("encoded response");
+    let result: InventoryScanFindingsResultV1 = serde_json::from_slice(&encoded).expect("result");
+    assert_eq!(result.status, "error");
+    assert_eq!(result.code, "native_inventory_scan_findings_reply_too_large");
+    assert!(result.payload.is_none());
+    // The refusal itself has to reach the caller, so it is framed like any
+    // other reply.
+    assert!(encoded.len() <= guard_contracts::MAX_NATIVE_RESPONSE_BYTES);
+}
+
+#[test]
+fn a_scan_the_transport_can_carry_is_still_answered() {
+    let wire = request(vec![wordy_run(256)], vec![]);
+    let encoded =
+        evaluate_inventory_scan_findings_request(&parse(&wire)).expect("encoded response");
+    let result: InventoryScanFindingsResultV1 = serde_json::from_slice(&encoded).expect("result");
+    assert_eq!(result.status, "ok");
+    assert_eq!(result.code, "ok");
+    let payload = result.payload.expect("payload");
+    assert_eq!(payload["findings"].as_array().expect("findings").len(), 256);
+    assert!(encoded.len() <= guard_contracts::MAX_NATIVE_RESPONSE_BYTES);
+}
+
 #[test]
 fn the_response_binds_itself_to_its_request() {
     let wire = request(

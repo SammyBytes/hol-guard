@@ -44,7 +44,10 @@ pub(crate) fn evaluate_inventory_scan_findings_request(
         .map_err(|_| "native_inventory_scan_findings_too_large".to_owned())?;
     let (status, code, payload) = match refusal(request) {
         Some(code) => ("error", code, None),
-        None => ("ok", "ok", Some(evaluate_request(request))),
+        None => match bounded_payload(request) {
+            Ok(payload) => ("ok", "ok", Some(payload)),
+            Err(code) => ("error", code, None),
+        },
     };
     crate::encode_response(&InventoryScanFindingsResultV1 {
         schema: INVENTORY_SCAN_FINDINGS_RESULT_SCHEMA.to_owned(),
@@ -54,6 +57,35 @@ pub(crate) fn evaluate_inventory_scan_findings_request(
         code: code.to_owned(),
         payload,
     })
+}
+
+/// Largest payload one reply carries.
+///
+/// The resident frames at most `MAX_NATIVE_RESPONSE_BYTES`, and the reply wraps
+/// this payload in its schema, request id and digest, so the payload is held a
+/// frame's slack below that ceiling.
+const MAX_PAYLOAD_BYTES: usize = crate::MAX_NATIVE_RESPONSE_BYTES - 64 * 1024;
+
+/// The scan's answer, or the code to refuse it with when it will not fit a
+/// reply.
+///
+/// The run and item caps bound what a request may carry, not what an answer
+/// grows to: a run's status, message and duration ride in the evidence of every
+/// finding that run produced, so a few hundred small findings in a request can
+/// describe far more bytes coming back than they took going out. Measuring the
+/// payload here is what lets the caller hear which scan was too large to answer,
+/// rather than the frame boundary reporting an answer that cannot be delivered
+/// as a runtime that stopped responding.
+fn bounded_payload(request: &InventoryScanFindingsRequestV1) -> Result<Value, &'static str> {
+    let payload = evaluate_request(request);
+    match serde_json::to_vec(&payload) {
+        Ok(encoded) if encoded.len() > MAX_PAYLOAD_BYTES => {
+            Err("native_inventory_scan_findings_reply_too_large")
+        }
+        // A payload that will not serialize at all is not this op's refusal to
+        // make: `encode_response` names an encoding failure for what it is.
+        _ => Ok(payload),
+    }
 }
 
 /// The conditions the op refuses rather than answers.

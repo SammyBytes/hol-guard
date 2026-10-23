@@ -47,7 +47,14 @@ _TIMEOUT_CEILING_SECONDS = 60.0
 # across the whole scan, so the request cannot be split into batches.
 _MAX_RUNS = 256
 _MAX_ITEMS = 8192
-_MAX_REQUEST_BYTES = 8 * 1024 * 1024
+# The largest envelope this bridge will offer the transport. It is not the op's
+# own ``INVENTORY_SCAN_FINDINGS_MAX_BYTES``: that measures the canonical request
+# inside the envelope and this measures the envelope, which is the larger of the
+# two. It is the transport's frame limit, which is what the client checks this
+# same byte string against, so a scan this bridge accepts is one the client will
+# frame and the op will answer for -- and a scan past it is refused for its size
+# rather than dropped as a runtime that stopped answering.
+_MAX_REQUEST_BYTES = 6 * 1024 * 1024
 _MISSING = object()
 
 

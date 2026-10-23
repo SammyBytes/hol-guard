@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from codex_plugin_scanner.guard import inventory_contract
+from codex_plugin_scanner.guard import inventory_contract, native_resident_client
 from codex_plugin_scanner.guard import native_inventory_scan_findings as bridge
 
 
@@ -160,6 +160,19 @@ def test_a_bigger_scan_is_given_a_longer_deadline() -> None:
     small = bridge._request_timeout_seconds(1)
     large = bridge._request_timeout_seconds(bridge._MAX_ITEMS)
     assert bridge._TIMEOUT_FLOOR_SECONDS <= small < large <= bridge._TIMEOUT_CEILING_SECONDS
+
+
+def test_the_bridge_never_offers_more_than_the_transport_frames() -> None:
+    """A bound above the frame limit refuses a scan as a dead runtime.
+
+    The bridge measures the serialized envelope and so does the resident client,
+    on the very same bytes, so a bound at the client's ceiling admits every scan
+    the client would have framed and no more. A bound above it would hand the
+    client a request it drops before dispatch, and the caller would read a scan
+    that merely asked for too much as a runtime that stopped answering.
+    """
+
+    assert bridge._MAX_REQUEST_BYTES <= native_resident_client._MAX_REQUEST_BYTES
 
 
 def test_more_than_the_cap_fails_closed_rather_than_splitting(monkeypatch: pytest.MonkeyPatch) -> None:

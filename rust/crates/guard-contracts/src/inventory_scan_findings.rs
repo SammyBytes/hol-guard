@@ -29,7 +29,14 @@ pub const INVENTORY_SCAN_FINDINGS_RESULT_SCHEMA: &str = "guard-inventory-scan-fi
 /// Capability advertised by the runtime when this operation is available.
 pub const INVENTORY_SCAN_FINDINGS_FEATURE: &str = "inventory-scan-findings-v1";
 /// Largest canonical request serialization the op will accept.
-pub const INVENTORY_SCAN_FINDINGS_MAX_BYTES: usize = 8 * 1024 * 1024;
+///
+/// The transport frames at most [`crate::MAX_NATIVE_REQUEST_BYTES`], and the
+/// envelope the sender builds around this request is the larger of the two, so
+/// the bound sits a frame's slack under that ceiling. A larger number admits no
+/// larger scan: it only moves the refusal from this op, which names the request
+/// as too big, to the client, which drops an unframeable request as a runtime
+/// that stopped answering.
+pub const INVENTORY_SCAN_FINDINGS_MAX_BYTES: usize = crate::MAX_NATIVE_REQUEST_BYTES - 64 * 1024;
 /// Most scanner runs one request may carry.
 pub const INVENTORY_SCAN_FINDINGS_MAX_RUNS: usize = 256;
 /// Most inventory items one request may carry.
