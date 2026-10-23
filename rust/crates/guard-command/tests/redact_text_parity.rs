@@ -39,7 +39,11 @@ fn recorded_inputs_redact_to_their_recorded_results() {
 
         let redacted = redact_text(&input);
 
-        assert_eq!(redacted.text, case["text"].as_str().expect("text"), "{name}");
+        assert_eq!(
+            redacted.text,
+            case["text"].as_str().expect("text"),
+            "{name}"
+        );
         assert_eq!(
             redacted.count as u64,
             case["count"].as_u64().expect("count"),
