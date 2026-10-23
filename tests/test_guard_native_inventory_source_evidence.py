@@ -263,12 +263,13 @@ def test_a_snapshot_without_the_resident_fails_closed(monkeypatch: pytest.Monkey
         )
 
 
-def test_the_client_asks_for_the_resident_that_derives_the_item_kind(
+def test_the_client_asks_for_the_resident_that_reads_kind_and_role(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A v1 resident refuses an entry with no ``item_kind``, and this client
-    sends none. Asking for v2 turns that into plain unavailability rather than
-    an inventory that silently loses every artifact's source evidence."""
+    """A v1 resident refuses an entry with no ``item_kind`` and an older one
+    answers without the instruction role. This client derives neither, so it
+    asks for v3: anything older is plain unavailability rather than an
+    inventory that silently loses evidence it never sees missing."""
 
     asked: list[object] = []
     monkeypatch.setattr(bridge, "_resolve_digest_home", lambda _home: Path("/tmp/inventory-evidence-home"))
@@ -283,5 +284,5 @@ def test_the_client_asks_for_the_resident_that_derives_the_item_kind(
 
     _ask(_entries(1))
 
-    assert bridge.INVENTORY_SOURCE_EVIDENCE_FEATURE == "inventory-source-evidence-v2"
-    assert asked == ["inventory-source-evidence-v2"]
+    assert bridge.INVENTORY_SOURCE_EVIDENCE_FEATURE == "inventory-source-evidence-v3"
+    assert asked == ["inventory-source-evidence-v3"]
