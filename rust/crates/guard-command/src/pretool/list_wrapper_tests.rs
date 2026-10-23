@@ -52,6 +52,11 @@ fn text_that_wraps_nothing_or_reads_unclearly_stays_as_submitted() {
         "! cat Cargo.toml && wc -l Cargo.toml",
         "! make check || echo failed",
         "! cat Cargo.toml; wc -l Cargo.toml",
+        // Guard's own launcher keeps the exact text its proofs read.
+        "hol-guard pytest-contained -- pytest -q &",
+        "! hol-guard pytest-contained -- pytest -q",
+        "'hol-guard' pytest-contained -- pytest -q &",
+        "HOL-GUARD.EXE pytest-contained -- pytest -q &",
     ] {
         assert_eq!(unwrapped(command), None, "{command}");
     }

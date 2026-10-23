@@ -51,6 +51,27 @@ pub(super) fn safe_hol_guard_segment(
                 && super::pytest_contained::safe_pytest_contained_arguments(arguments, cwd)))
 }
 
+/// Whether the first word of `text` runs Guard's own launcher through a
+/// bare-name lookup.
+///
+/// Only the bare name answers yes. A path-spelled launcher is not the
+/// invocation this crate's proofs admit, so it is already refused wherever it
+/// appears and needs no second answer here. Quoting is removed first, because
+/// the shell removes it before the lookup: `'hol-guard'` and `hol"guard"`
+/// both reach the same program.
+pub(super) fn names_launcher(text: &str) -> bool {
+    let Some(word) = text.split_whitespace().next() else {
+        return false;
+    };
+    let dequoted: String = word
+        .chars()
+        .filter(|c| !matches!(c, '\'' | '"' | '\\'))
+        .collect();
+    SHADOW_NAMES
+        .iter()
+        .any(|name| dequoted.eq_ignore_ascii_case(name))
+}
+
 fn cwd_shadows_launcher(cwd: &Path) -> bool {
     !cwd.is_absolute()
         || SHADOW_NAMES.iter().any(|name| {

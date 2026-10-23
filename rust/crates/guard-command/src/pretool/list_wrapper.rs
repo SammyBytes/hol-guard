@@ -9,6 +9,12 @@
 //! the first pipeline, so a `&&` or `||` successor runs on the opposite
 //! outcome once it is gone. A negation is therefore only read as its list
 //! when that list is a single pipeline.
+//!
+//! Guard's own launcher is left out. The invocations it is admitted for, such
+//! as the contained test runner, are proved by their exact text because the
+//! runtime behind them honours exactly what that text asks for; reading a
+//! wrapped spelling as the bare one would hand a wrapper the answer the exact
+//! text earned. The wrapped form stays reviewable instead.
 
 use super::script_content::foreground_job;
 
@@ -28,7 +34,10 @@ pub(crate) fn unwrapped(command: &str) -> Option<String> {
     }
     let foreground = foreground_job(command).map_or(command, str::trim);
     let unnegated = unnegated(foreground).unwrap_or(foreground);
-    (unnegated != command).then(|| unnegated.to_owned())
+    if unnegated == command || super::guard_diagnostics::names_launcher(unnegated) {
+        return None;
+    }
+    Some(unnegated.to_owned())
 }
 
 /// The list a leading `!` negates. `!` is a reserved word only as the first
