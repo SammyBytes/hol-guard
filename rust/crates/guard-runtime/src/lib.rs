@@ -14,6 +14,7 @@ mod aibom_marketplace;
 mod aibom_mcp_metadata;
 mod aibom_op;
 mod aibom_paths;
+mod aibom_report_summaries_op;
 mod aibom_skill_rules;
 mod aibom_skills;
 mod aibom_symlink;
@@ -737,6 +738,7 @@ mod totp;
 mod unique_nanos;
 mod verified_npm_op;
 mod verified_read_decision_op;
+mod verified_read_plan_op;
 #[cfg(windows)]
 mod windows_node_build;
 #[cfg(windows)]
