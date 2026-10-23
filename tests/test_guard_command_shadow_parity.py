@@ -91,7 +91,8 @@ def test_the_fixture_keeps_recording_selections_that_sample_in() -> None:
 def test_the_fixture_keeps_the_sampling_rates_the_two_halves_read_differently() -> None:
     """A sampling rate is read the same way on both sides, digit for digit.
 
-    ``int()`` reads any Unicode decimal digit, so ``int("５００")`` is 500, while
+    ``int()`` reads any Unicode decimal digit, so a rate written in fullwidth
+    digits (U+FF10 to U+FF19) parses as the number it looks like, while
     the native parser the Rust twin runs reads ASCII digits only. Both halves
     now refuse a rate spelled that way. They already agreed about padding: the
     characters ``str.strip()`` removes and ``str::trim`` leaves — U+001C through
