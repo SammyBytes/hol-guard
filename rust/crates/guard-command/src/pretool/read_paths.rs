@@ -8,6 +8,9 @@ pub(super) use allowances::{
 pub(super) mod feature_directories;
 #[path = "read_path_harness_notes.rs"]
 pub(super) mod harness_notes;
+#[path = "read_path_missing.rs"]
+mod missing;
+use missing::missing_absolute_read_allowed;
 #[path = "hidden_listing.rs"]
 mod hidden_listing;
 #[path = "omp_json_query.rs"]
@@ -235,10 +238,10 @@ fn bounded_read_target_with_brackets(
     // lexical floor.
     if expanded_path.is_absolute() {
         return missing_notes
-            && harness_notes::missing_document(expanded_path).is_some_and(|resolved| {
+            && (harness_notes::missing_document(expanded_path).is_some_and(|resolved| {
                 resolved_location_allowed(&resolved, home_dir, cwd, false)
                     && harness_notes::harness_home_document(&resolved, home_dir)
-            });
+            }) || missing_absolute_read_allowed(expanded_path, home_dir, cwd));
     }
     safe_read_target(path)
 }
