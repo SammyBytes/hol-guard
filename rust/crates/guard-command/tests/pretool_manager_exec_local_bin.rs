@@ -78,6 +78,8 @@ fn a_manager_option_or_a_write_keeps_the_review() {
         "bun exec tsc --noEmit",
         "npm exec tsc --noEmit && rm -rf /",
         "npm exec vitest watch",
+        "npm exec --no-install vitest run",
+        "npm exec --",
     ] {
         let result = classify("omp", command);
         assert_ne!(

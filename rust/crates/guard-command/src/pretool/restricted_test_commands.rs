@@ -427,10 +427,14 @@ pub(super) fn manager_local_bin_arguments<'a>(
         ("pnpm" | "yarn", [subcommand, rest @ ..]) if subcommand == "exec" => rest,
         _ => return None,
     };
-    Some(match rest {
+    let rest = match rest {
         [separator, rest @ ..] if separator == "--" => rest,
         rest => rest,
-    })
+    };
+    // The sinks run the project's own tool. A manager option before the tool
+    // is not a local-bin run.
+    rest.first().filter(|tool| !tool.starts_with('-'))?;
+    Some(rest)
 }
 
 pub(super) fn manager_script_task<'a>(manager: &str, arguments: &'a [String]) -> Option<&'a str> {
