@@ -57,6 +57,15 @@ fn text_that_wraps_nothing_or_reads_unclearly_stays_as_submitted() {
         "! hol-guard pytest-contained -- pytest -q",
         "'hol-guard' pytest-contained -- pytest -q &",
         "HOL-GUARD.EXE pytest-contained -- pytest -q &",
+        // A later segment of the list is still the launcher.
+        "true && hol-guard pytest-contained -- pytest -q &",
+        "true; hol-guard pytest-contained -- pytest -q &",
+        "false || hol-guard pytest-contained -- pytest -q &",
+        "true\nhol-guard pytest-contained -- pytest -q &",
+        "(hol-guard pytest-contained -- pytest -q) &",
+        "X=1 hol-guard pytest-contained -- pytest -q &",
+        "cat Cargo.toml | hol-guard pytest-contained -- pytest -q &",
+        "./bin/hol-guard pytest-contained -- pytest -q &",
     ] {
         assert_eq!(unwrapped(command), None, "{command}");
     }
@@ -125,4 +134,18 @@ fn a_wrapped_loop_or_group_decides_as_its_list() {
 #[test]
 fn a_negated_multi_pipeline_list_keeps_its_review() {
     assert_ne!(decide("! cd src && touch ../escape.txt").0, "allow");
+}
+
+/// The launcher keeps its exact-text proof only as the exact text: a
+/// backgrounded list that reaches it through another segment stays reviewed.
+#[test]
+fn a_backgrounded_list_reaching_the_launcher_is_not_admitted() {
+    for command in [
+        "true && hol-guard pytest-contained -- pytest -q &",
+        "true; hol-guard pytest-contained -- pytest -q &",
+        "false || hol-guard pytest-contained -- pytest -q &",
+        "(hol-guard pytest-contained -- pytest -q) &",
+    ] {
+        assert_ne!(decide(command).0, "allow", "{command}");
+    }
 }

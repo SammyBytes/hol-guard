@@ -51,25 +51,34 @@ pub(super) fn safe_hol_guard_segment(
                 && super::pytest_contained::safe_pytest_contained_arguments(arguments, cwd)))
 }
 
-/// Whether the first word of `text` runs Guard's own launcher through a
-/// bare-name lookup.
+/// Whether any word of `text` runs Guard's own launcher.
 ///
-/// Only the bare name answers yes. A path-spelled launcher is not the
-/// invocation this crate's proofs admit, so it is already refused wherever it
-/// appears and needs no second answer here. Quoting is removed first, because
-/// the shell removes it before the lookup: `'hol-guard'` and `hol"guard"`
-/// both reach the same program.
+/// Every word is read, not only the first: in `true && hol-guard ...`,
+/// `(hol-guard ...)` or `X=1 hol-guard ...` the launcher is a later segment
+/// whose own proof would still admit it. Words are split at whitespace and at
+/// every shell operator, assignment and substitution character, so a prefix
+/// cannot hide one. Quoting is removed first, because the shell removes it
+/// before the lookup: `'hol-guard'` and `hol"guard"` both reach the same
+/// program. A path-spelled launcher answers yes too, by its last component.
+/// Over-reading costs only a review of a wrapped list that mentions the name.
 pub(super) fn names_launcher(text: &str) -> bool {
-    let Some(word) = text.split_whitespace().next() else {
-        return false;
-    };
-    let dequoted: String = word
-        .chars()
-        .filter(|c| !matches!(c, '\'' | '"' | '\\'))
-        .collect();
-    SHADOW_NAMES
-        .iter()
-        .any(|name| dequoted.eq_ignore_ascii_case(name))
+    text.split(|c: char| {
+        c.is_whitespace()
+            || matches!(
+                c,
+                ';' | '&' | '|' | '(' | ')' | '{' | '}' | '`' | '$' | '<' | '>' | '='
+            )
+    })
+    .any(|word| {
+        let dequoted: String = word
+            .chars()
+            .filter(|c| !matches!(c, '\'' | '"' | '\\'))
+            .collect();
+        let name = dequoted.rsplit('/').next().unwrap_or_default();
+        SHADOW_NAMES
+            .iter()
+            .any(|shadow| name.eq_ignore_ascii_case(shadow))
+    })
 }
 
 fn cwd_shadows_launcher(cwd: &Path) -> bool {
