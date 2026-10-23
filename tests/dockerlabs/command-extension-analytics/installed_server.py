@@ -443,6 +443,8 @@ def _assert_seeded_activity(store: GuardStore) -> None:
             order by harness, execution_status, activity_id
             """
         ).fetchall()
+    # The daemon enrolls the extension-control authority at startup, so each
+    # hook records the built-in extension matches that shaped its decision.
     expected = [
         (
             "claude-code",
@@ -461,26 +463,26 @@ def _assert_seeded_activity(store: GuardStore) -> None:
             "prevented",
             "pre_hook",
             "require-reapproval",
-            "policy",
-            0,
+            "extension_match",
+            2,
             1,
             "not-applicable",
         ),
-        ("codex", "pre", "allowed_unconfirmed", "pre_hook", "allow", "capability", 0, 0, "accepted"),
+        ("codex", "pre", "allowed_unconfirmed", "pre_hook", "allow", "capability", 1, 0, "accepted"),
         (
             "codex",
             "post_success",
             "confirmed_success",
             "post_hook",
             "warn",
-            "policy",
-            0,
+            "extension_match",
+            1,
             0,
             "not-applicable",
         ),
-        ("codex", "pre", "prevented", "pre_hook", "require-reapproval", "policy", 0, 1, "not-applicable"),
-        ("codex", "pre", "prevented", "pre_hook", "require-reapproval", "policy", 0, 1, "rejected"),
-        ("cursor", "pre", "prevented", "pre_hook", "block", "policy", 0, 1, "not-applicable"),
+        ("codex", "pre", "prevented", "pre_hook", "require-reapproval", "extension_match", 1, 1, "not-applicable"),
+        ("codex", "pre", "prevented", "pre_hook", "require-reapproval", "extension_match", 1, 1, "rejected"),
+        ("cursor", "pre", "prevented", "pre_hook", "block", "extension_match", 2, 1, "not-applicable"),
     ]
     if sorted(rows) != sorted(expected):
         raise RuntimeError(f"installed hook activity mismatch: {rows!r}")
