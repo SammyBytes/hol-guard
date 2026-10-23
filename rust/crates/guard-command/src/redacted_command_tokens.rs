@@ -68,12 +68,12 @@ static PRIVATE_KEY_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 static SECRET_ENV_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?im)^([ \t]*)([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|KEY|CREDENTIAL)[A-Z0-9_]*)=(.+)$",
+        r"(?im)^([ \t]*(?:export[ \t]+)?)([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|KEY|CREDENTIAL)[A-Z0-9_]*)=(.+)$",
     )
     .unwrap()
 });
 static CONNECTION_ENV_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?im)^([ \t]*)([A-Z0-9_]*(?:URL|URI|DSN))=([A-Za-z][A-Za-z0-9+.-]*://.+)$")
+    Regex::new(r"(?im)^([ \t]*(?:export[ \t]+)?)([A-Z0-9_]*(?:URL|URI|DSN))=([A-Za-z][A-Za-z0-9+.-]*://.+)$")
         .unwrap()
 });
 static CONNECTION_STRING_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -507,5 +507,22 @@ mod tests {
             redacted.classifiers,
             vec!["github-token".to_string(), "secret-env".to_string()]
         );
+    }
+
+    /// Oracle: `redact_text` from `redaction.py` on exported assignments.
+    #[test]
+    fn exported_assignments_are_redacted() {
+        let redacted = redact_text("export API_SECRET=supersecretvalue123");
+        assert_eq!(redacted.text, "export API_SECRET=*****");
+        assert_eq!(redacted.classifiers, vec!["secret-env".to_string()]);
+
+        let redacted = redact_text("    export DATABASE_URL=postgres://user:pw@host/db");
+        assert_eq!(redacted.text, "    export DATABASE_URL=*****");
+        assert_eq!(redacted.classifiers, vec!["connection-env".to_string()]);
+
+        // Only a leading `export` introduces an assignment.
+        let redacted = redact_text("echo export API_KEY=hunter2");
+        assert_eq!(redacted.text, "echo export API_KEY=hunter2");
+        assert!(redacted.classifiers.is_empty());
     }
 }

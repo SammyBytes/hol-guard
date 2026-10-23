@@ -86,6 +86,24 @@ class TestRedactText:
         assert "postgres://user:pw@host/db" not in result.text
         assert "connection-env" in result.classifiers
 
+    def test_exported_secret_env_var_is_redacted(self) -> None:
+        result = redact_text("export API_SECRET=supersecretvalue123")
+        assert "supersecretvalue123" not in result.text
+        assert result.text == "export API_SECRET=*****"
+        assert "secret-env" in result.classifiers
+
+    def test_exported_connection_env_url_is_redacted(self) -> None:
+        result = redact_text("    export DATABASE_URL=postgres://user:pw@host/db")
+        assert "postgres://user:pw@host/db" not in result.text
+        assert result.text == "    export DATABASE_URL=*****"
+        assert "connection-env" in result.classifiers
+
+    def test_export_keyword_inside_a_line_is_not_an_assignment(self) -> None:
+        """Only a leading `export` introduces an assignment; mid-line text does not."""
+        result = redact_text("echo export API_KEY=hunter2")
+        assert result.text == "echo export API_KEY=hunter2"
+        assert "secret-env" not in result.classifiers
+
     @pytest.mark.parametrize(
         ("line", "secret_fragment"),
         [
