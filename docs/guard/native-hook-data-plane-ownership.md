@@ -265,6 +265,16 @@ side omits would unbind it. Every outcome other than a well-formed,
 request-bound `ok` reply raises, and both callers already fail closed on that,
 so no view is composed in Python beside the one the resident decided.
 
+Shell execution-context modeling is the resident's
+(`guard-command/src/shell_execution_context_support.rs`): which segment runs a
+`cd`, `pushd` or `popd`, what its operand is once assignments, wrappers and
+redirects are set aside, when an operand is too dynamic to model, and which
+`shell_cwd_*` reason code explains a directory it will not follow. Python kept a
+second copy of that grammar after the port and no longer calls it; the copy is
+removed and the retirement ledger names its symbols so they cannot return. What
+stays on this side is the vocabulary the answer is read with and the filesystem
+identity this process captures for it, which needs the descriptors it holds.
+
 ## Harness route inventory
 
 The v2 contract maps all harnesses in `HARNESS_CONTRACTS`, including harnesses
