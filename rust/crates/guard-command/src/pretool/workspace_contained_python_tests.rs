@@ -461,15 +461,18 @@ fn a_redirected_pytest_run_routes_to_the_workspace_sandbox() {
         "pytest -q tests/ > out.txt 2>&1",
         ".venv/bin/pytest -q > out.txt",
         "pytest -q >> pytest.log",
+        // Duplicating a descriptor is a redirect of its own, and the narrower
+        // profile peels no sink for it either, so this run belongs in the
+        // sandbox beside the ones that name a file.
+        "pytest -q 2>&1",
     ] {
         for harness in ["codex", "claude-code", "omp"] {
             let (reason, _) = outcome(harness, command, &ws);
             assert_eq!(reason == CONTAINED, host(), "{reason} {harness}: {command}");
         }
     }
-    // A redirect the sandbox cannot confine keeps its review, and a run with no
-    // output redirect keeps the narrower profile the sink peels itself.
-    for command in ["pytest -q > ../out.txt", "pytest -q 2>&1"] {
+    // A redirect the sandbox cannot confine keeps its review.
+    for command in ["pytest -q > ../out.txt"] {
         for harness in ["codex", "claude-code", "omp"] {
             let (reason, _) = outcome(harness, command, &ws);
             assert_ne!(reason, CONTAINED, "{harness}: {command}");
