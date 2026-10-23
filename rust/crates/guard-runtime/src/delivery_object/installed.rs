@@ -46,11 +46,13 @@ pub(super) fn batch(input: &Value) -> Outcome {
     }
     let mut groups = BTreeMap::<(PathBuf, String), Vec<(usize, String, u64)>>::new();
     let mut replies = vec![Value::Null; items.len()];
+    let mut directories = vec![Value::Null; items.len()];
     for (index, (plan, length)) in plans.into_iter().enumerate() {
         if plan["bound"].is_null() {
             replies[index] = plan;
             continue;
         }
+        directories[index] = plan["directory"].clone();
         let path = path(&input["root"], &plan)?;
         groups
             .entry((path, plan["asset"].as_str().unwrap_or_default().to_owned()))
@@ -70,7 +72,9 @@ pub(super) fn batch(input: &Value) -> Outcome {
                 .iter()
                 .map(|(_, name, length)| (name.as_str(), *length)),
         )?;
-        for ((index, _, _), reply) in members.into_iter().zip(verified) {
+        for ((index, _, _), mut reply) in members.into_iter().zip(verified) {
+            // Each item answers as a single fetch of it would.
+            reply["directory"] = directories[index].take();
             replies[index] = reply;
         }
     }
