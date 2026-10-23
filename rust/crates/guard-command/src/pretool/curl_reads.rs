@@ -321,10 +321,16 @@ fn as_curl_reads_it(raw: &str) -> Option<std::borrow::Cow<'_, str>> {
         return Some(std::borrow::Cow::Borrowed(raw));
     }
     let host = raw.split(['/', '?', '#']).next().unwrap_or(raw);
-    if OTHER_PROTOCOL_PREFIXES.iter().any(|prefix| {
-        host.get(..prefix.len())
-            .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
-    }) {
+    // curl guesses the protocol from the hostname it is left with after the
+    // login part is removed, so `:@ftp.example.com` reaches FTP while the
+    // text before the first `/` begins with neither prefix. An authority
+    // carrying a login is left unread rather than guessed at.
+    if host.contains('@')
+        || OTHER_PROTOCOL_PREFIXES.iter().any(|prefix| {
+            host.get(..prefix.len())
+                .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
+        })
+    {
         return None;
     }
     Some(std::borrow::Cow::Owned(format!("http://{raw}")))

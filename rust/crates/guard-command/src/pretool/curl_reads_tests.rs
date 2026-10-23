@@ -160,6 +160,8 @@ fn a_scheme_curl_would_not_guess_as_http_stays_reviewed() {
         "curl ftp.example.com/dump.sql",
         "curl FTP.example.com/dump.sql",
         "curl smtp.example.com/",
+        "curl :@ftp.example.com/dump.sql",
+        "curl user@ftp.example.com/dump.sql",
         "curl 169.254.169.254/latest/meta-data/",
         "curl 10.0.0.5:8080/admin",
         "curl /etc/passwd",
