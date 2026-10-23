@@ -31,6 +31,21 @@ fn split_execution_segments_inner(
     allow_background: bool,
 ) -> Result<Vec<RawSegment>, &'static str> {
     let chars: Vec<char> = command.chars().collect();
+    // A whole command the shell runs as one group: `(cd src && npm test)` and
+    // `{ cd src && npm test; }`. The group itself names no program, so the
+    // list inside it owns everything the command can run, and reading it as
+    // that list is what proves it. The offsets stay the caller's, so a segment
+    // still points at the text it came from.
+    if let Some(inside) = sole_command_group(&chars) {
+        let inner: String = chars[inside.clone()].iter().collect();
+        let mut segments =
+            split_execution_segments_inner(&inner, preserve_unquoted_backslash, allow_background)?;
+        for segment in &mut segments {
+            segment.start += inside.start;
+            segment.end += inside.start;
+        }
+        return Ok(segments);
+    }
     let mut quote = Quote::None;
     let mut escaped = false;
     let mut segments = Vec::new();
@@ -400,6 +415,52 @@ pub(super) fn is_plain_cd_target(value: &str) -> bool {
                 '$' | '`' | '<' | '>' | '|' | ';' | '&' | '(' | ')' | '{' | '}' | '\0'
             )
         })
+}
+
+/// The span inside a command that is nothing but one group: a `( list )`
+/// subshell or a `{ list; }` brace group, with no second bracket of its own
+/// kind anywhere in the text.
+///
+/// Requiring the group to be the whole command, and to be the only one, is
+/// what makes stripping it sound. A bracket left over would mean a nesting,
+/// an expansion such as `$(` or `${`, or a glob this pass has not read, and a
+/// redirect, a pipe or a background `&` after the closing bracket would leave
+/// text outside the group that the list inside it does not account for.
+///
+/// A subshell runs its list in a child, so the directory, environment and
+/// options it sets do not outlive it; reading the list as though they did can
+/// only widen what the command is taken to own, never narrow it.
+fn sole_command_group(chars: &[char]) -> Option<std::ops::Range<usize>> {
+    let open = chars.iter().position(|value| !value.is_whitespace())?;
+    let close = chars.iter().rposition(|value| !value.is_whitespace())?;
+    let (opener, closer) = match (chars[open], chars[close]) {
+        ('(', ')') => ('(', ')'),
+        ('{', '}') => ('{', '}'),
+        _ => return None,
+    };
+    if close <= open + 1 {
+        return None;
+    }
+    let brackets = chars
+        .iter()
+        .filter(|value| **value == opener || **value == closer)
+        .count();
+    if brackets != 2 {
+        return None;
+    }
+    // `{` is a word unless whitespace separates it from the list, so `{ls; }`
+    // runs a program named `{ls`. The list itself has to be terminated, which
+    // is what keeps `}` a bracket rather than the list's last word.
+    if opener == '{'
+        && !(is_shell_token_whitespace(chars[open + 1])
+            && chars[open + 1..close]
+                .iter()
+                .rposition(|value| !is_shell_token_whitespace(*value))
+                .is_some_and(|last| matches!(chars[open + 1 + last], ';' | '&')))
+    {
+        return None;
+    }
+    Some(open + 1..close)
 }
 
 pub(super) fn push_segment(
