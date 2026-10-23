@@ -162,8 +162,7 @@ fn only_cohorts_this_release_carries_and_the_rate_admits_are_selected() {
 fn a_selection_refuses_an_activity_id_rather_than_bucketing_it() {
     let error = control(&[])
         .selected_cohorts(&cohorts(&[CommandShadowCohort::Baseline]), "has space")
-        .err()
-        .expect("a malformed id is refused");
+        .expect_err("a malformed id is refused");
     assert_eq!(error.message(), "activity_id must be an opaque identifier");
 }
 
