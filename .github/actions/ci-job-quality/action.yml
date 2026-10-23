@@ -51,6 +51,7 @@ runs:
   - name: Lint production sources
     run: |
       uv run --no-sync python -m ruff check \
+        tests/test_ci_native_evaluator_fast_path.py \
         scripts/ci/native_approval_contract_gate.py \
         tests/test_ci_native_approval_workflow.py \
         tests/test_policy_bundle_crate_boundary.py \
@@ -109,6 +110,7 @@ runs:
   - name: Check formatting for production sources
     run: |
       uv run --no-sync python -m ruff format --check \
+        tests/test_ci_native_evaluator_fast_path.py \
         scripts/ci/native_approval_contract_gate.py \
         tests/test_ci_native_approval_workflow.py \
         tests/test_policy_bundle_crate_boundary.py \
