@@ -262,6 +262,8 @@ mod verified_read_plan;
 pub use verified_read_plan::*;
 mod inventory_source_evidence;
 pub use inventory_source_evidence::*;
+mod inventory_snapshot_digest;
+pub use inventory_snapshot_digest::*;
 mod command_pack_record;
 pub use command_pack_record::*;
 

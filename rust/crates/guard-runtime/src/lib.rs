@@ -499,6 +499,7 @@ mod hook_path_rules;
 mod hook_policy_config;
 mod hook_process_spawn;
 mod hook_render_op;
+mod inventory_snapshot_digest_op;
 mod inventory_source_evidence_op;
 #[path = "adapters/detection/kimi_detect.rs"]
 mod kimi_detect;
