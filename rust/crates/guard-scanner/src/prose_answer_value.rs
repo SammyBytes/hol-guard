@@ -204,9 +204,10 @@ pub(crate) fn last_value_offset(tail: &str) -> Option<usize> {
             start.get_or_insert(index);
             continue;
         }
+        let rest = &line[index + character.len_utf8()..];
         last = start
             .take()
-            .filter(|_| !names_field(character))
+            .filter(|_| !names_field(character, rest))
             .filter(|&begin| holds_value(&line[begin..index]))
             .or(last);
     }
@@ -217,8 +218,18 @@ pub(crate) fn last_value_offset(tail: &str) -> Option<usize> {
 /// rather than a value of this one. `Token: none, password_v2: none` answers
 /// two fields and assigns neither, so the second field's name must not read as
 /// the first field's value.
-fn names_field(ended_by: char) -> bool {
-    matches!(ended_by, ':' | '=')
+///
+/// What follows the separator decides it, because a field is named `name:
+/// value` or `name=value`. A colon no space follows belongs to the token
+/// itself, as in a host and port or a basic-auth pair, and base64 padding -
+/// `=` before another `=` or at the end of the line - ends a value instead of
+/// naming anything, so a key written out in full still reads as one.
+fn names_field(ended_by: char, rest: &str) -> bool {
+    match (ended_by, rest.chars().next()) {
+        (':', Some(next)) => next.is_whitespace(),
+        ('=', Some(next)) => next != '=',
+        _ => false,
+    }
 }
 
 /// Whether one token on that line is a chosen value rather than more prose.
@@ -303,6 +314,18 @@ mod tests {
         )));
     }
 
+    /// A key written out beside the answer keeps the match whatever ends it:
+    /// base64 padding and a port are part of the value, not a field name.
+    #[test]
+    fn a_padded_or_ported_credential_beside_an_answer_still_matches() {
+        assert!(credential_assignment(
+            "- Token: none dGhpc2lzYXNlY3JldGtleTEy=\n"
+        ));
+        assert!(credential_assignment(
+            "- Token: none q7Lm2Xv9Rt4Kp8Wz:8080\n"
+        ));
+    }
+
     #[test]
     fn a_state_word_reads_as_an_answer_only_where_the_field_asks() {
         assert!(is_prose_answer("password: yes", "", "Has "));
@@ -380,6 +403,16 @@ mod tests {
     #[test]
     fn a_field_answered_later_on_the_line_is_not_the_first_field_s_value() {
         assert!(is_prose_answer("Token: none", ", password_v2: none", ""));
+        assert!(!is_prose_answer(
+            "Token: none",
+            " dGhpc2lzYXNlY3JldGtleTEy=",
+            ""
+        ));
+        assert!(!is_prose_answer(
+            "Token: none",
+            " q7Lm2Xv9Rt4Kp8Wz:8080",
+            ""
+        ));
         assert!(!credential_assignment("Token: none, password_v2: none\n"));
         assert!(is_prose_answer("Token: none", " (api_key_v2=none)", ""));
         // A value written after the second field still ends both answers. The
