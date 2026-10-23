@@ -109,7 +109,17 @@ fn line_count(value: &str) -> Result<u32, &'static str> {
     let normalized = value.strip_prefix("--lines=").unwrap_or(value);
     let normalized = normalized.strip_prefix('-').unwrap_or(normalized);
     let bound = "line count exceeds the bound";
-    let count = bounded_digits(normalized, 9).ok_or(bound)?;
+    // `int` reads leading zeros as padding, so `0000000001` is one line; only
+    // the significant digits count toward the overflow guard.
+    if normalized.is_empty() || !normalized.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(bound);
+    }
+    let significant = normalized.trim_start_matches('0');
+    let count = if significant.is_empty() {
+        0
+    } else {
+        bounded_digits(significant, 9).ok_or(bound)?
+    };
     if !(1..=MAX_COUNT).contains(&count) {
         return Err(bound);
     }
@@ -118,7 +128,7 @@ fn line_count(value: &str) -> Result<u32, &'static str> {
 
 /// ASCII digits, no more than `limit` of them so a long run cannot overflow.
 /// Python reads these with `int`, which also accepts other Unicode decimal
-/// digits; the admitted command carries ASCII, and only ASCII is read back.
+/// digits; `head`, `tail` and `sed` read ASCII only, and so does this.
 fn bounded_digits(value: &str, limit: usize) -> Option<u32> {
     if value.is_empty() || value.len() > limit || !value.bytes().all(|byte| byte.is_ascii_digit()) {
         return None;

@@ -76,6 +76,29 @@ fn the_line_bound_holds_at_a_thousand() {
 }
 
 #[test]
+fn zero_padding_is_read_as_the_number_it_spells() {
+    for bound in ["-0000000001", "--lines=0000000040", "000000000000000005"] {
+        assert!(plan(&["head", bound, "main.py"]).is_ok(), "{bound}");
+    }
+    assert_eq!(
+        error(&["head", "-00000001001", "main.py"]),
+        "line count exceeds the bound"
+    );
+    assert_eq!(
+        error(&["head", "-0000", "main.py"]),
+        "line count exceeds the bound"
+    );
+    assert_eq!(
+        error(&["head", "-\u{0664}", "main.py"]),
+        "line count exceeds the bound"
+    );
+    assert_eq!(
+        error(&["sed", "-n", "0000003p", "main.py"]),
+        "sed expression is outside the verified grammar"
+    );
+}
+
+#[test]
 fn head_and_tail_take_exactly_one_bound_and_one_file() {
     for argv in [
         vec!["head", "-5"],

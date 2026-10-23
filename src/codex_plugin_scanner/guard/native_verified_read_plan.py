@@ -23,6 +23,8 @@ _WORKING_DIRECTORY: Final = "working_directory"
 _LEADING_LINES: Final = "leading_lines"
 _TRAILING_LINES: Final = "trailing_lines"
 _LINE_RANGE: Final = "line_range"
+_REFUSED = "native_verified_read_plan_refused"
+_MAX_DETAIL_CHARS = 256
 # The resident accepts a canonical request up to 16 KiB; the wire envelope
 # carries the same material plus framing, so leave room for both.
 _MAX_REQUEST_BYTES = 16 * 1024
@@ -31,6 +33,14 @@ _MAX_WIRE_BYTES = 6 * _MAX_REQUEST_BYTES + 4096
 
 class NativeVerifiedReadPlanError(RuntimeError):
     """The native owner could not supply a complete, request-bound plan."""
+
+
+class NativeVerifiedReadPlanRefusedError(NativeVerifiedReadPlanError):
+    """The resident answered: this argv is outside the verified-read grammar."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(_REFUSED)
+        self.detail = detail
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +101,10 @@ def verified_read_plan(
         raise NativeVerifiedReadPlanError("native_verified_read_plan_unavailable")
     try:
         plan = _validated_plan(decoded, wire, request_sha256)
+    except NativeVerifiedReadPlanRefusedError:
+        # A request-bound refusal is a healthy resident answering the question.
+        _record(home, status.identity, success=True)
+        raise
     except NativeVerifiedReadPlanError:
         _record(home, status.identity, success=False)
         raise
@@ -99,10 +113,19 @@ def verified_read_plan(
 
 
 def _validated_plan(decoded: dict[str, Any], wire: dict[str, object], request_sha256: str) -> VerifiedReadPlan:
-    if set(decoded) != _RESULT_KEYS or decoded.get("code") != "ok":
+    if set(decoded) != _RESULT_KEYS:
         raise NativeVerifiedReadPlanError("native_verified_read_plan_invalid_result")
     if decoded.get("request_id") != wire["request_id"] or decoded.get("request_sha256") != request_sha256:
         raise NativeVerifiedReadPlanError("native_verified_read_plan_request_mismatch")
+    status, code = decoded.get("status"), decoded.get("code")
+    if status == "error" and code == _REFUSED:
+        detail: Any = decoded.get("detail")
+        bounded = isinstance(detail, str) and 0 < len(detail) <= _MAX_DETAIL_CHARS
+        if not bounded or decoded.get("plan") is not None:
+            raise NativeVerifiedReadPlanError("native_verified_read_plan_invalid_result")
+        raise NativeVerifiedReadPlanRefusedError(detail)
+    if status != "ok" or code != "ok":
+        raise NativeVerifiedReadPlanError("native_verified_read_plan_invalid_result")
     payload: Any = decoded.get("plan")
     if not isinstance(payload, dict) or set(payload) != _PLAN_KEYS:
         raise NativeVerifiedReadPlanError("native_verified_read_plan_invalid_result")
