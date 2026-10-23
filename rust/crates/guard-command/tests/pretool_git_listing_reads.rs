@@ -212,4 +212,34 @@ fn repository_report_inspections_are_proven_reads() {
         &session.primary,
         &["config", "--unset-all", "core.fsmonitor"],
     );
+    // An attributes file outside the checkout names anything. Git reads the
+    // first word of each of its lines as a pattern and the rest as attributes,
+    // so a credential file becomes attributes an attribute check prints. A
+    // count never reads attributes.
+    git(
+        &session.home,
+        &session.primary,
+        &["config", "core.attributesFile", "./synthetic-never-read"],
+    );
+    for (command, allowed) in [
+        ("git check-attr diff src/main.rs", false),
+        ("git check-attr -a src/main.rs", false),
+        ("git check-attr --stdin diff", false),
+        ("git count-objects -v", true),
+    ] {
+        let result = session.evaluate_at(command, &session.primary);
+        assert_eq!(
+            result.minimum_action == "allow",
+            allowed,
+            "{command}: {}",
+            result.reason_code
+        );
+    }
+    git(
+        &session.home,
+        &session.primary,
+        &["config", "--unset-all", "core.attributesFile"],
+    );
+    let result = session.evaluate_at("git check-attr diff src/main.rs", &session.primary);
+    assert_eq!(result.minimum_action, "allow", "{}", result.reason_code);
 }
