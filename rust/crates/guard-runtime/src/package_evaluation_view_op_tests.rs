@@ -144,6 +144,22 @@ fn a_terminal_action_keeps_no_approval_route_in_the_copy() {
 }
 
 #[test]
+fn a_terminal_action_drops_the_legacy_approval_instruction() {
+    let payload = view(json!({
+        "policy_action": "block",
+        "user_copy": {
+            "title": "Blocked",
+            "summary": "Blocked.",
+            "harness_message": "Blocked by policy. Open HOL Guard to approve or keep this blocked: \
+                 http://127.0.0.1:4781/requests/req-7 \
+                 After you choose, retry the same npm install action.",
+        },
+    }));
+    let message = payload["user_copy"]["harness_message"].as_str().unwrap();
+    assert_eq!(message, "Blocked by policy.");
+}
+
+#[test]
 fn a_review_gains_the_local_instruction_once() {
     let payload = view(json!({
         "policy_action": "review",
@@ -282,4 +298,11 @@ fn absent_identity_still_occupies_the_digested_request() {
         serde_json::from_slice(&evaluate_package_evaluation_view(&bare).unwrap()).unwrap();
     assert_eq!(reply["payload"]["bundle_version"], Value::Null);
     assert_eq!(reply["payload"]["workspace_fingerprint"], Value::Null);
+}
+
+#[test]
+fn a_request_larger_than_a_reply_is_refused_before_any_view_is_built() {
+    let oversized = "x".repeat(guard_contracts::MAX_NATIVE_RESPONSE_BYTES);
+    let refused = evaluate_package_evaluation_view(&request(json!({ "risk_summary": oversized })));
+    assert!(refused.is_err());
 }

@@ -15,9 +15,11 @@ use serde_json::Value;
 /// Capability advertised when the package-evaluation view op exists.
 pub const PACKAGE_EVALUATION_VIEW_FEATURE: &str = "package-evaluation-view-v1";
 
-/// Largest payload the view accepts: a workspace audit's evaluation carries one
-/// row per scanned package, so it takes the evaluation budget, not a small one.
-pub const PACKAGE_EVALUATION_VIEW_MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
+/// Largest request the view accepts. Every row it reads back was answered by
+/// the resident inside one reply, so it fits the reply budget; a request above
+/// it could only produce a view the resident cannot send back, and is refused
+/// before any work rather than after it.
+pub const PACKAGE_EVALUATION_VIEW_MAX_REQUEST_BYTES: usize = crate::MAX_NATIVE_RESPONSE_BYTES;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]

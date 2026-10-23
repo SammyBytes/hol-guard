@@ -23,9 +23,11 @@ from typing import Any, TypeGuard
 from .models import GuardArtifact
 from .native_context import _canonical_request_sha256, ensure_resident_prerequisite
 from .native_package_authority import (
+    _EVALUATION_VIEW_WIRE_FIELDS,
     _REQUEST_SCHEMA,
     _RESULT_SCHEMA,
     NativePackageEvaluationViewUnavailableError,
+    _evaluation_from_view,
     _request_id,
     _resident_request,
     evaluation_from_native_payload,
@@ -429,7 +431,12 @@ def evaluate_package_request_native(
                 now=_now_text(now),
             ),
         )
-        evaluation = evaluation_from_native_payload(payload, guard_home=guard_home)
+        # The settled reply already carries the resident's view of this
+        # evaluation, so it is read as one rather than sent back to be viewed.
+        # Transport-only keys such as the archive descriptors are not part of it.
+        evaluation = _evaluation_from_view(
+            {key: value for key, value in payload.items() if key in _EVALUATION_VIEW_WIRE_FIELDS}
+        )
     except (
         NativeSupplyChainEvalError,
         NativePackageEvaluationViewUnavailableError,

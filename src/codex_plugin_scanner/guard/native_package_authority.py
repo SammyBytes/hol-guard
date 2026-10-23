@@ -34,6 +34,9 @@ _ARTIFACT_MAX_REQUEST_BYTES = 4 * 1024 * 1024
 _RESIDENT_PROTOCOL_FEATURE = "resident-protocol-v2"
 _PACKAGE_AUTHORITY_FEATURE = "package-authority-v1"
 _PACKAGE_EVALUATION_VIEW_FEATURE = "package-evaluation-view-v1"
+# Mirrors PACKAGE_EVALUATION_VIEW_MAX_REQUEST_BYTES: the view reads back rows the
+# resident answered inside one reply, so its request takes the reply budget.
+_EVALUATION_VIEW_MAX_REQUEST_BYTES = 2 * 1024 * 1024
 _REQUEST_SCHEMA = "guard-package-authority-request.v1"
 _RESULT_SCHEMA = "guard-package-authority-result.v1"
 _request_counter = 0
@@ -486,9 +489,11 @@ def evaluation_from_native_payload(
         guard_home=home,
         timeout_seconds=timeout_seconds,
         required_features=(_PACKAGE_EVALUATION_VIEW_FEATURE,),
-        max_request_bytes=_ARTIFACT_MAX_REQUEST_BYTES,
+        max_request_bytes=_EVALUATION_VIEW_MAX_REQUEST_BYTES,
     )
-    if response is None:
+    if response is None or response.get("code") != "ok":
+        # A reply whose code is not ``ok`` did not answer with a view, whatever
+        # its status and payload look like.
         raise NativePackageEvaluationViewUnavailableError("native_package_evaluation_view_unavailable")
     if response.get("request_id") != request["request_id"] or response.get("request_sha256") != request_sha256:
         # Another request's view would describe a package this caller never
