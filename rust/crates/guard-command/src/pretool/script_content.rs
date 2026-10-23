@@ -147,7 +147,13 @@ fn structure(
         (structured.confidence == "exact" && structured.wrapper_chain.is_empty())
             .then_some((structured.normalized_text, structured.segments))
     };
-    parse(&model.normalized_text).or_else(|| parse(foreground_job(&model.normalized_text)?))
+    parse(&model.normalized_text)
+        .or_else(|| parse(foreground_job(&model.normalized_text)?))
+        .or_else(|| {
+            parse(crate::native_command_controls::launcher_body(
+                &model.normalized_text,
+            )?)
+        })
 }
 
 /// The text of a command whose only unreadable part is the `&` that
@@ -181,6 +187,23 @@ pub(crate) fn backgrounded_launch(model: &CanonicalCommandV1, context: PathConte
         && model.wrapper_chain.is_empty()
         && !model.path_overridden
         && foreground_job(&model.normalized_text).is_some()
+        && structure(model, context).is_some()
+}
+
+/// Whether the command is a scheduling or buffering prefix in front of a
+/// program this scan can read, such as `nohup node server.js`.
+///
+/// The parser leaves the whole text unmodelled at that prefix, so the
+/// interpreter behind it looks like one naming a file nobody read, and the
+/// command blocked with no approval to give it - while the same words without
+/// the prefix modelled exactly and ran. The prefix changes scheduling,
+/// buffering or a hangup, never the program, the user or the directory, so the
+/// owners are the owners of the command the text already names.
+pub(crate) fn prefixed_launch(model: &CanonicalCommandV1, context: PathContext<'_>) -> bool {
+    model.uncertainty_reason.as_deref() == Some("transparent_wrapper_not_yet_supported")
+        && model.wrapper_chain.is_empty()
+        && !model.path_overridden
+        && crate::native_command_controls::launcher_body(&model.normalized_text).is_some()
         && structure(model, context).is_some()
 }
 
