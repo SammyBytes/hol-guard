@@ -8,6 +8,8 @@ import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 
+from .contained_launcher_prefix import peel_launcher
+
 # Mirrors the native inert-assignment allowlist: these names change output or
 # presentation, never which program runs or what it loads.
 _INERT_ENVIRONMENT_NAMES = frozenset(
@@ -176,3 +178,23 @@ def peel_timeout_clock(command: list[str]) -> tuple[list[str], int | None]:
 def _assignment_word(word: str) -> bool:
     name, separator, _ = word.partition("=")
     return bool(separator and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name))
+
+
+def peel_run_prefixes(command: list[str]) -> tuple[list[str], int | None]:
+    """Peel the prefixes native authority reads through, and the tightest clock.
+
+    A system `timeout`, `nice` and `stdbuf` each run the program they name
+    unchanged, so the planners are handed that program, as native authority
+    is. Each peel is followed by the inert `command`/`env` prefix and
+    assignment split the planners already receive.
+    """
+    seconds: int | None = None
+    for _ in range(4):
+        timed, clock = peel_timeout_clock(command)
+        if clock is not None:
+            seconds = clock if seconds is None else min(seconds, clock)
+        peeled = peel_launcher(timed)
+        if peeled == command:
+            break
+        command, _ = _split_command_prefix(peeled)
+    return command, seconds
