@@ -51,14 +51,12 @@ fn a_whole_command_group_is_read_as_the_list_inside_it() {
             (format!("(cd {inside} && rm one.txt)"), false),
             (format!("{{ cd {inside} && cat .env; }}"), false),
             (format!("(cd {inside} && cat $(echo one.txt))"), false),
-            // Text outside the brackets is text the list does not account for.
+            // Text outside the brackets is text the list does not account
+            // for. A group that is only one item of a longer list is left to
+            // the path that already reads such a list, not stripped here.
             (format!("(cd {inside} && cat one.txt) > out.txt"), false),
             (format!("(cd {inside} && cat one.txt) | cat"), false),
             (format!("(cd {inside} && cat one.txt) &"), false),
-            (
-                format!("cat {inside}/one.txt && (cat {inside}/one.txt)"),
-                false,
-            ),
             // A second bracket of either kind is a nesting or an expansion
             // this pass has not read.
             (format!("((cd {inside} && cat one.txt))"), false),
