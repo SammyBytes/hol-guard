@@ -409,9 +409,26 @@ fn outside_the_workspace(target: &str, context: PathContext<'_>) -> bool {
     ) else {
         return false;
     };
-    let candidate = std::fs::canonicalize(&candidate).unwrap_or(candidate);
+    let candidate = canonical_through_existing(&candidate);
     let workspace = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
     !candidate.starts_with(&workspace)
+}
+
+/// `path` with its nearest existing ancestor canonicalized.
+///
+/// A file the command has not written yet does not canonicalize, and its raw
+/// spelling never matches a canonical workspace that is reached through a
+/// link or a short name: `/var/...` on macOS is `/private/var/...`, and a
+/// Windows temp directory canonicalizes to a verbatim path. Read that way,
+/// `cp seed.sh run.sh && . ./run.sh` sourced a file "outside the workspace"
+/// and lost the failure a file this command writes keeps.
+fn canonical_through_existing(path: &Path) -> PathBuf {
+    path.ancestors()
+        .find_map(|ancestor| {
+            let canonical = std::fs::canonicalize(ancestor).ok()?;
+            Some(canonical.join(path.strip_prefix(ancestor).ok()?))
+        })
+        .unwrap_or_else(|| path.to_path_buf())
 }
 
 /// Whether no segment other than the shell's `source` builtin runs words of
