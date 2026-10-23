@@ -51,6 +51,21 @@ def test_an_answer_outside_the_command_leaves_it_whole(monkeypatch: pytest.Monke
         assert peel_run_prefixes(["nice", "pytest"]) == (["nice", "pytest"], None), answer
 
 
+def test_only_a_launcher_name_asks_native_authority(monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: list[object] = []
+
+    def native(operation: str, fields: dict[str, object], expected: object) -> object:
+        asked.append(fields["command"])
+        return _native(operation, fields, expected)
+
+    monkeypatch.setattr(native_restricted_pytest, "restricted_native", native)
+    for text in ("pytest -q", "timeout 20 pytest -q", "./nice pytest -q"):
+        peel_run_prefixes(shlex.split(text))
+    assert asked == []
+    assert peel_run_prefixes(shlex.split("nice pytest -q")) == (["pytest", "-q"], None)
+    assert asked == [["nice", "pytest", "-q"]]
+
+
 def _required() -> dict[str, object]:
     return {
         "decision": "deny",

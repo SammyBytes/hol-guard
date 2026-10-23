@@ -178,6 +178,11 @@ def _assignment_word(word: str) -> bool:
     return bool(separator and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name))
 
 
+# Native authority reads a launcher only when the first word is exactly one of
+# these names, so any other command keeps its words without asking it.
+_LAUNCHERS = frozenset({"nice", "stdbuf"})
+
+
 def _peel_launcher(command: list[str]) -> list[str]:
     """The program a system `nice` or `stdbuf` runs, as the native parser reads it.
 
@@ -185,6 +190,8 @@ def _peel_launcher(command: list[str]) -> list[str]:
     position and never parses launcher options itself. A launcher the parser
     leaves in place stays in place, and the planners refuse it.
     """
+    if not command or command[0] not in _LAUNCHERS:
+        return command
     from ..native_restricted_pytest import restricted_native
 
     index = restricted_native("launcher_program", {"command": command}, (int, type(None)))
