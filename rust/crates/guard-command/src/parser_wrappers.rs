@@ -216,17 +216,18 @@ pub(super) fn is_file_shell_invocation(executable: Option<&str>, arguments: &[St
 ///
 /// A word carrying shell syntax is not a file name: what `sh $PLAN`,
 /// `sh "$(pick)"` or `sh build-*` runs is settled by expansion the text does
-/// not fix, so those keep the uncertainty they arrive with. A directory is not
-/// a script either, and a leading `-` is an option.
+/// not fix, so those keep the uncertainty they arrive with, and so does a home
+/// path the shell expands. A directory is not a script either, and a leading
+/// `-` is an option. A space is none of that: the word reaches here already
+/// split, so `sh -- './pre flight.sh'` names one file the shell opens.
 fn names_a_script_file(script: &str) -> bool {
     !script.is_empty()
         && !script.starts_with('-')
+        && !script.starts_with('~')
         && !script.ends_with('/')
         && script != "."
         && script != ".."
-        && script.chars().all(|character| {
-            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-' | '/' | '+')
-        })
+        && !script.contains(['$', '*', '?', '[', ']', '`', '"', '\'', '\\', '\n', '\t'])
 }
 
 pub(super) fn is_encoded_stdin_shell(
@@ -362,6 +363,9 @@ mod tests {
             ".sh",
             "/tmp/fixture/run",
             "a+b",
+            // Quoting is resolved before this word is read, so a name holding
+            // a space arrives whole.
+            "./pre flight.sh",
         ] {
             assert!(super::names_a_script_file(script), "{script}");
         }
@@ -374,7 +378,6 @@ mod tests {
             "${PLAN}",
             "\"$(pick)\"",
             "build-*",
-            "run me",
             "~/run",
             "scripts/",
             ".",
