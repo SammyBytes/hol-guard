@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PINNED = "1.88.0-x86_64-unknown-linux-gnu"
 ACTIVE = f"{PINNED} (default)\n"
 UNUSED = "stable-x86_64-unknown-linux-gnu"
+WINDOWS_HOST = "x86_64-pc-windows-msvc"
+WINDOWS_PINNED = f"1.88.0-{WINDOWS_HOST}"
 
 
 @pytest.mark.parametrize("flags", ["default", "active, default", "default, active"])
@@ -60,10 +62,11 @@ def test_rejects_ambiguous_inventory_before_removing_anything(
         ("false", "github-hosted", "Linux"),
         ("true", "", "Linux"),
         ("true", "github-hosted", "macOS"),
-        ("true", "github-hosted", "Windows"),
+        ("true", "self-hosted", "Windows"),
+        ("false", "github-hosted", "Windows"),
     ],
 )
-def test_never_invokes_rustup_outside_opted_in_linux_hosted_runner(
+def test_never_invokes_rustup_outside_supported_hosted_runner(
     monkeypatch: pytest.MonkeyPatch,
     actions: str,
     environment: str,
@@ -113,6 +116,65 @@ def test_validates_inventory_and_default_before_any_uninstall(
     assert calls[2:] == ([] if malformed else [["rustup", "toolchain", "uninstall", UNUSED]])
 
 
+def test_windows_runner_patch_drift_leaves_identical_compiler_key_inputs() -> None:
+    normalized = []
+    for version in ("1.99.0", "1.99.1"):
+        active = f"{WINDOWS_PINNED} (default)\n"
+        installed = f"{version}-{WINDOWS_HOST}\n{active}"
+        removed = normalize.removals("1.88.0", installed, active, expected_host=WINDOWS_HOST)
+        assert removed == [f"{version}-{WINDOWS_HOST}"]
+        normalized.append(
+            {name: flags for name, flags in normalize.parse_toolchains(installed).items() if name not in removed}
+        )
+    assert normalized[0] == normalized[1] == {WINDOWS_PINNED: {"default"}}
+
+
+@pytest.mark.parametrize(
+    ("architecture", "active", "unused", "allowed"),
+    [
+        ("X64", f"{WINDOWS_PINNED} (default)\n", f"1.99.1-{WINDOWS_HOST}", True),
+        ("X64", ACTIVE, f"1.99.1-{WINDOWS_HOST}", False),
+        ("X64", "1.88.0-x86_64-pc-windows-gnu (default)\n", f"1.99.1-{WINDOWS_HOST}", False),
+        ("X64", f"{WINDOWS_PINNED} (active)\n", f"1.99.1-{WINDOWS_HOST}", False),
+        ("X64", f"{WINDOWS_PINNED} (default)\n", "bad inventory line", False),
+        ("ARM64", f"{WINDOWS_PINNED} (default)\n", f"1.99.1-{WINDOWS_HOST}", False),
+    ],
+)
+def test_windows_validates_pinned_host_and_inventory_before_uninstall(
+    monkeypatch: pytest.MonkeyPatch, architecture: str, active: str, unused: str, allowed: bool
+) -> None:
+    for name, value in {
+        "GITHUB_ACTIONS": "true",
+        "RUNNER_ENVIRONMENT": "github-hosted",
+        "RUNNER_OS": "Windows",
+        "RUNNER_ARCH": architecture,
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(sys, "argv", ["normalize", "--toolchain", "1.88.0"])
+    calls = []
+
+    def rustup(arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert kwargs["check"] is True
+        calls.append(arguments)
+        if arguments == ["rustup", "toolchain", "list"]:
+            output = active + unused + "\n"
+        elif arguments == ["rustup", "show", "active-toolchain"]:
+            output = active
+        else:
+            assert allowed and arguments == ["rustup", "toolchain", "uninstall", unused]
+            output = ""
+        return subprocess.CompletedProcess(arguments, 0, output)
+
+    monkeypatch.setattr(normalize.subprocess, "run", rustup)
+    if allowed:
+        normalize.main()
+        assert calls[-1] == ["rustup", "toolchain", "uninstall", unused]
+    else:
+        with pytest.raises(ValueError):
+            normalize.main()
+        assert all(command[:3] != ["rustup", "toolchain", "uninstall"] for command in calls)
+
+
 def test_normalization_is_opt_in_and_precedes_full_environment_hashing() -> None:
     action = yaml.safe_load((ROOT / ".github/actions/setup-rust/action.yml").read_text())
     assert action["inputs"]["normalize-toolchains"]["default"] == "false"
@@ -124,7 +186,8 @@ def test_normalization_is_opt_in_and_precedes_full_environment_hashing() -> None
     assert 'rustup default "$RUST_TOOLCHAIN"' in install["run"]
     assert install["run"].index("rustup toolchain install") < install["run"].index("rustup default")
     assert normalize_step["if"] == (
-        "inputs.normalize-toolchains == 'true' && runner.environment == 'github-hosted' && runner.os == 'Linux'"
+        "inputs.normalize-toolchains == 'true' && runner.environment == 'github-hosted' && "
+        "(runner.os == 'Linux' || runner.os == 'Windows')"
     )
     assert "add-rust-environment-hash-key" not in cache["with"]
     assert "cache-workspace-crates" in cache["with"]
@@ -137,3 +200,8 @@ def test_normalization_is_opt_in_and_precedes_full_environment_hashing() -> None
     )
     assert setup["with"]["normalize-toolchains"] == "true"
     assert setup["with"]["components"] == "clippy"
+    windows = yaml.safe_load((ROOT / ".github/actions/ci-job-windows-native-runtime/action.yml").read_text())
+    windows_setup = next(
+        step for step in windows["runs"]["steps"] if step.get("uses") == "./.github/actions/setup-rust"
+    )
+    assert windows_setup["with"] == {"normalize-toolchains": "true"}
