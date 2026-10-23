@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 
 from ..aibom_cli import _AIBOM_CLOUD_SYNC_OPTIONS, AibomCliOptions, AibomExportFormat
+from ..native_aibom_summaries import NativeAibomSummariesError
 from ..native_inventory_url_redaction import NativeInventoryUrlRedactionError
 from ..policy_decision_explain import matched_rule_for_receipt
 from ._commands_shared import *
@@ -362,6 +363,8 @@ def _run_guard_aibom_command(
             )
         except NativeInventoryUrlRedactionError as error:
             return _inventory_redaction_unavailable("aibom.status", error)
+        except NativeAibomSummariesError as error:
+            return _aibom_summaries_unavailable("aibom.status", args, error)
         _emit("aibom.status", payload, getattr(args, "json", False))
         return 0
     if aibom_command == "sync":
@@ -419,11 +422,23 @@ def _run_guard_aibom_command(
         )
     except NativeInventoryUrlRedactionError as error:
         return _inventory_redaction_unavailable("aibom", error)
+    except NativeAibomSummariesError as error:
+        return _aibom_summaries_unavailable("aibom", args, error)
     if resolved_format == "markdown" and not getattr(args, "json", False):
         print(str(payload.get("markdown", "")))
         return 0
     _emit("aibom", payload, True)
     return 0
+
+
+def _aibom_summaries_unavailable(kind: str, args: argparse.Namespace, error: NativeAibomSummariesError) -> int:
+    """Fail closed with the resident's code; the counts are never recomputed here."""
+
+    if getattr(args, "json", False) or kind == "aibom":
+        _emit(kind, {"error": str(error)}, True)
+    else:
+        print(f"AIBOM report summaries are unavailable: {error}", file=sys.stderr)
+    return 1
 
 
 def _run_guard_abom_command(

@@ -687,6 +687,9 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
             ResidentOperationV1::InventoryUrlRedaction(request) => {
                 crate::inventory_url_redaction_op::evaluate_inventory_url_redaction(&request)
             }
+            ResidentOperationV1::AibomReportSummaries(request) => {
+                crate::aibom_report_summaries_op::evaluate_aibom_report_summaries(&request)
+            }
             #[cfg(not(unix))]
             ResidentOperationV1::ContainedNodeExecute(_)
             | ResidentOperationV1::ContainedTypescriptExecute(_)
