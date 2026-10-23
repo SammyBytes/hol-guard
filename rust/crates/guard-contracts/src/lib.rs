@@ -264,6 +264,8 @@ mod inventory_item_classification;
 pub use inventory_item_classification::*;
 mod inventory_source_evidence;
 pub use inventory_source_evidence::*;
+mod codex_hook_identity;
+pub use codex_hook_identity::*;
 mod inventory_snapshot_digest;
 pub use inventory_snapshot_digest::*;
 mod command_pack_record;

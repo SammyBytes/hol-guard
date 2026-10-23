@@ -522,6 +522,9 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
                     &request,
                 )
             }
+            ResidentOperationV1::CodexHookIdentity(request) => {
+                crate::codex_hook_identity_op::evaluate_codex_hook_identity_request(&request)
+            }
             ResidentOperationV1::ArtifactContentHash(request) => {
                 crate::artifact_content_hash_op::evaluate_artifact_content_hash_request(&request)
             }
