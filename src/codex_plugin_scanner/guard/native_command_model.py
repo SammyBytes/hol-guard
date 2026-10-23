@@ -51,6 +51,34 @@ def _assignment_name(token: str) -> str | None:
     return name
 
 
+_ENV_PROGRAMS = frozenset({"env", "/usr/bin/env", "/bin/env"})
+
+
+def _env_prefix(tokens: list[str], index: int) -> tuple[int, list[str]] | None:
+    """Step past an ``env NAME=value...`` prefix the native parser reads as the shell's own.
+
+    The parser carries the names an ``env`` prefix sets the way it carries a
+    bare ``NAME=value`` prefix, and reports the program after them as the
+    executable. It does that only for at least one assignment followed by a
+    program that is not an option and holds no ``=``, since ``env`` would take
+    such a word as one more assignment. Every other spelling leaves ``env``
+    itself as the executable, and the parser reports that as uncertain.
+    """
+    if index >= len(tokens) or tokens[index] not in _ENV_PROGRAMS:
+        return None
+    names: list[str] = []
+    following = index + 1
+    while following < len(tokens) and (name := _assignment_name(tokens[following])) is not None:
+        names.append(name)
+        following += 1
+    if not names or following >= len(tokens):
+        return None
+    program = tokens[following]
+    if not program or program.startswith("-") or "=" in program:
+        return None
+    return following, names
+
+
 def _bound_to_request(normalized_text: str, command: str) -> bool:
     """Report whether one native model answers this exact request.
 
@@ -213,7 +241,16 @@ def _decode_command_model(
                 return None
         elif segment_wrappers:
             return None
-        executable_index = skip_exec_launcher(tokens, executable_index)
+        while True:
+            prefix = _env_prefix(tokens, executable_index)
+            if prefix is not None:
+                executable_index, names = prefix
+                expected_environment_names.extend(names)
+                continue
+            launched = skip_exec_launcher(tokens, executable_index)
+            if launched == executable_index:
+                break
+            executable_index = launched
         expected_executable = tokens[executable_index] if executable_index < len(tokens) else None
         expected_arguments = tokens[executable_index + 1 :] if expected_executable is not None else []
         expected_path_override = "PATH" in expected_environment_names

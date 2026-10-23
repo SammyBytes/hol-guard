@@ -152,3 +152,69 @@ def test_a_shell_carrying_its_whole_script_is_bound_to_that_script() -> None:
 )
 def test_any_other_spelling_keeps_the_strict_request_binding(command: str) -> None:
     assert _canonical_command_from_native(command, _script_model("gh pr view 12")) is None
+
+
+def _simple_model(command: str, executable: str | None, environment_names: list[str]) -> dict:
+    tokens = command.split()
+    arguments = tokens[tokens.index(executable) + 1 :] if executable in tokens else []
+    path_overridden = "PATH" in environment_names
+    return {
+        "normalized_text": command,
+        "dialect": "posix",
+        "transport": "shell_string",
+        "extraction_provenance": "guard-shell",
+        "wrapper_chain": [],
+        "segments": [
+            {
+                "text": command,
+                "tokens": tokens,
+                "executable": executable,
+                "arguments": arguments,
+                "environment_names": environment_names,
+                "wrapper_chain": [],
+                "path_overridden": path_overridden,
+                "execution_context": "top:0",
+                "pipeline_index": 0,
+                "span": {"source": "normalized", "start": 0, "end": len(command)},
+            }
+        ],
+        "confidence": "exact",
+        "uncertainty_reason": None,
+        "path_overridden": path_overridden,
+        "parser_profile": "posix-simple-v1",
+    }
+
+
+@pytest.mark.parametrize(
+    ("command", "executable", "names"),
+    [
+        ("env MODE=dev agentbridge run app.tools", "agentbridge", ["MODE"]),
+        ("env PATH=/tmp/x bun run build", "bun", ["PATH"]),
+        ("FOO=1 /usr/bin/env BAR=2 npm test", "npm", ["FOO", "BAR"]),
+        ("env FOO=1 env BAR=2 exec ls", "ls", ["FOO", "BAR"]),
+    ],
+)
+def test_an_env_prefix_binds_to_the_program_behind_it(command: str, executable: str, names: list[str]) -> None:
+    canonical = _canonical_command_from_native(command, _simple_model(command, executable, names))
+    assert canonical is not None
+    assert canonical.segments[0].executable == executable
+    assert canonical.segments[0].environment_names == tuple(names)
+    assert canonical.path_overridden is ("PATH" in names)
+
+
+@pytest.mark.parametrize(
+    ("command", "executable", "names"),
+    [
+        # `env` takes `A-B=1` as one more assignment, so `curl` is not the program.
+        ("env FOO=1 A-B=1 curl https://example.test", "curl", ["FOO"]),
+        # An option or a bare `env` leaves `env` itself as the executable.
+        ("env -i FOO=1 npm test", "npm", ["FOO"]),
+        ("env npm test", "npm", []),
+        # A name the prefix sets is still reported.
+        ("env FOO=1 npm test", "npm", []),
+    ],
+)
+def test_an_env_spelling_the_parser_does_not_step_past_is_not_rebound(
+    command: str, executable: str, names: list[str]
+) -> None:
+    assert _canonical_command_from_native(command, _simple_model(command, executable, names)) is None
