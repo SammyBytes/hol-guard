@@ -104,7 +104,10 @@ fn two_scans_of_an_unchanged_machine_agree() {
     // unchanged machine looks like.
     let first = request(
         vec![
-            item("alpha", json!({"path": "/tmp/alpha", "observedAt": "08:00"})),
+            item(
+                "alpha",
+                json!({"path": "/tmp/alpha", "observedAt": "08:00"}),
+            ),
             item("beta", json!({"path": "/tmp/beta", "scanDurationMs": 12})),
         ],
         vec![finding("f-1"), finding("f-2")],
@@ -113,7 +116,10 @@ fn two_scans_of_an_unchanged_machine_agree() {
     let second = request(
         vec![
             item("beta", json!({"path": "/tmp/beta", "scanDurationMs": 4100})),
-            item("alpha", json!({"path": "/tmp/alpha", "observedAt": "09:30"})),
+            item(
+                "alpha",
+                json!({"path": "/tmp/alpha", "observedAt": "09:30"}),
+            ),
         ],
         vec![finding("f-2"), finding("f-1")],
         vec![source("s-2"), source("s-1")],
@@ -124,8 +130,16 @@ fn two_scans_of_an_unchanged_machine_agree() {
 
 #[test]
 fn a_changed_item_changes_the_digest() {
-    let before = request(vec![item("alpha", json!({"path": "/tmp/alpha"}))], vec![], vec![]);
-    let after = request(vec![item("alpha", json!({"path": "/tmp/moved"}))], vec![], vec![]);
+    let before = request(
+        vec![item("alpha", json!({"path": "/tmp/alpha"}))],
+        vec![],
+        vec![],
+    );
+    let after = request(
+        vec![item("alpha", json!({"path": "/tmp/moved"}))],
+        vec![],
+        vec![],
+    );
 
     assert_ne!(digest(&before), digest(&after));
 }
@@ -148,7 +162,10 @@ fn an_absent_dataclass_field_reads_as_its_default() {
     // `risk_level` defaults to `info`. A row that omits it and a row that
     // spells the default are the same inventory.
     let mut omitted = item("alpha", json!({}));
-    omitted.as_object_mut().expect("object").remove("risk_level");
+    omitted
+        .as_object_mut()
+        .expect("object")
+        .remove("risk_level");
     let mut spelled = item("alpha", json!({}));
     spelled["risk_level"] = json!("info");
 

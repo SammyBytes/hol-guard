@@ -135,9 +135,7 @@ fn text(row: &Value, key: &str) -> String {
 /// `None` and an absent key are the dataclass default; `""` stays `""`, and
 /// the digest shows the difference.
 fn optional_text(row: &Value, key: &str) -> Option<String> {
-    row.get(key)
-        .and_then(Value::as_str)
-        .map(ToOwned::to_owned)
+    row.get(key).and_then(Value::as_str).map(ToOwned::to_owned)
 }
 
 fn object(row: &Value, key: &str) -> Map<String, Value> {
