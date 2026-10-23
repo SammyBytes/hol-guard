@@ -433,33 +433,41 @@ pub(crate) const ARITHMETIC_VALUE: &str = "1";
 /// `cat` and `sh` in bash and zsh and is a syntax error in dash; either way it
 /// is not arithmetic. A nested substitution or a backtick inside the body runs
 /// a command of its own, so it is not read here.
+///
+/// The body is not scanned as ordinary shell text. The shell expands it as if
+/// it were double-quoted, so a `'` inside it quotes nothing: bash 5.2 runs the
+/// substitution in `echo $(( '$(echo SQ >&2)' 1 ))`. Tracking quotes here
+/// would hide that `$(` from the check below and hide a `)` from the depth
+/// count, so a quote, a backslash or a backtick anywhere in the body ends the
+/// read instead. Arithmetic needs none of them, and refusing them leaves the
+/// expansion unmodelled, which is where it was before it was read at all.
 pub(crate) fn arithmetic_close(chars: &[char], start: usize) -> Option<usize> {
     if chars.get(start + 1) != Some(&'(') || chars.get(start + 2) != Some(&'(') {
         return None;
     }
-    let (mut single, mut double, mut escaped) = (false, false, false);
     let mut depth = 1usize;
     for (index, &character) in chars.iter().enumerate().skip(start + 3) {
-        if single {
-            single = character != '\'';
-        } else if escaped {
-            escaped = false;
-        } else {
-            match character {
-                '\\' => escaped = true,
-                '\'' if !double => single = true,
-                '"' => double = !double,
-                '`' => return None,
-                '$' if chars.get(index + 1) == Some(&'(') => return None,
-                '(' if !double => depth += 1,
-                ')' if !double => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return (chars.get(index + 1) == Some(&')')).then_some(index + 1);
-                    }
-                }
-                _ => {}
+        match character {
+            '\\' | '\'' | '"' | '`' => return None,
+            // `$(cmd)`, and the ksh `${ cmd; }` and `${| cmd; }` forms, each
+            // run a command inside what would otherwise read as a number.
+            // `${name}` is an ordinary parameter and stays.
+            '$' if chars.get(index + 1) == Some(&'(') => return None,
+            '$' if chars.get(index + 1) == Some(&'{')
+                && chars
+                    .get(index + 2)
+                    .is_some_and(|next| next.is_whitespace() || *next == '|') =>
+            {
+                return None;
             }
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return (chars.get(index + 1) == Some(&')')).then_some(index + 1);
+                }
+            }
+            _ => {}
         }
     }
     None
