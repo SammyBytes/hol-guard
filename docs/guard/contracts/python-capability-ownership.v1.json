@@ -2105,6 +2105,21 @@
    "native_replacements": [
     "rust/crates/guard-runtime/src/extension_control_authority_op/installed_upgrade.rs"
    ]
+  },
+  {
+   "path": "src/codex_plugin_scanner/guard/aibom_reporting.py",
+   "source_sha256": "88d426855b8267a9187850afc9e9a3959e267e720d7ece04cf3285a080759f54",
+   "forbidden_symbols": [
+    "average_score",
+    "coverage_percent",
+    "covered",
+    "eligible",
+    "low_trust",
+    "scores"
+   ],
+   "native_replacements": [
+    "rust/crates/guard-runtime/src/aibom_report_summaries_op.rs"
+   ]
   }
  ]
 }
