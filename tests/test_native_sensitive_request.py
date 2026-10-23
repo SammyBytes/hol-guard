@@ -194,14 +194,14 @@ def test_tool_action_reply_keeps_embedded_command_text(monkeypatch: pytest.Monke
     assert "secret\n" in texts
 
 
-def test_command_list_outage_blocks_the_post_tool_artifact(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from codex_plugin_scanner.guard.cli import commands_support_codex_commands as codex
+def test_post_tool_review_outage_blocks_the_post_tool_artifact(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from codex_plugin_scanner.guard.cli import commands_support_runtime_artifacts as artifacts
+    from codex_plugin_scanner.guard.native_codex_tool_output import ToolOutputAnswer
 
-    def down(*_args: object, **_kwargs: object) -> tuple[str, ...]:
-        raise client.NativeSensitiveRequestError("native_sensitive_request_unavailable")
+    def down(*_args: object, **_kwargs: object) -> ToolOutputAnswer:
+        return ToolOutputAnswer(False, None, "native_codex_tool_output_unavailable")
 
-    monkeypatch.setattr(codex, "command_list_candidate_texts", down)
+    monkeypatch.setattr(artifacts, "codex_tool_output_native", down)
     result = artifacts._hook_runtime_artifact(
         harness="codex",
         payload={
