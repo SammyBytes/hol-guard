@@ -9,13 +9,14 @@ the digests are; this module only moves the inputs and reads the record back.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from . import native_execution
-from .native_context import _canonical_request_sha256, _resolve_digest_home, ensure_resident_prerequisite
+from .native_context import _resolve_digest_home, ensure_resident_prerequisite
 from .native_runtime import native_runtime_status
 from .native_runtime_resilience import native_record_resident_failure, native_record_resident_success
 
@@ -26,11 +27,14 @@ _FEATURE = "retry-lineage-capture-v1"
 _REQUEST_SCHEMA = "guard-retry-lineage-capture-request.v1"
 _RESULT_SCHEMA = "guard-retry-lineage-capture-result.v1"
 _RESULT_KEYS = frozenset({"schema", "request_id", "request_sha256", "status", "code", "lineage"})
-# The resident accepts a canonical request up to 4 MiB; leave the envelope room
-# for framing without passing what the transport will frame.
+# The resident refuses a canonical request over 4 MiB, so a larger one is
+# refused here instead of costing resident health.
+_MAX_REQUEST_BYTES = 4 * 1024 * 1024
+# The ASCII-escaped wire is the canonical request plus framing.
 _MAX_WIRE_BYTES = 6 * 1024 * 1024 - 64 * 1024
-# Lineage rides on a hook that is already asking; it must not hold that hook up.
-_TIMEOUT_SECONDS = 2.0
+# Lineage rides on a hook that is already asking; it must not hold that hook
+# up. A healthy resident answers in milliseconds.
+_TIMEOUT_SECONDS = 0.75
 # One past the longest identifier the resident accepts, so a longer string
 # keeps being refused without its whole body crossing the wire.
 _MAX_SCALAR_CHARS = 257
@@ -61,14 +65,21 @@ def capture_retry_lineage(
         "action_envelope": dict(action_envelope) if action_envelope is not None else None,
     }
     try:
-        # A lone surrogate survives the ASCII-escaped transport but not the
-        # resident's decoder; refuse it here instead of as a resident failure.
-        json.dumps(wire["action_envelope"], ensure_ascii=False).encode("utf-8")
+        # A lone surrogate (an envelope value, or a workspace path decoded
+        # with surrogateescape) survives the ASCII-escaped transport but not
+        # the resident's decoder; refuse it here instead of as a resident failure.
+        json.dumps(wire, ensure_ascii=False).encode("utf-8")
+        # The same canonical bytes the resident digests and bounds.
+        canonical = json.dumps(wire, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode(
+            "utf-8"
+        )
+        if len(canonical) > _MAX_REQUEST_BYTES:
+            return None
         home = _resolve_digest_home(guard_home)
         if not ensure_resident_prerequisite(home):
             return None
         # The resident answers with the prefixed token, so bind against the same form.
-        request_sha256 = "sha256:" + _canonical_request_sha256(wire)
+        request_sha256 = "sha256:" + hashlib.sha256(canonical).hexdigest()
         # Resolved once: the transport and the health record below must name
         # the same binary, and the lookup walks the runtime on disk.
         status = native_runtime_status()

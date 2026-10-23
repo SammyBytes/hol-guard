@@ -132,6 +132,39 @@ def test_an_untransportable_envelope_never_reaches_the_resident(
     assert recorded == []
 
 
+def test_an_untransportable_workspace_never_reaches_the_resident(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    recorded, sent = _install(monkeypatch)
+
+    lineage = native_retry_lineage.capture_retry_lineage(
+        {"session_id": "s"}, harness="pi", workspace="/w/bad-\udcff", guard_home=tmp_path
+    )
+
+    assert lineage is None
+    assert sent == []
+    assert recorded == []
+
+
+def test_a_request_over_the_resident_budget_is_refused_locally(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    recorded, sent = _install(monkeypatch)
+    envelope = {"content": "x" * (4 * 1024 * 1024)}
+
+    lineage = native_retry_lineage.capture_retry_lineage(
+        {"session_id": "s"}, harness="pi", action_envelope=envelope, guard_home=tmp_path
+    )
+
+    assert lineage is None
+    assert sent == []
+    assert recorded == []
+    # Just under the budget still crosses.
+    envelope = {"content": "x" * (4 * 1024 * 1024 - 1024)}
+    assert (
+        native_retry_lineage.capture_retry_lineage(
+            {"session_id": "s"}, harness="pi", action_envelope=envelope, guard_home=tmp_path
+        )
+        == _LINEAGE
+    )
+
+
 def test_an_unavailable_resident_drops_the_lineage(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     recorded, sent = _install(monkeypatch)
     monkeypatch.setattr(native_retry_lineage, "ensure_resident_prerequisite", lambda _home: False)
