@@ -9,9 +9,12 @@
 //! have we seen its replay identity before. Only once all of that holds does
 //! it load the public key.
 //!
-//! This module is that middle stretch. It hands back the canonical bytes the
-//! signature covers and the replay identity the caller records, so the signing
-//! half stays where the keys are. Every refusal carries Python's wording.
+//! This module is that stretch, up to but not including the key. It validates
+//! the payload under the envelope's signing time first, exactly as Python does,
+//! so no caller can reach the hash checks with a payload the rules would have
+//! refused. It hands back the canonical bytes the signature covers and the
+//! replay identity the caller records, so the signing half stays where the keys
+//! are. Every refusal carries Python's wording.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,8 +22,9 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::attestation_envelope::{
-    normalize_pem, public_key_fingerprint, TrustAttestationEnvelope,
+    normalize_pem, payload_with_signed_at, public_key_fingerprint, TrustAttestationEnvelope,
 };
+use crate::attestation_payload::{validate_attestation_payload, AttestationPayloadRules};
 use crate::attestation_timestamp::{parse_attestation_timestamp, AttestationInstant};
 use crate::evidence_hash::canonical_guard_evidence_payload;
 use crate::trust_claim::{trust_attestation_replay_key, trust_claim_hash};
@@ -127,9 +131,12 @@ fn key_is_trusted(
 
 /// Run every check a verifier makes before it loads the signing key.
 ///
-/// `payload` is the payload `validate_attestation_payload` already accepted
-/// under a verifier's rules. `trusted_keys` of `None` is Python's "any key the
-/// envelope ships", which only a caller that trusts the transport should pass.
+/// `payload` is the payload as it arrived. The envelope's signing time replaces
+/// whatever it carries and the result is validated under
+/// `AttestationPayloadRules::SIGNED`, exactly as Python does, because every
+/// later check reads the validated copy. `trusted_keys` of `None` is Python's
+/// "any key the envelope ships", which only a caller that trusts the transport
+/// should pass.
 ///
 /// # Errors
 ///
@@ -147,6 +154,12 @@ pub fn trust_attestation_under_signature(
     trusted_keys: Option<&[TrustAttestationVerificationKey]>,
     policy: &TrustAttestationVerificationPolicy,
 ) -> Result<TrustAttestationUnderSignature, AttestationVerificationError> {
+    let payload = &validate_attestation_payload(
+        &payload_with_signed_at(payload, envelope),
+        AttestationPayloadRules::SIGNED,
+    )
+    .map_err(|error| AttestationVerificationError(error.message().to_owned()))?;
+
     if let Some(claim) = claim {
         let require_layer_identity =
             payload.get("scope").and_then(Value::as_str) == Some("trust_layer");

@@ -7,7 +7,10 @@
 
 use std::collections::BTreeSet;
 
-use guard_command::attestation_envelope::validated_trust_attestation_envelope;
+use guard_command::attestation_envelope::{
+    payload_with_signed_at, validated_trust_attestation_envelope,
+};
+use guard_command::attestation_payload::{validate_attestation_payload, AttestationPayloadRules};
 use guard_command::attestation_verification::{
     trust_attestation_under_signature, TrustAttestationVerificationKey,
     TrustAttestationVerificationPolicy,
@@ -153,12 +156,47 @@ fn the_canonical_payload_a_verifier_hands_on_is_what_the_envelope_hashed() {
             &policy,
         )
         .unwrap_or_else(|refusal| panic!("{name}: {refusal}"));
+        // The bytes cover the payload the verifier read, which is the one the
+        // envelope's signing time and the payload rules produced — not the one
+        // the attestation happened to arrive carrying.
+        let read = validate_attestation_payload(
+            &payload_with_signed_at(payload, &envelope),
+            AttestationPayloadRules::SIGNED,
+        )
+        .unwrap_or_else(|refusal| panic!("{name}: {refusal}"));
         assert_eq!(
-            guard_command::evidence_hash::canonical_guard_evidence_payload(payload),
+            guard_command::evidence_hash::canonical_guard_evidence_payload(&read),
             verified.canonical_payload,
             "{name}"
         );
         checked += 1;
     }
     assert!(checked >= 8, "no accepted case carried canonical bytes");
+}
+
+#[test]
+fn the_fixture_keeps_an_envelope_that_overrides_the_payloads_signing_time() {
+    // The twin of the Python guard: a fixture whose envelopes always agreed
+    // with their payloads could not tell a verifier reading the right time
+    // from one reading the payload's own.
+    let overridden: Vec<Value> = cases()
+        .into_iter()
+        .filter(|case| {
+            case.get("envelope")
+                .and_then(|envelope| envelope.get("signedAt"))
+                != case
+                    .get("payload")
+                    .and_then(|payload| payload.get("signedAt"))
+        })
+        .collect();
+    assert!(
+        !overridden.is_empty(),
+        "no case records an envelope that moves the signing time"
+    );
+    assert!(
+        overridden
+            .iter()
+            .any(|case| matches!(case.get("replay_key"), Some(Value::String(_)))),
+        "no accepted case records an envelope that moves the signing time"
+    );
 }
