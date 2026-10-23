@@ -44,6 +44,7 @@ mod inert_environment;
 pub(crate) mod kubectl_reads;
 mod loopback_ports;
 pub(crate) mod port_probes;
+pub(crate) mod rsync_local;
 mod workspace_contained;
 /// The package firewall's extensions, whose permission marks which
 /// ecosystem's manager ran rather than a risk the run carries.
@@ -65,7 +66,9 @@ mod bun_eval;
 mod chain_temporary;
 mod clone_siblings;
 mod compound_reason;
+mod control_flow_flatten;
 mod fanout_reads;
+mod filter_pattern_text;
 mod find_reads;
 mod for_loop_unroll;
 pub(crate) mod git_apply_check;
@@ -85,6 +88,7 @@ mod git_reads;
 mod git_ref_listings;
 mod git_rev_list;
 mod git_search_text;
+pub(crate) mod git_side_record_reads;
 pub(crate) mod git_stash_reads;
 pub(crate) mod git_tag_listing;
 mod repo_create_reason;
@@ -150,6 +154,7 @@ mod search_scope_filter;
 mod search_scope_glob;
 mod search_scope_ignore;
 mod search_scope_tracked;
+mod search_scope_walk;
 mod secret_aliases;
 pub(crate) mod sed_edits;
 mod segment_proof;
@@ -157,6 +162,7 @@ mod shell_script;
 mod stderr_merge;
 mod stdin_filters;
 mod symlink_writes;
+mod tree_reads;
 mod version_probes;
 #[cfg(test)]
 #[path = "workspace_contained_runner_tests.rs"]
@@ -188,7 +194,7 @@ pub use safe_scalar::PsqlEnvironment;
 #[cfg_attr(not(unix), allow(unused_imports))]
 pub(crate) use script_content::launch_loopback_ports;
 pub(crate) use script_content::{
-    activation_script_text, sole_program_sources, sole_sourcing_sources, sourced_program_sources,
+    activation_script_text, sole_program_sources, sourced_program_sources, sourcing_bounded_sources,
 };
 pub(crate) use segment_proof::{benign_command_segments, without_stderr_merge};
 pub(crate) use worktree_add::new_checkout_route;
@@ -769,11 +775,15 @@ pub(super) fn evaluate_pre_tool_with_execution_context(
     if request.dialect != "posix" || decision.minimum_action != "review" {
         return Ok(decision);
     }
-    // A loop over literal words is its unrolled command list. The unrolled
-    // form goes through the same proofs and replaces the loop's decision: an
-    // allow there admits the loop, a block is never softened, and a review
-    // carries the unrolled model so later layers judge modeled commands.
-    let Some(unrolled) = for_loop_unroll::unroll(&request.command) else {
+    // A loop over literal words is its unrolled command list, and a
+    // conditional or a `while` loop is the lists written inside it. Either
+    // rewrite goes through the same proofs and replaces the construct's
+    // decision: an allow there admits the construct, a block is never
+    // softened, and a review carries the rewritten model so later layers
+    // judge modeled commands.
+    let Some(unrolled) = for_loop_unroll::unroll(&request.command)
+        .or_else(|| control_flow_flatten::flatten(&request.command))
+    else {
         return Ok(ungrouped_decision(
             request,
             decision,
@@ -1132,6 +1142,9 @@ fn evaluate_single_command(
     ))
 }
 
+#[cfg(test)]
+#[path = "control_flow_tests.rs"]
+mod control_flow_tests;
 #[cfg(test)]
 #[path = "for_loop_tests.rs"]
 mod for_loop_tests;
