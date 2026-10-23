@@ -121,14 +121,17 @@ pub(crate) fn evaluate_request(request: &InventorySourceEvidenceRequestV1) -> Va
 ///
 /// Only an overlay has one: it is the artifact kind whose config path is the
 /// instruction document itself. The path is read as written, the way the
-/// discovery walk reads it, so a role never depends on where the scan ran.
+/// discovery walk reads it, so a role never depends on where the scan ran:
+/// `configured_path` is what the harness configured, and the caller sends it
+/// whenever it had to anchor a relative path to reach the filesystem.
 fn overlay_instruction_role(entry: &InventorySourceEvidenceEntryV1) -> Option<&'static str> {
     if item_kind(&entry.artifact_type) != "overlay" {
         return None;
     }
     let config_path = entry
-        .config_path
+        .configured_path
         .as_deref()
+        .or(entry.config_path.as_deref())
         .filter(|value| !value.is_empty())?;
     instruction_role_for_path(&py_path(config_path))
 }

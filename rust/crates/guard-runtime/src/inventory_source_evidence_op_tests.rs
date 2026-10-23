@@ -398,6 +398,51 @@ fn leaves_the_instruction_role_unanswered_when_the_path_names_none() {
 }
 
 #[test]
+fn reads_the_role_from_the_path_the_harness_configured() {
+    // The caller anchors a relative config path so the resident has something
+    // to resolve, and the directory it anchors to is wherever the scan ran.
+    // The role has to keep reading the configured path: `notes.md` names no
+    // role, however many role-shaped components the working directory has.
+    let wire = |config_path: &str, configured_path: &str| {
+        json!({
+            "schema": INVENTORY_SOURCE_EVIDENCE_REQUEST_SCHEMA,
+            "request_id": "",
+            "home_dir": "/home/example",
+            "include_symlinks": false,
+            "follow_unsafe_symlinks": false,
+            "entries": [{
+                "harness": "claude",
+                "artifact_type": "instruction",
+                "config_path": config_path,
+                "configured_path": configured_path,
+            }],
+        })
+    };
+    assert_eq!(
+        evidence(&wire(
+            "/home/example/code/docs/security/notes.md",
+            "notes.md"
+        ))[0]["instruction_role"],
+        Value::Null
+    );
+    assert_eq!(
+        evidence(&wire(
+            "/home/example/code/.cursor/rules/notes.md",
+            "notes.md"
+        ))[0]["instruction_role"],
+        Value::Null
+    );
+    // A configured path that does name a role keeps it, anchored or not.
+    assert_eq!(
+        evidence(&wire(
+            "/home/example/code/docs/security/policy.md",
+            "docs/security/policy.md"
+        ))[0]["instruction_role"],
+        json!("security_md")
+    );
+}
+
+#[test]
 fn reads_no_instruction_role_for_an_artifact_that_is_not_an_overlay() {
     // A skill's config path can be a Markdown document too. The role names
     // what an instruction overlay is, so a skill never carries one however

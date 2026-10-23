@@ -111,6 +111,35 @@ def test_relative_paths_are_anchored_to_the_callers_directory(monkeypatch: pytes
     ]
 
 
+def test_an_anchored_path_also_carries_the_one_the_harness_wrote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The instruction role reads the configured path, not the directory we ran in."""
+
+    sent = _resident(monkeypatch, lambda request: {"evidence": [{}, {}]})
+    monkeypatch.setattr(
+        bridge.Path, "cwd", classmethod(lambda _cls: Path("/run/from/docs/security"))
+    )
+    bridge.native_inventory_source_evidence(
+        [
+            {"harness": "codex", "artifact_type": "instruction", "config_path": "notes.md"},
+            {
+                "harness": "codex",
+                "artifact_type": "instruction",
+                "config_path": "/w/notes.md",
+            },
+        ],
+        home_dir=Path("/h"),
+    )
+    (wire,) = sent
+    relative, absolute = wire["entries"]
+    assert relative["config_path"] == "/run/from/docs/security/notes.md"
+    assert relative["configured_path"] == "notes.md"
+    # An absolute path is already what the harness wrote, so the request keeps
+    # the shape every caller sends today and its digest with it.
+    assert "configured_path" not in absolute
+
+
 def test_a_bigger_batch_is_given_a_longer_deadline() -> None:
     """A fixed deadline would fail an inventory purely for being big."""
 

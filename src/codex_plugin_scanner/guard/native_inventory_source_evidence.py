@@ -175,7 +175,18 @@ def _entry_wire(entry: Mapping[str, object], cwd: Path) -> dict[str, object]:
     }
     config_path = entry.get("config_path")
     if isinstance(config_path, str) and config_path:
-        wire["config_path"] = _absolute(config_path, cwd)
+        anchored = _absolute(config_path, cwd)
+        wire["config_path"] = anchored
+        # The instruction role is a reading of the path a harness configured,
+        # so the resident needs that path as well whenever anchoring changed
+        # it: a relative `notes.md` names no role, but the working directory
+        # this scan happens to run in can carry `docs/security` or
+        # `.cursor/rules` and hand the anchored path a role the configured one
+        # never had. An absolute path is already what the harness wrote, so
+        # nothing is sent for it and the request keeps the shape every caller
+        # has today.
+        if anchored != config_path:
+            wire["configured_path"] = config_path
     return wire
 
 

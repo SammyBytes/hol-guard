@@ -74,6 +74,19 @@ pub struct InventorySourceEvidenceEntryV1 {
     /// answer, with both readings absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_path: Option<String>,
+    /// The same path as the harness wrote it, when the caller had to anchor a
+    /// relative one to reach the filesystem.
+    ///
+    /// Only the instruction role reads it. A role is a reading of the path a
+    /// harness configured, so a relative `notes.md` names no role wherever the
+    /// scan happens to run; classifying the anchored path instead would let
+    /// the working directory's own components - a scan started inside
+    /// `docs/security`, or `.cursor/rules` - hand that role to a document
+    /// whose configured path never named it. The two readings that walk the
+    /// filesystem keep using `config_path`, which is the only one that
+    /// resolves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configured_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
