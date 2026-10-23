@@ -4756,9 +4756,14 @@ function LocalCliDetail(props) {
   const setupMatch = props.setupLink ? connectorSetupMatch(props.item, props.setupLink) : null;
   const openPending = reactExports.useCallback(async (state, fromSetupLink = false) => {
     setFreshTotpRequired(false);
+    const started = previousItem.current;
     await refreshApprovalGate();
+    if (catalogRevisionChanged(started, previousItem.current)) {
+      setError("The tool list changed. Review the current tools again.");
+      return;
+    }
     setRecommended(fromSetupLink);
-    reviewedRevision.current = previousItem.current.mcp_catalog?.revision ?? null;
+    reviewedRevision.current = started.mcp_catalog?.revision ?? null;
     setPending(state);
   }, [refreshApprovalGate]);
   const requestRecommended = reactExports.useCallback(() => {
