@@ -335,10 +335,13 @@ earns, and the edits that bind a skill's document evidence or drop a directory
 hash nothing proved. The answer is edits — the keys to remove and the pairs to
 write — rather than a rebuilt map, so the caller keeps its own insertion order
 and an exported snapshot does not churn. The kind rides back from
-`inventory-source-evidence-v1`, the first question asked about an artifact,
-because the caller needs it to enrich metadata before it can ask anything else;
-a client built before that change may still send its own and the resident
-ignores it. Python computed all of this; the copies are gone, the ownership
+`inventory-source-evidence-v2`, the first question asked about an artifact,
+because the caller needs it to enrich metadata before it can ask anything else.
+The version marks the entry shape: a v2 client sends no kind of its own, and a
+v1 resident refuses an entry that leaves the field out, so the client asks for
+v2 and treats a resident that only advertises v1 as unavailable. The runtime
+keeps advertising v1 as well, because a client built before the change still
+sends its own kind and the resident ignores it. Python computed all of this; the copies are gone, the ownership
 contract names the symbols so they cannot return, and
 `scripts/ci/inventory_item_metadata_reference.py` keeps the retired CPython only
 to regenerate the parity corpus the port is pinned to.

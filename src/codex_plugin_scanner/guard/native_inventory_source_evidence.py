@@ -24,7 +24,10 @@ from .native_context import _resolve_digest_home, ensure_resident_prerequisite
 from .native_execution import _resident_request
 from .native_store_policy import _payload
 
-INVENTORY_SOURCE_EVIDENCE_FEATURE = "inventory-source-evidence-v1"
+# v2 is the resident that derives an artifact's item kind. This client sends
+# no kind of its own, so a v1 resident would refuse every entry: asking for
+# v2 turns that into plain unavailability instead of a lost answer.
+INVENTORY_SOURCE_EVIDENCE_FEATURE = "inventory-source-evidence-v2"
 _REQUEST_SCHEMA = "guard-inventory-source-evidence-request.v1"
 _RESULT_SCHEMA = "guard-inventory-source-evidence-result.v1"
 # The deadline covers a whole batch, and a batch is as large as the contract

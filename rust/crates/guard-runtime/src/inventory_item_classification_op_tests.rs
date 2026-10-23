@@ -265,3 +265,9 @@ fn an_answered_request_carries_one_item_per_entry() {
     let payload = result.payload.expect("payload");
     assert_eq!(payload["items"].as_array().expect("items").len(), 2);
 }
+
+#[test]
+fn the_feature_is_advertised() {
+    assert!(crate::resident_op_features::RESIDENT_OP_FEATURES
+        .contains(&guard_contracts::INVENTORY_ITEM_CLASSIFICATION_FEATURE));
+}
