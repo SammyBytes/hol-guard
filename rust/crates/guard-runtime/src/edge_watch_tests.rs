@@ -47,3 +47,42 @@ fn harness_watch_releases_output_review_but_keeps_credentials_hidden() {
     assert_eq!(credential["result"]["reason_code"], "output_secret_match");
     assert_eq!(credential["harness_response"]["decision"], "deny");
 }
+
+#[test]
+fn harness_watch_keeps_truncated_output_with_a_credential_hidden() {
+    use crate::policy_enforcement::tests::{policy, snapshot};
+    // `guard_rules::MAX_OUTPUT_CHARS`: past it the scanner reviews only an excerpt.
+    const MAX_OUTPUT_CHARS: usize = 5 * 1024 * 1024;
+    let token = format!("{}{}", ["gh", "p_"].concat(), "d".repeat(30));
+    let request = NativeHookRequestV1 {
+        protocol_version: NATIVE_PROTOCOL_VERSION,
+        request_id: Some("edge-watch-test".to_owned()),
+        harness: "omp".to_owned(),
+        event_name: "PostToolUse".to_owned(),
+        payload: serde_json::json!({
+            "tool_name": "bash",
+            "tool_input": {"command": "cat config"},
+            "tool_response": format!("{token}{}", "x".repeat(MAX_OUTPUT_CHARS)),
+        }),
+        cwd: Some("/workspace".to_owned()),
+        home_dir: "/home/test".to_owned(),
+        guard_home: "/tmp/hol-guard-edge-watch-test".to_owned(),
+        source_ref_external_allowed: false,
+        observe_mode: false,
+        deadline_budget_ms: Some(5_000),
+    };
+    let native = review_post_tool(&request);
+    assert_eq!(native.reason_code, "output_too_large");
+    let watched = crate::policy_enforcement::apply_post_tool_policy_with_delivery(
+        &AdmittedPolicySnapshot::new(snapshot(policy("allow"))).unwrap(),
+        &request,
+        GuardHookPayloadKindV2::Inline,
+        native,
+        None,
+        true,
+    )
+    .unwrap();
+    assert_eq!(watched.decision, "deny");
+    assert_eq!(watched.reason_code, "output_too_large");
+    assert_ne!(watched.model_output_action, "allow_original");
+}
