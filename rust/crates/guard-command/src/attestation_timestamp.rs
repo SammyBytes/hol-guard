@@ -292,11 +292,11 @@ fn parse_hh_mm_ss_ff(tstr: &[u8]) -> Option<[u32; 4]> {
     let mut comps = [0u32; 4];
     let mut pos = 0usize;
     let mut has_sep = false;
-    for comp in 0..3 {
+    for (comp, slot) in comps.iter_mut().enumerate().take(3) {
         if len.checked_sub(pos)? < 2 {
             return None;
         }
-        comps[comp] = digits(tstr, pos, 2)?;
+        *slot = digits(tstr, pos, 2)?;
         pos += 2;
         let next = tstr.get(pos).copied();
         if comp == 0 {

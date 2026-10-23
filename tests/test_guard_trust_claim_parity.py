@@ -47,6 +47,13 @@ def _epoch_microseconds(moment: datetime) -> int:
 
 @pytest.mark.parametrize("case", _section("timestamps"), ids=lambda case: case["input"])
 def test_recorded_timestamps_parse_to_their_recorded_instant(case: dict[str, object]) -> None:
+    if case.get("cpythonVersionDependent"):
+        # ``datetime.fromisoformat`` disagrees with itself across the
+        # interpreters this project supports: 3.14 reads ``24:00`` as the
+        # next midnight and refuses a fraction on the minute, while 3.12
+        # does the opposite. The Rust port pins 3.14, so the fixture holds
+        # that answer and only the Rust side replays these spellings.
+        pytest.skip("CPython disagrees with itself about this spelling")
     if case.get("pythonRaisesOverflow"):
         # Shifting this to UTC leaves ``datetime``'s own range. Python raises
         # where the Rust port returns nothing; neither names a claim.

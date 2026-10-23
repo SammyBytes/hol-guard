@@ -55,7 +55,8 @@
     },
     {
       "input": "2026-10-23T24:00:00Z",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:01Z",
@@ -71,7 +72,8 @@
     },
     {
       "input": "2026-10-23T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T1 :00Z",
@@ -135,7 +137,8 @@
     },
     {
       "input": "20261023T24:00:00Z",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "20261023T24:00:01Z",
@@ -151,7 +154,8 @@
     },
     {
       "input": "20261023T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "20261023T1 :00Z",
@@ -215,7 +219,8 @@
     },
     {
       "input": "2026-W43-5T24:00:00Z",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-W43-5T24:00:01Z",
@@ -231,7 +236,8 @@
     },
     {
       "input": "2026-W43-5T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-W43-5T1 :00Z",
@@ -295,7 +301,8 @@
     },
     {
       "input": "2026W435T24:00:00Z",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026W435T24:00:01Z",
@@ -311,7 +318,8 @@
     },
     {
       "input": "2026W435T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026W435T1 :00Z",
@@ -375,7 +383,8 @@
     },
     {
       "input": "2026-W43T24:00:00Z",
-      "epochMicroseconds": 1792454400000000
+      "epochMicroseconds": 1792454400000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-W43T24:00:01Z",
@@ -391,7 +400,8 @@
     },
     {
       "input": "2026-W43T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-W43T1 :00Z",
@@ -455,7 +465,8 @@
     },
     {
       "input": "2026W43T24:00:00Z",
-      "epochMicroseconds": 1792454400000000
+      "epochMicroseconds": 1792454400000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026W43T24:00:01Z",
@@ -471,7 +482,8 @@
     },
     {
       "input": "2026W43T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026W43T1 :00Z",
@@ -615,7 +627,8 @@
     },
     {
       "input": "2024-02-29T24:00:00Z",
-      "epochMicroseconds": 1709251200000000
+      "epochMicroseconds": 1709251200000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2024-02-29T24:00:01Z",
@@ -631,7 +644,8 @@
     },
     {
       "input": "2024-02-29T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2024-02-29T1 :00Z",
@@ -855,7 +869,8 @@
     },
     {
       "input": "2026-10-00T24:00:00Z",
-      "epochMicroseconds": 1790812800000000
+      "epochMicroseconds": 1790812800000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-00T24:00:01Z",
@@ -1015,7 +1030,8 @@
     },
     {
       "input": "0001-01-01T24:00:00Z",
-      "epochMicroseconds": -62135510400000000
+      "epochMicroseconds": -62135510400000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "0001-01-01T24:00:01Z",
@@ -1031,7 +1047,8 @@
     },
     {
       "input": "0001-01-01T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "0001-01-01T1 :00Z",
@@ -1111,7 +1128,8 @@
     },
     {
       "input": "9999-12-31T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "9999-12-31T1 :00Z",
@@ -1495,7 +1513,8 @@
     },
     {
       "input": "2026-W53-1T24:00:00Z",
-      "epochMicroseconds": 1798502400000000
+      "epochMicroseconds": 1798502400000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-W53-1T24:00:01Z",
@@ -1511,7 +1530,8 @@
     },
     {
       "input": "2026-W53-1T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-W53-1T1 :00Z",
@@ -1575,7 +1595,8 @@
     },
     {
       "input": "2020-W53-1T24:00:00Z",
-      "epochMicroseconds": 1609200000000000
+      "epochMicroseconds": 1609200000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2020-W53-1T24:00:01Z",
@@ -1591,7 +1612,8 @@
     },
     {
       "input": "2020-W53-1T12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2020-W53-1T1 :00Z",
@@ -3583,15 +3605,18 @@
     },
     {
       "input": "2026-10-23 24:00:00Z",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00z",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00z",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00",
@@ -3603,67 +3628,83 @@
     },
     {
       "input": "2026-10-23T24:00:00+00:00",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00+00:00",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00-00:00",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00-00:00",
-      "epochMicroseconds": 1792800000000000
+      "epochMicroseconds": 1792800000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00+05",
-      "epochMicroseconds": 1792782000000000
+      "epochMicroseconds": 1792782000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00+05",
-      "epochMicroseconds": 1792782000000000
+      "epochMicroseconds": 1792782000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00-05",
-      "epochMicroseconds": 1792818000000000
+      "epochMicroseconds": 1792818000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00-05",
-      "epochMicroseconds": 1792818000000000
+      "epochMicroseconds": 1792818000000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00+0530",
-      "epochMicroseconds": 1792780200000000
+      "epochMicroseconds": 1792780200000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00+0530",
-      "epochMicroseconds": 1792780200000000
+      "epochMicroseconds": 1792780200000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00-05:30",
-      "epochMicroseconds": 1792819800000000
+      "epochMicroseconds": 1792819800000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00-05:30",
-      "epochMicroseconds": 1792819800000000
+      "epochMicroseconds": 1792819800000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00+05:30:15",
-      "epochMicroseconds": 1792780185000000
+      "epochMicroseconds": 1792780185000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00+05:30:15",
-      "epochMicroseconds": 1792780185000000
+      "epochMicroseconds": 1792780185000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00+05:30:15.500000",
-      "epochMicroseconds": 1792780184500000
+      "epochMicroseconds": 1792780184500000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00+05:30:15.500000",
-      "epochMicroseconds": 1792780184500000
+      "epochMicroseconds": 1792780184500000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00+24:00",
@@ -3683,11 +3724,13 @@
     },
     {
       "input": "2026-10-23T24:00:00+23:59",
-      "epochMicroseconds": 1792713660000000
+      "epochMicroseconds": 1792713660000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 24:00:00+23:59",
-      "epochMicroseconds": 1792713660000000
+      "epochMicroseconds": 1792713660000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T24:00:00+5:30",
@@ -4143,15 +4186,18 @@
     },
     {
       "input": "2026-10-23 12:00.5Z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5z",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5",
@@ -4163,67 +4209,83 @@
     },
     {
       "input": "2026-10-23T12:00.5+00:00",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5+00:00",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5-00:00",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5-00:00",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5+05",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5+05",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5-05",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5-05",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5+0530",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5+0530",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5-05:30",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5-05:30",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5+05:30:15",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5+05:30:15",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5+05:30:15.500000",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5+05:30:15.500000",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5+24:00",
@@ -4243,11 +4305,13 @@
     },
     {
       "input": "2026-10-23T12:00.5+23:59",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23 12:00.5+23:59",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00.5+5:30",
@@ -6084,7 +6148,8 @@
     },
     {
       "input": "2026-10-23T12:00:00+00:00.500000",
-      "epochMicroseconds": null
+      "epochMicroseconds": null,
+      "cpythonVersionDependent": true
     },
     {
       "input": "1970-01-01T00:00:00Z",
@@ -6109,15 +6174,18 @@
     },
     {
       "input": "2026-12-31T24:00:00Z",
-      "epochMicroseconds": 1798761600000000
+      "epochMicroseconds": 1798761600000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-02-28T24:00:00Z",
-      "epochMicroseconds": 1772323200000000
+      "epochMicroseconds": 1772323200000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2024-02-28T24:00:00Z",
-      "epochMicroseconds": 1709164800000000
+      "epochMicroseconds": 1709164800000000,
+      "cpythonVersionDependent": true
     },
     {
       "input": "2026-10-23T12:00:00-23:59:59.999999",

@@ -27,6 +27,7 @@ fn recorded_timestamps_parse_to_their_recorded_instant() {
     let cases = vectors["timestamps"].as_array().expect("timestamps array");
     assert!(cases.len() >= 500, "the fixture records too few timestamps");
     let mut accepted = 0usize;
+    let mut version_dependent = 0usize;
     for case in cases {
         let input = case["input"].as_str().expect("input");
         let expected = case["epochMicroseconds"].as_i64();
@@ -38,8 +39,17 @@ fn recorded_timestamps_parse_to_their_recorded_instant() {
             "{input:?} parsed differently"
         );
         accepted += usize::from(expected.is_some());
+        version_dependent +=
+            usize::from(case["cpythonVersionDependent"].as_bool().unwrap_or(false));
     }
     assert!(accepted >= 400, "the fixture records too few instants");
+    // These spellings are the ones `datetime.fromisoformat` reads differently
+    // depending on the interpreter, so the Python twin skips them and this
+    // side is the only one holding the port to an answer.
+    assert!(
+        version_dependent >= 60,
+        "the fixture stopped recording the spellings CPython disagrees about"
+    );
 }
 
 #[test]
