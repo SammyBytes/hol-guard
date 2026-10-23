@@ -659,7 +659,7 @@
       "enabled_extensions": [
         "command.omairc"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],

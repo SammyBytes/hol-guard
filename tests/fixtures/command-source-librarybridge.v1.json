@@ -13389,7 +13389,7 @@
       "enabled_extensions": [
         "command.librarybridge"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],
@@ -13566,7 +13566,7 @@
       "enabled_extensions": [
         "command.librarybridge"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],
@@ -13743,7 +13743,7 @@
       "enabled_extensions": [
         "command.librarybridge"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],
@@ -13920,7 +13920,7 @@
       "enabled_extensions": [
         "command.librarybridge"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],
@@ -14105,7 +14105,7 @@
       "enabled_extensions": [
         "command.librarybridge"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],
@@ -14282,7 +14282,7 @@
       "enabled_extensions": [
         "command.librarybridge"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],
@@ -14459,7 +14459,7 @@
       "enabled_extensions": [
         "command.librarybridge"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],

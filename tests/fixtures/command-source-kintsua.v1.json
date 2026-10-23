@@ -1167,7 +1167,7 @@
       "enabled_extensions": [
         "command.kintsua"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],

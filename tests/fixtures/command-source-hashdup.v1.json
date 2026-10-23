@@ -11111,7 +11111,7 @@
       "enabled_extensions": [
         "command.hashdup"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],

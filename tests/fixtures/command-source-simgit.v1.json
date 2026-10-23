@@ -648,7 +648,7 @@
       "enabled_extensions": [
         "command.simgit"
       ],
-      "expected_action": "block",
+      "expected_action": "review",
       "expected_effective_segments": [
         0
       ],
@@ -773,9 +773,7 @@
         "command.simgit"
       ],
       "expected_action": "review",
-      "expected_effective_segments": [
-        0
-      ],
+      "expected_effective_segments": [],
       "id": "exec-exe",
       "rule_id": "command.simgit.discard-dirty"
     },

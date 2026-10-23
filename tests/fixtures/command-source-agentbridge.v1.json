@@ -702,10 +702,8 @@
       "enabled_extensions": [
         "command.agentbridge"
       ],
-      "expected_action": "review",
-      "expected_effective_segments": [
-        0
-      ],
+      "expected_action": "block",
+      "expected_effective_segments": [],
       "id": "exec-cmd-run-tool-registry",
       "rule_id": "command.agentbridge.run-tool-registry"
     },
