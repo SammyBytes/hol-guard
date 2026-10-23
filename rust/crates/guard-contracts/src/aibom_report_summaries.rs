@@ -23,9 +23,10 @@ pub const AIBOM_REPORT_SUMMARIES_FEATURE: &str = "aibom-report-summaries-v1";
 /// inside it.
 pub const AIBOM_REPORT_SUMMARIES_MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
 
-/// Upper bound on a single snapshot's measured rows. The counts stand in for
-/// rows the caller did not send, so an unbounded count would be an unbounded
-/// allocation.
+/// Upper bound on a request's measured rows: every finding and source count
+/// across all of its snapshots together. The counts stand in for rows the
+/// caller did not send, so an unbounded total would be an unbounded
+/// allocation, however small the request.
 pub const AIBOM_REPORT_SUMMARIES_MAX_ROWS: u64 = 1_000_000;
 
 /// Request schema identifier.

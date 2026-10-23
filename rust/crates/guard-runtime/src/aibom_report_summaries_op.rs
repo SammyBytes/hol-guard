@@ -28,12 +28,17 @@ fn invalid() -> String {
 ///
 /// The findings and the sources only ever reach the grammar through their
 /// length, so the counts stand in for rows the caller never sent.
-fn snapshot(wire: &AibomSummarySnapshotV1) -> Result<GuardAgentInventorySnapshot, String> {
-    if wire.finding_count > AIBOM_REPORT_SUMMARIES_MAX_ROWS
-        || wire.source_count > AIBOM_REPORT_SUMMARIES_MAX_ROWS
-    {
-        return Err(invalid());
-    }
+/// The measured rows a request asks the resident to stand in for, summed over
+/// every snapshot. `None` when the sum overflows.
+fn measured_rows(snapshots: &[AibomSummarySnapshotV1]) -> Option<u64> {
+    snapshots.iter().try_fold(0u64, |total, wire| {
+        total
+            .checked_add(wire.finding_count)?
+            .checked_add(wire.source_count)
+    })
+}
+
+fn snapshot(wire: &AibomSummarySnapshotV1) -> GuardAgentInventorySnapshot {
     let items = wire
         .items
         .iter()
@@ -51,7 +56,7 @@ fn snapshot(wire: &AibomSummarySnapshotV1) -> Result<GuardAgentInventorySnapshot
             }
         })
         .collect();
-    Ok(GuardAgentInventorySnapshot {
+    GuardAgentInventorySnapshot {
         items,
         findings: vec![Value::Null; wire.finding_count as usize],
         sources: vec![Value::Null; wire.source_count as usize],
@@ -63,7 +68,7 @@ fn snapshot(wire: &AibomSummarySnapshotV1) -> Result<GuardAgentInventorySnapshot
             })
             .collect(),
         ..GuardAgentInventorySnapshot::default()
-    })
+    }
 }
 
 pub(crate) fn evaluate_aibom_report_summaries(
@@ -77,11 +82,12 @@ pub(crate) fn evaluate_aibom_report_summaries(
     if request.request_id.is_empty() {
         return Err(invalid());
     }
-    let snapshots = request
-        .snapshots
-        .iter()
-        .map(snapshot)
-        .collect::<Result<Vec<_>, String>>()?;
+    // Checked before any placeholder row is built: many compact snapshots
+    // must not add up to more rows than one request may stand in for.
+    if measured_rows(&request.snapshots).is_none_or(|rows| rows > AIBOM_REPORT_SUMMARIES_MAX_ROWS) {
+        return Err(invalid());
+    }
+    let snapshots: Vec<_> = request.snapshots.iter().map(snapshot).collect();
     let (layer_summary, trust, drift) = summarize_aibom_layers(&snapshots, &request.generated_at);
     let mut payload = Map::new();
     payload.insert("layer_summary".to_owned(), Value::Object(layer_summary));

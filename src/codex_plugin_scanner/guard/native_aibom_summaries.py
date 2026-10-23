@@ -107,26 +107,30 @@ def _item_row(item: Any) -> dict[str, object]:
         "drift_state": str(item.drift_state),
         # Always present: a key the request omits digests differently on each
         # side of the call, and the reply would never bind to this request.
-        "trust_resolution": _json_metadata(metadata.get("trustResolution")),
-        "source_links": _json_metadata(metadata.get("sourceLinks")),
-        "source_of_truth": _json_metadata(metadata.get("sourceOfTruth")),
+        "trust_resolution": _trust_shape(metadata.get("trustResolution")),
+        "source_links": _links_shape(metadata.get("sourceLinks")),
+        "source_of_truth": {} if isinstance(metadata.get("sourceOfTruth"), dict) else None,
     }
 
 
-def _json_metadata(value: object) -> object:
-    """Pass through the shapes the grammar recognises; everything else is null.
+# Stored metadata is arbitrary and can be large. The grammar reads a source of
+# truth for being an object, the source links for how many there are, and the
+# trust resolution for being an object and for its score. The rows below keep
+# exactly that shape, so the answer is the same and nested scan detail never
+# counts against the request budget. Whether a value counts stays the
+# resident's call.
 
-    Stored metadata is arbitrary, and only an object or a list of them changes
-    a count. A value of another shape already counted for nothing, so sending
-    it as null keeps the answer the same and keeps unrelated scan detail out of
-    the request.
-    """
 
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, list):
-        return list(value)
-    return None
+def _trust_shape(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    score = value.get("trustScore")
+    # A number is small however it is spelled; anything else reads as no score.
+    return {"trustScore": score} if isinstance(score, int | float) else {}
+
+
+def _links_shape(value: object) -> list[None] | None:
+    return [None] * len(value) if isinstance(value, list) else None
 
 
 def _validated_summaries(

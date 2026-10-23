@@ -99,7 +99,7 @@ def test_the_request_carries_counts_and_every_metadata_key(monkeypatch, tmp_path
     item = row["items"][0]
     # Every key travels on every item: one the request omits digests
     # differently on each side and the reply never binds to it.
-    assert item["source_links"] == [{"url": "one"}]
+    assert item["source_links"] == [None]
     assert item["trust_resolution"] is None
     assert item["source_of_truth"] is None
 
@@ -110,6 +110,27 @@ def test_metadata_the_grammar_cannot_read_travels_as_null(monkeypatch, tmp_path)
     item = sent[0]["snapshots"][0]["items"][0]
     assert item["trust_resolution"] is None
     assert item["source_of_truth"] is None
+
+
+def test_large_metadata_travels_as_the_shape_the_grammar_reads(monkeypatch, tmp_path) -> None:
+    _recorded, sent = _install(monkeypatch, lambda result: None)
+    detail = {"evidence": ["x" * 4096] * 2048}
+    metadata = {
+        "trustResolution": {"trustScore": 64, **detail},
+        "sourceLinks": [detail, detail, detail],
+        "sourceOfTruth": detail,
+    }
+    _call(tmp_path, (_snapshot(metadata),))
+    item = sent[0]["snapshots"][0]["items"][0]
+    assert item["trust_resolution"] == {"trustScore": 64}
+    assert item["source_links"] == [None, None, None]
+    assert item["source_of_truth"] == {}
+
+
+def test_a_trust_resolution_without_a_numeric_score_travels_as_an_empty_object(monkeypatch, tmp_path) -> None:
+    _recorded, sent = _install(monkeypatch, lambda result: None)
+    _call(tmp_path, (_snapshot({"trustResolution": {"trustScore": "high", "notes": "n"}}),))
+    assert sent[0]["snapshots"][0]["items"][0]["trust_resolution"] == {}
 
 
 @pytest.mark.parametrize(

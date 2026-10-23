@@ -124,6 +124,28 @@ fn a_count_beyond_the_row_bound_is_refused() {
 }
 
 #[test]
+fn the_row_bound_holds_across_snapshots_not_only_within_one() {
+    let compact = |finding_count| AibomSummarySnapshotV1 {
+        items: Vec::new(),
+        finding_count,
+        source_count: 0,
+        drift_states: Vec::new(),
+    };
+    let half = AIBOM_REPORT_SUMMARIES_MAX_ROWS / 2;
+    assert!(evaluate_aibom_report_summaries(&request(vec![compact(half), compact(half)])).is_ok());
+    let over = request(vec![compact(half), compact(half), compact(1)]);
+    assert_eq!(
+        evaluate_aibom_report_summaries(&over).unwrap_err(),
+        "native_aibom_report_summaries_invalid"
+    );
+    let overflow = request(vec![compact(u64::MAX), compact(1)]);
+    assert_eq!(
+        evaluate_aibom_report_summaries(&overflow).unwrap_err(),
+        "native_aibom_report_summaries_invalid"
+    );
+}
+
+#[test]
 fn source_links_win_over_source_of_truth_and_count_once_each() {
     // Python returned early once an item had links, so the source of truth on
     // the same item never added a second row.
