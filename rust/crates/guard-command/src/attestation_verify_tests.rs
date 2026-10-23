@@ -29,8 +29,7 @@ fn refusal(payload: Value, envelope: Value) -> String {
         None,
         &TrustAttestationVerificationPolicy::default(),
     )
-    .err()
-    .expect("the attestation should be refused")
+    .expect_err("the attestation should be refused")
     .message()
     .to_owned()
 }
