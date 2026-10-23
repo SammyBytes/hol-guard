@@ -1,7 +1,7 @@
 //! Fetches from the installed release bundle.
 //!
 //! The bundle ships its delivery data under one fixed directory, one
-//! subdirectory per release tag. A location names the asset to read; this
+//! subdirectory per release tag, named for the tag's batch. A location names the asset to read; this
 //! resolves it against the bundle's source and reads a member out of its
 //! container in one step. A bulk traversal can share a process while retaining
 //! those same checks for each object.
@@ -118,7 +118,7 @@ pub(super) fn fetch(input: &Value) -> Outcome {
 fn path(root: &Value, plan: &Value) -> Result<PathBuf, String> {
     let root = root.as_str().ok_or_else(request)?;
     let text = |key: &str| plan[key].as_str().unwrap_or_default();
-    let directory = Path::new(root).join(text("tag"));
+    let directory = Path::new(root).join(text("directory"));
     Ok(directory.join(text("asset")))
 }
 

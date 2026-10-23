@@ -43,17 +43,30 @@ def validate_compatibility(value, extensions, *, compiler=None):
     _native_metadata("compatibility", value=value, extensions=extensions, compiler=compiler)
 
 
-def asset_path(relative, *, source_sha):
+def asset_path(relative):
     if (
         re.fullmatch(
-            r"assets/extension-data-"
-            + re.escape(source_sha)
-            + r"-0\.0-[0-9]{6}/(?:(?:objects|packs)-[0-9]{6}\.zip|object-[0-9a-f]{64}\.json|pack-[0-9a-f]{64}\.zip)",
+            r"assets/[0-9]{6}/(?:(?:objects|packs)-[0-9]{6}\.zip|object-[0-9a-f]{64}\.json|pack-[0-9a-f]{64}\.zip)",
             relative,
         )
         is None
     ):
         raise ValueError("installed bundle asset path invalid")
+
+
+def tag_directory(tag, *, source_sha):
+    """The directory under ``assets`` that holds an installed tag's assets.
+
+    Every installed tag is ``extension-data-<source>-0.0-<batch>``, so only the
+    batch varies and the directory is named for it alone. The full tag would put
+    wheel members past the 260-character path limit of a stock Windows install.
+    The native reader maps tags the same way.
+    """
+    prefix = f"extension-data-{source_sha}-0.0-"
+    batch = tag[len(prefix) :] if isinstance(tag, str) and tag.startswith(prefix) else ""
+    if re.fullmatch(r"[0-9]{6}", batch) is None:
+        raise ValueError("installed bundle asset path invalid")
+    return batch
 
 
 def _package() -> Path:
@@ -234,7 +247,9 @@ class VerifiedInstalledBundle:
             # container member by its digest; a whole asset is only resolved.
             reply = addressed(
                 "installed",
-                sources=lambda _reply: [root / target_location["tag"] / target_location["asset"]],
+                sources=lambda _reply: [
+                    root / tag_directory(target_location["tag"], source_sha=self.source_sha) / target_location["asset"]
+                ],
                 root=str(root),
                 target=target_location,
                 source=self.source_sha,
@@ -247,7 +262,8 @@ class VerifiedInstalledBundle:
             raise
         if "data" in reply:
             return base64.b64decode(reply["data"], validate=True)
-        path = base / target_location["tag"] / target_location["asset"]
+        # Native validated the tag and names its directory.
+        path = base / reply["directory"] / target_location["asset"]
         if not path.exists() and not path.is_symlink() and reply["kind"] == "pack":
             # The fixed native factory checks the installed release/executable
             # binding and constructs the public URL. No selector, caller URL,
