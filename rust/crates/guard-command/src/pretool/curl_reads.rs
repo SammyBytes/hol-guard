@@ -317,16 +317,31 @@ const OTHER_PROTOCOL_PREFIXES: [&str; 6] = ["ftp.", "dict.", "ldap.", "imap.", "
 /// checks. Proving one and reviewing the other would turn the scheme into
 /// authority it does not carry.
 fn as_curl_reads_it(raw: &str) -> Option<std::borrow::Cow<'_, str>> {
-    if raw.contains("://") {
+    if written_with_a_scheme(raw) {
         return Some(std::borrow::Cow::Borrowed(raw));
     }
     let host = raw.split(['/', '?', '#']).next().unwrap_or(raw);
     if OTHER_PROTOCOL_PREFIXES.iter().any(|prefix| {
-        host.len() >= prefix.len() && host[..prefix.len()].eq_ignore_ascii_case(prefix)
+        host.get(..prefix.len())
+            .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
     }) {
         return None;
     }
     Some(std::borrow::Cow::Owned(format!("http://{raw}")))
+}
+
+/// Whether the URL itself names a scheme, rather than carrying a `://` in a
+/// query the request only passes on. `localhost:3000/redirect?next=https://app`
+/// is a request to the dev server, which curl fetches over HTTP, so only a
+/// `://` that follows a leading scheme is read as one.
+fn written_with_a_scheme(raw: &str) -> bool {
+    raw.find("://").is_some_and(|delimiter| {
+        let scheme = &raw[..delimiter];
+        scheme.starts_with(|first: char| first.is_ascii_alphabetic())
+            && scheme
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
+    })
 }
 
 /// An `http(s)` URL naming `127.0.0.1` or `localhost` itself, on a dev-server
