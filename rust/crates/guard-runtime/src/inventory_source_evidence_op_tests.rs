@@ -435,8 +435,8 @@ fn reads_the_role_from_the_path_the_harness_configured() {
     // A configured path that does name a role keeps it, anchored or not.
     assert_eq!(
         evidence(&wire(
-            "/home/example/code/docs/security/policy.md",
-            "docs/security/policy.md"
+            "/home/example/code/docs/security/notes.md",
+            "docs/security/notes.md"
         ))[0]["instruction_role"],
         json!("security_md")
     );
