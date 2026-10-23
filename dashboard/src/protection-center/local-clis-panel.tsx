@@ -20,7 +20,7 @@ import { McpDeclaredSkills } from "./mcp-declared-skills";
 import { useResolvedApprovalGate } from "../use-resolved-approval-gate";
 import { InlineError } from "./components/protection-primitives";
 import { customExtensionContinuityView } from "../managed-controls/custom-extension-continuity";
-import { commandPermissionChanges, mcpCatalogCopy, mcpToolCanReceiveDirectAllow, rebaseCommandDraft } from "./mcp-catalog-state";
+import { catalogRevisionChanged, commandPermissionChanges, mcpCatalogCopy, mcpToolCanReceiveDirectAllow, rebaseCommandDraft } from "./mcp-catalog-state";
 import { McpProviderActions, type ProviderActionDraft } from "./mcp-provider-actions";
 import { ProviderWorkflows } from "./provider-workflows";
 import { bulkPolicyCopy, connectorGroupOutcomeCopy, continuityCopy, customExtensionStateLabel, detailCatalogHeading, detailCatalogHelper, detailPolicyCopy, FRESH_TOTP_REQUIRED_MESSAGE, isFreshTotpRequired, keepChoicesCopy, mcpPermissionStatusLabel, nativePublicationMessage, randomToken, SUGGESTED_RULES_NOTICE } from "./local-cli-panel-copy";
@@ -55,6 +55,10 @@ export function LocalCliDetail(props: {
 }) {
   const { resolvedApprovalGate, resolveApprovalGate, refreshApprovalGate } = useResolvedApprovalGate(null);
   const [pending, setPending] = useState<LocalCliState | null>(null);
+  // The catalog revision the open confirmation was made against; a save reviews only that listing.
+  const reviewedRevision = useRef<number | null>(null);
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
   const [commands, setCommands] = useState(() => prefillSuggestedStates(props.item));
   const [providerDrafts, setProviderDrafts] = useState<Record<string, ProviderActionDraft>>({});
   const previousItem = useRef(props.item);
@@ -74,6 +78,12 @@ export function LocalCliDetail(props: {
   const [setupOutcome, setSetupOutcome] = useState<string | null>(null);
   useEffect(() => {
     const previous = previousItem.current;
+    const catalogChanged = catalogRevisionChanged(previous, props.item);
+    if (catalogChanged && pendingRef.current !== null) {
+      // The confirmation does not show tools listed since it opened, so reopen it for the current catalog.
+      setPending(null);
+      setError("The tool list changed. Review the current tools again.");
+    }
     if (previous.cli_id !== props.item.cli_id || previous.identity_hash !== props.item.identity_hash) {
       setPending(null);
       setSetupOutcome(null);
@@ -85,8 +95,7 @@ export function LocalCliDetail(props: {
       if (previous.cli_id !== props.item.cli_id || previous.identity_hash !== props.item.identity_hash) {
         return prefillSuggestedStates(props.item);
       }
-      const changed = previous.mcp_catalog?.revision !== props.item.mcp_catalog?.revision
-        ? props.item.mcp_catalog?.changes?.changed : [];
+      const changed = catalogChanged ? props.item.mcp_catalog?.changes?.changed : [];
       return rebaseCommandDraft(current, previous.commands, props.item.commands, changed);
     });
     previousItem.current = props.item;
@@ -96,6 +105,7 @@ export function LocalCliDetail(props: {
     setFreshTotpRequired(false);
     await refreshApprovalGate();
     setRecommended(fromSetupLink);
+    reviewedRevision.current = previousItem.current.mcp_catalog?.revision ?? null;
     setPending(state);
   }, [refreshApprovalGate]);
   const requestRecommended = useCallback(() => {
@@ -163,8 +173,8 @@ export function LocalCliDetail(props: {
         session_nonce: randomToken(),
         commands: commandStatesPayload(recommended ? prefillSuggestedStates(props.item) : commands),
         // These choices were made against this catalog; saving them reviews its new and changed tools.
-        ...(pending !== "unset" && typeof props.item.mcp_catalog?.revision === "number"
-          ? { mcp_catalog_revision: props.item.mcp_catalog.revision } : {}),
+        ...(pending !== "unset" && reviewedRevision.current !== null
+          ? { mcp_catalog_revision: reviewedRevision.current } : {}),
         ...(pending !== "unset" && Object.keys(providerDrafts).length > 0
           ? { provider_actions: Object.values(providerDrafts) } : {}),
         // Same endpoint and proof as any other change; the daemon re-checks the request belongs to this connector.

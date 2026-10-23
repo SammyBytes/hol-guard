@@ -1532,6 +1532,9 @@ function mcpCatalogCopy(item) {
     description: "Discovery reached a limit or returned an incomplete inventory. Unknown tools still need review."
   };
 }
+function catalogRevisionChanged(previous, next) {
+  return previous.cli_id === next.cli_id && previous.mcp_catalog?.revision !== next.mcp_catalog?.revision;
+}
 function rebaseCommandDraft(current, previous, next, changedToolNames = []) {
   const changed = new Set(changedToolNames);
   const previousStates = new Map(previous.map((command) => [command.command_id, command.state]));
@@ -4708,6 +4711,9 @@ function AddCustomExtensionButton(props) {
 function LocalCliDetail(props) {
   const { resolvedApprovalGate, resolveApprovalGate, refreshApprovalGate } = useResolvedApprovalGate(null);
   const [pending, setPending] = reactExports.useState(null);
+  const reviewedRevision = reactExports.useRef(null);
+  const pendingRef = reactExports.useRef(pending);
+  pendingRef.current = pending;
   const [commands, setCommands] = reactExports.useState(() => prefillSuggestedStates(props.item));
   const [providerDrafts, setProviderDrafts] = reactExports.useState({});
   const previousItem = reactExports.useRef(props.item);
@@ -4726,6 +4732,11 @@ function LocalCliDetail(props) {
   const [setupOutcome, setSetupOutcome] = reactExports.useState(null);
   reactExports.useEffect(() => {
     const previous = previousItem.current;
+    const catalogChanged = catalogRevisionChanged(previous, props.item);
+    if (catalogChanged && pendingRef.current !== null) {
+      setPending(null);
+      setError("The tool list changed. Review the current tools again.");
+    }
     if (previous.cli_id !== props.item.cli_id || previous.identity_hash !== props.item.identity_hash) {
       setPending(null);
       setSetupOutcome(null);
@@ -4737,7 +4748,7 @@ function LocalCliDetail(props) {
       if (previous.cli_id !== props.item.cli_id || previous.identity_hash !== props.item.identity_hash) {
         return prefillSuggestedStates(props.item);
       }
-      const changed = previous.mcp_catalog?.revision !== props.item.mcp_catalog?.revision ? props.item.mcp_catalog?.changes?.changed : [];
+      const changed = catalogChanged ? props.item.mcp_catalog?.changes?.changed : [];
       return rebaseCommandDraft(current, previous.commands, props.item.commands, changed);
     });
     previousItem.current = props.item;
@@ -4747,6 +4758,7 @@ function LocalCliDetail(props) {
     setFreshTotpRequired(false);
     await refreshApprovalGate();
     setRecommended(fromSetupLink);
+    reviewedRevision.current = previousItem.current.mcp_catalog?.revision ?? null;
     setPending(state);
   }, [refreshApprovalGate]);
   const requestRecommended = reactExports.useCallback(() => {
@@ -4811,7 +4823,7 @@ function LocalCliDetail(props) {
         session_nonce: randomToken$2(),
         commands: commandStatesPayload(recommended ? prefillSuggestedStates(props.item) : commands),
         // These choices were made against this catalog; saving them reviews its new and changed tools.
-        ...pending !== "unset" && typeof props.item.mcp_catalog?.revision === "number" ? { mcp_catalog_revision: props.item.mcp_catalog.revision } : {},
+        ...pending !== "unset" && reviewedRevision.current !== null ? { mcp_catalog_revision: reviewedRevision.current } : {},
         ...pending !== "unset" && Object.keys(providerDrafts).length > 0 ? { provider_actions: Object.values(providerDrafts) } : {},
         // Same endpoint and proof as any other change; the daemon re-checks the request belongs to this connector.
         ...recommended && pending === "allowed" && props.setupLink && setupMatch === "ready" ? { connector_group_request_id: props.setupLink.requestId } : {},
