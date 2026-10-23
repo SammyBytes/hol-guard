@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -192,3 +193,59 @@ def test_a_resident_that_cannot_start_is_not_a_missing_identity(
             event_name="PreToolUse",
             group={},
         )
+
+
+def _nested(depth: int) -> dict[str, object]:
+    """A group mapping whose deepest value sits ``depth`` levels down.
+
+    The mapping itself is the first level, so the innermost string is reached
+    after ``depth - 1`` wrappers.
+    """
+
+    value: object = "echo hi"
+    for _ in range(depth - 1):
+        value = {"nested": value}
+    return cast("dict[str, object]", value)
+
+
+def test_a_definition_the_resident_would_read_still_ships(monkeypatch: pytest.MonkeyPatch) -> None:
+    sent = _resident(monkeypatch, _digests)
+    codex_hook_identity.canonical_codex_hook_group_identity(
+        source_scope="user",
+        source_hooks_enabled=True,
+        event_name="PreToolUse",
+        group=_nested(bridge._MAX_DEFINITION_DEPTH),
+    )
+    assert len(sent) == 1
+
+
+def test_a_definition_deeper_than_the_resident_reads_names_the_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent = _resident(monkeypatch, _digests)
+    with pytest.raises(bridge.CodexHookDefinitionTooDeepError) as raised:
+        codex_hook_identity.canonical_codex_hook_group_identity(
+            source_scope="user",
+            source_hooks_enabled=True,
+            event_name="PreToolUse",
+            group=_nested(bridge._MAX_DEFINITION_DEPTH + 1),
+        )
+    assert raised.value.code == "native_codex_hook_definition_too_deep"
+    # A caller that only knows the broad failure still fails closed on it.
+    assert isinstance(raised.value, bridge.CodexHookIdentityUnavailableError)
+    assert sent == []
+
+
+def test_a_deep_list_counts_toward_the_same_bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    sent = _resident(monkeypatch, _digests)
+    group: object = ["leaf"]
+    for _ in range(bridge._MAX_DEFINITION_DEPTH - 1):
+        group = {"nested": group}
+    with pytest.raises(bridge.CodexHookDefinitionTooDeepError):
+        codex_hook_identity.canonical_codex_hook_group_identity(
+            source_scope="user",
+            source_hooks_enabled=True,
+            event_name="PreToolUse",
+            group=cast("dict[str, object]", group),
+        )
+    assert sent == []

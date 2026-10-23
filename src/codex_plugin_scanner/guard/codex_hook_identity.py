@@ -18,6 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from .native_codex_hook_identity import (
+    CodexHookDefinitionTooDeepError,
     CodexHookIdentityUnavailableError,
     native_codex_hook_identity,
 )
@@ -248,6 +249,7 @@ def _answer(entry: Mapping[str, object]) -> dict[str, object]:
 
 __all__ = [
     "CODEX_HOOK_IDENTITY_SCHEMA",
+    "CodexHookDefinitionTooDeepError",
     "CodexHookGroupQuestion",
     "CodexHookHandlerIdentity",
     "CodexHookHandlerQuestion",

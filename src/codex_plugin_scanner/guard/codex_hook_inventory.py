@@ -10,8 +10,10 @@ from typing import Literal
 
 from .codex_hook_identity import (
     CODEX_HOOK_IDENTITY_SCHEMA,
+    CodexHookDefinitionTooDeepError,
     CodexHookGroupQuestion,
     CodexHookHandlerQuestion,
+    CodexHookIdentityUnavailableError,
     canonical_codex_command_argv,
     canonical_codex_hook_conflict_keys,
     canonical_codex_hook_group_conflict_keys,
@@ -30,6 +32,10 @@ CODEX_HOOK_INVENTORY_SOURCE_DUPLICATE = "codex_hook_inventory_source_duplicate_k
 CODEX_HOOK_INVENTORY_SOURCE_MALFORMED = "codex_hook_inventory_source_malformed"
 CODEX_HOOK_INVENTORY_SOURCE_UNREADABLE = "codex_hook_inventory_source_unreadable"
 CODEX_HOOK_INVENTORY_SOURCE_CHANGED = "codex_hook_inventory_source_changed"
+# The identity failures a source can carry, named here for callers that match
+# on a reason code. Each is the ``code`` of the error the bridge raises.
+CODEX_HOOK_INVENTORY_IDENTITY_UNAVAILABLE = CodexHookIdentityUnavailableError.code
+CODEX_HOOK_INVENTORY_DEFINITION_TOO_DEEP = CodexHookDefinitionTooDeepError.code
 HookSourceFormat = Literal["json", "toml"]
 HookOwnership = Literal["authenticated_manifest", "exact_legacy_adoption", "self_install_binding", "unmanaged"]
 
@@ -203,7 +209,36 @@ def enumerate_codex_hooks(
                 if record is not None:
                     records.append(record)
                 issues.extend(handler_issues)
-    return CodexHookInventory(str(source_path), _identified(records, questions), tuple(issues))
+    try:
+        identified = _identified(records, questions)
+    except CodexHookIdentityUnavailableError as error:
+        return CodexHookInventory(
+            str(source_path),
+            (),
+            (*issues, _unidentified_source_issue(source_path, error)),
+        )
+    return CodexHookInventory(str(source_path), identified, tuple(issues))
+
+
+def _unidentified_source_issue(
+    source_path: Path,
+    error: CodexHookIdentityUnavailableError,
+) -> CodexHookInventoryIssue:
+    """Report a source Guard cannot identify rather than one with no hooks.
+
+    The resident owns hook identity. With no answer there is nothing to compare
+    against the manifest, so every handler in the source would read as unowned;
+    an issue keeps the caller on its fail-closed path instead. The error's own
+    code travels with it, so a definition the resident will not read stays
+    distinguishable from a resident that could not answer at all.
+    """
+
+    return CodexHookInventoryIssue(
+        error.code,
+        "Guard's native runtime did not identify this source's Codex hooks. Repair whichever the code names, "
+        "the Guard installation or the hook definition, before retrying install.",
+        str(source_path),
+    )
 
 
 def _identified(
@@ -479,6 +514,8 @@ def _bindings_contain_handler(
 
 __all__ = [
     "CODEX_HOOK_IDENTITY_SCHEMA",
+    "CODEX_HOOK_INVENTORY_DEFINITION_TOO_DEEP",
+    "CODEX_HOOK_INVENTORY_IDENTITY_UNAVAILABLE",
     "CODEX_HOOK_INVENTORY_MALFORMED_GROUP",
     "CODEX_HOOK_INVENTORY_MALFORMED_HANDLER",
     "CODEX_HOOK_INVENTORY_SOURCE_CHANGED",

@@ -23,6 +23,7 @@ from ..codex_config import dump_toml, read_config_bytes, read_toml_payload
 from ..codex_hook_command_line import encode_hook_config_argument, render_hook_command
 from ..codex_hook_compatibility import NATIVE_CODEX_HOOK_COMMAND, NATIVE_CODEX_HOOK_FEATURE, python_bridge_argv
 from ..codex_hook_file_integrity import validate_regular_file
+from ..codex_hook_identity import CodexHookIdentityUnavailableError
 from ..codex_hook_integrity import (
     atomic_write_bytes,
     atomic_write_text,
@@ -524,6 +525,43 @@ _CODEX_HOOK_MIGRATION_CONFLICT = "codex_hook_migration_conflict"
 _CODEX_HOOK_MIGRATION_READBACK_MISMATCH = "codex_hook_migration_readback_mismatch"
 
 
+def _unidentified_migration(error: CodexHookIdentityUnavailableError) -> RuntimeError:
+    """The failure a migration reports when it has no identity to compare.
+
+    The error carries its own code, so a definition the resident will not read
+    stays distinguishable from a resident that could not answer at all.
+    """
+
+    return RuntimeError(
+        f"{error.code}: Guard's native runtime did not identify the Codex hooks this migration compares. "
+        "Repair whichever the code names, the Guard installation or the hook definition, before retrying "
+        "migration."
+    )
+
+
+def _group_identities(questions: Sequence[CodexHookGroupQuestion]) -> tuple[str, ...]:
+    """Ask the resident for each group's identity, failing the caller closed.
+
+    The resident owns hook identity, so a migration that cannot reach it has no
+    way to tell an incoming group from one already written. It stops with the
+    reason code rather than merging on a locally guessed identity.
+    """
+
+    try:
+        return canonical_codex_hook_group_identities(questions)
+    except CodexHookIdentityUnavailableError as error:
+        raise _unidentified_migration(error) from error
+
+
+def _group_conflict_keys(questions: Sequence[CodexHookGroupQuestion]) -> tuple[tuple[str, ...], ...]:
+    """Ask the resident for each group's conflict keys, failing the caller closed."""
+
+    try:
+        return canonical_codex_hook_group_conflict_keys(questions)
+    except CodexHookIdentityUnavailableError as error:
+        raise _unidentified_migration(error) from error
+
+
 def _append_unique_hook_groups(
     existing_groups: object,
     incoming_groups: object,
@@ -547,8 +585,8 @@ def _append_unique_hook_groups(
         )
         for group in (*settled, *(group for group in incoming_groups if isinstance(group, Mapping)))
     ]
-    group_identities = canonical_codex_hook_group_identities(questions)
-    group_conflicts = canonical_codex_hook_group_conflict_keys(questions)
+    group_identities = _group_identities(questions)
+    group_conflicts = _group_conflict_keys(questions)
     identities = set(group_identities[: len(settled)])
     conflict_keys = {key for keys in group_conflicts[: len(settled)] for key in keys}
     position = len(settled)
@@ -640,7 +678,7 @@ def _canonical_hook_semantics(
             )
             for group in mappings
         )
-    identities = canonical_codex_hook_group_identities(questions)
+    identities = _group_identities(questions)
     semantics: dict[str, tuple[str, ...]] = {}
     start = 0
     for event_name, count in counts:
@@ -692,7 +730,7 @@ def _migration_group_identities(
     if not isinstance(hooks, Mapping):
         return set()
     return set(
-        canonical_codex_hook_group_identities(
+        _group_identities(
             [
                 _hook_group_question(
                     group,

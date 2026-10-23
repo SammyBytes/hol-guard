@@ -404,11 +404,6 @@ fn whole_float_digits(value: f64) -> String {
     text
 }
 
-/// A canonical value, in the shape CPython's `json.dumps` writes.
-///
-/// `serde_json::Value` cannot hold an integer wider than 64 bits and writes
-/// floats its own way, so the canonical form is carried here instead and
-/// written by `write_canon` below.
 /// The group or handler mapping an entry carries. `refusal` has already proven
 /// it is an object for every kind that reads one, so the empty stand-in is
 /// unreachable rather than a silent default.
@@ -422,6 +417,11 @@ fn object_of<'a>(
     }
 }
 
+/// A canonical value, in the shape CPython's `json.dumps` writes.
+///
+/// `serde_json::Value` cannot hold an integer wider than 64 bits and writes
+/// floats its own way, so the canonical form is carried here instead and
+/// written by `write_canon` below.
 #[derive(Debug, Clone, PartialEq)]
 enum Canon {
     Null,

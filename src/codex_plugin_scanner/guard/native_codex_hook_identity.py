@@ -47,12 +47,30 @@ _MAX_REQUEST_BYTES = 4 * 1024 * 1024
 # float on the way across.
 _EXACT_INT_MIN = -(2**63)
 _EXACT_INT_MAX = 2**64 - 1
+# The resident's JSON parser refuses a value nested past 32 levels, counting
+# every value and not only containers. The envelope spends two levels before a
+# definition starts -- the request object, its ``entries`` array, then the entry
+# object the definition hangs off -- so a definition's deepest value may sit 30
+# levels down, counting the definition mapping itself as the first. Measuring it
+# here names the config file that is too deep instead of letting the resident
+# refuse the whole frame and look unavailable.
+_MAX_DEFINITION_DEPTH = 30
 
 
 class CodexHookIdentityUnavailableError(RuntimeError):
     """The resident could not derive the Codex hook identity."""
 
     code = "native_codex_hook_identity_unavailable"
+
+
+class CodexHookDefinitionTooDeepError(CodexHookIdentityUnavailableError):
+    """A hook definition nests deeper than the resident will read.
+
+    A subclass, so every caller keeps failing closed on it; the separate code
+    says the config file is at fault rather than the Guard installation.
+    """
+
+    code = "native_codex_hook_definition_too_deep"
 
 
 def native_codex_hook_identity(
@@ -169,21 +187,24 @@ class _ScalarTokens:
     def wire(self, value: Mapping[str, object]) -> dict[str, object]:
         """The JSON form of one mapping, with its exotic scalars replaced."""
 
-        return cast("dict[str, object]", self._wire_value(value))
+        return cast("dict[str, object]", self._wire_value(value, 1))
 
     def _token_for(self, meaning: dict[str, str]) -> str:
         token = f"{self._prefix}-{len(self.meanings)}"
         self.meanings[token] = meaning
         return token
 
-    def _wire_value(self, value: object) -> object:
+    def _wire_value(self, value: object, depth: int) -> object:
         """Mirror ``_canonical_value``'s dispatch, deciding what JSON holds.
 
         Order matters: ``bool`` is an ``int``, ``datetime`` is a ``date``, and
         ``str``/``bytes`` are sequences, so each is settled before the test
-        that would also match it.
+        that would also match it. ``depth`` counts the containers entered so
+        far, the definition itself included.
         """
 
+        if depth > _MAX_DEFINITION_DEPTH:
+            raise CodexHookDefinitionTooDeepError
         if value is None or isinstance(value, str | bool):
             return value
         if isinstance(value, int):
@@ -195,14 +216,14 @@ class _ScalarTokens:
                 return value
             return self._token_for({"type": "float", "value": repr(value)})
         if isinstance(value, Mapping):
-            return self._wire_mapping(value)
+            return self._wire_mapping(value, depth)
         if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
-            return [self._wire_value(item) for item in value]
+            return [self._wire_value(item, depth + 1) for item in value]
         if isinstance(value, datetime | date | time):
             return self._token_for({"type": type(value).__name__, "value": value.isoformat()})
         return self._token_for({"type": type(value).__name__, "value": repr(value)})
 
-    def _wire_mapping(self, value: Mapping[str, object]) -> dict[str, object]:
+    def _wire_mapping(self, value: Mapping[str, object], depth: int) -> dict[str, object]:
         """A mapping whose keys are already in their canonical spelling.
 
         A key a JSON object cannot name is rendered here exactly as
@@ -216,7 +237,7 @@ class _ScalarTokens:
             ((key if isinstance(key, str) else f"<{type(key).__name__}>:{key!r}", item) for key, item in value.items()),
             key=lambda pair: pair[0],
         )
-        return {key: self._wire_value(item) for key, item in items}
+        return {key: self._wire_value(item, depth + 1) for key, item in items}
 
 
 def _collect_strings(value: object, out: set[str]) -> None:
