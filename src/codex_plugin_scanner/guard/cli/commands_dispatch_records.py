@@ -319,7 +319,7 @@ def _run_guard_inventory_command(
                 options=_aibom_cli_options_from_args(args),
             )
         except NativeInventoryUrlRedactionError as error:
-            return _inventory_redaction_unavailable("inventory", error)
+            return _inventory_redaction_unavailable("inventory", args, error)
     else:
         payload = {"generated_at": generated_at, "items": store.list_inventory()}
     if getattr(args, "sync", False):
@@ -331,9 +331,15 @@ def _run_guard_inventory_command(
     return 0
 
 
-def _inventory_redaction_unavailable(kind: str, error: NativeInventoryUrlRedactionError) -> int:
+def _inventory_redaction_unavailable(
+    kind: str, args: argparse.Namespace, error: NativeInventoryUrlRedactionError
+) -> int:
     """Refuse an export the resident could not redact, without a Python fallback."""
-    _emit(kind, {"error": str(error)}, True)
+
+    if getattr(args, "json", False) or kind in {"aibom", "inventory"}:
+        _emit(kind, {"error": str(error)}, True)
+    else:
+        print(f"Inventory URL redaction is unavailable: {error}", file=sys.stderr)
     return 1
 
 
@@ -362,7 +368,7 @@ def _run_guard_aibom_command(
                 options=aibom_options,
             )
         except NativeInventoryUrlRedactionError as error:
-            return _inventory_redaction_unavailable("aibom.status", error)
+            return _inventory_redaction_unavailable("aibom.status", args, error)
         except NativeAibomSummariesError as error:
             return _aibom_summaries_unavailable("aibom.status", args, error)
         _emit("aibom.status", payload, getattr(args, "json", False))
@@ -421,7 +427,7 @@ def _run_guard_aibom_command(
             export_format=resolved_format,
         )
     except NativeInventoryUrlRedactionError as error:
-        return _inventory_redaction_unavailable("aibom", error)
+        return _inventory_redaction_unavailable("aibom", args, error)
     except NativeAibomSummariesError as error:
         return _aibom_summaries_unavailable("aibom", args, error)
     if resolved_format == "markdown" and not getattr(args, "json", False):
