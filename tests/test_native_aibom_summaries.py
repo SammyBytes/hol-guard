@@ -43,7 +43,8 @@ def _install(monkeypatch: pytest.MonkeyPatch, mutate) -> tuple[list[tuple[str, o
         result: dict[str, Any] = {
             "schema": response_schema,
             "request_id": request["request_id"],
-            "request_sha256": _canonical_request_sha256(request),
+            # The resident answers with the prefixed token.
+            "request_sha256": "sha256:" + _canonical_request_sha256(request),
             "status": "ok",
             "code": "ok",
             "payload": {key: dict(value) for key, value in _PAYLOAD.items()},
@@ -114,7 +115,9 @@ def test_metadata_the_grammar_cannot_read_travels_as_null(monkeypatch, tmp_path)
 @pytest.mark.parametrize(
     "mutate",
     [
-        lambda result: result.update(request_sha256="0" * 64),
+        lambda result: result.update(request_sha256="sha256:" + "0" * 64),
+        # The bare hex of the right request is still the wrong token.
+        lambda result: result.update(request_sha256=result["request_sha256"].removeprefix("sha256:")),
         lambda result: result.update(request_id="other"),
         lambda result: result.update(code="other"),
         lambda result: result.update(payload="nope"),
