@@ -304,7 +304,8 @@ fn answers_the_item_kind_the_artifact_type_maps_onto() {
             {"harness": "claude", "artifact_type": "gateway_config"},
         ],
     });
-    let kinds: Vec<&str> = evidence(&wire)
+    let answers = evidence(&wire);
+    let kinds: Vec<&str> = answers
         .iter()
         .map(|answer| answer["item_kind"].as_str().expect("item_kind"))
         .collect();

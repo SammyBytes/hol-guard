@@ -70,7 +70,8 @@ fn maps_every_artifact_type_onto_its_item_kind() {
         entry("guard_launcher_shim", json!({})),
         entry("something_new", json!({})),
     ]);
-    let kinds: Vec<&str> = items(&wire)
+    let answers = items(&wire);
+    let kinds: Vec<&str> = answers
         .iter()
         .map(|item| item["item_kind"].as_str().expect("item_kind"))
         .collect();
