@@ -226,6 +226,7 @@ impl CompiledNativeCommandControls {
         let sources_files = interpreted.contains("source") || interpreted.contains(".");
         let sourced = if sources_files {
             crate::pretool::sourced_program_sources(command, context)
+                .or_else(|| crate::pretool::sourcing_bounded_sources(command, context))
         } else {
             Some(Vec::new())
         };
@@ -237,10 +238,10 @@ impl CompiledNativeCommandControls {
         // sourcing, and the file still has to be named in the text, so
         // `source $INIT` and `eval evil && source ok.sh` keep their evaluation
         // failure. Nothing is projected from a file that was not read: the
-        // owners below come only from text this scan held, and this floor
-        // starts at `review` and only rises.
-        let sourced_bounded = sources_files
-            && (sourced.is_some() || crate::pretool::only_nesting_is_sourcing(command, context));
+        // owners below come only from text this scan held, including the text
+        // of a file read beside one that could not be, and this floor starts
+        // at `review` and only rises.
+        let sourced_bounded = sources_files && sourced.is_some();
         if shell.contains("$'")
             || shell.contains("$\"")
             || synthesizes_program(&unquoted_literal(shell), sourced_bounded)
@@ -665,7 +666,7 @@ fn sourcing_names_its_files(
     command: &CanonicalCommandV1,
     context: crate::pretool::PathContext<'_>,
 ) -> bool {
-    crate::pretool::only_nesting_is_sourcing(command, context)
+    crate::pretool::sourcing_bounded_sources(command, context).is_some()
 }
 
 /// A command with its heredocs removed that moves no data, or only to

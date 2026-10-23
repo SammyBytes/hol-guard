@@ -820,3 +820,77 @@ fn an_unreadable_workspace_file_keeps_its_evaluation_failure() {
     assert_ne!(action, "allow");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// The same evaluation with one extension disabled, so that a program named in
+/// a sourced file shows up in the decision instead of only in the owner set.
+fn decided(root: &Path, disabled: &str, command: &str) -> (String, String) {
+    let controls = super::tests::controls(
+        serde_json::json!([
+            { "target_kind": "extension", "target_id": disabled, "state": "disabled" }
+        ]),
+        false,
+    );
+    let cwd = root.join("project");
+    let result = crate::pretool::evaluate_pre_tool_envelope_with_context(
+        "claude-code",
+        "PreToolUse",
+        &serde_json::json!({"tool_name": "Bash", "tool_input": {"command": command}}),
+        Some(&controls),
+        None,
+        root.to_str(),
+        cwd.to_str(),
+    );
+    (result.minimum_action, result.reason_code)
+}
+
+/// A file this scan could not read gives up its own owners and nothing else.
+/// `source ./tools.sh && source ../outside/env.sh` reads the first file, so
+/// the `docker` it names still joins the owners and still carries the floor
+/// its disabled extension sets; the unreadable neighbour beside it must not
+/// hand the command a plain review card it could not have had alone.
+#[test]
+fn a_file_the_scan_read_keeps_its_owners_beside_one_it_could_not() {
+    let root = project("neighbour", ACTIVATE);
+    std::fs::write(root.join("project").join("tools.sh"), "docker ps\n").unwrap();
+    std::fs::create_dir_all(root.join("outside")).unwrap();
+    std::fs::write(
+        root.join("outside").join("env.sh"),
+        b"#!/bin/sh\n\xffexport PATH=/tmp:$PATH\n",
+    )
+    .unwrap();
+    let alone = decided(
+        &root,
+        "command.container-runtime",
+        "source ./tools.sh && pytest -q",
+    );
+    assert_eq!(alone.0, "block", "{}", alone.1);
+    let beside = decided(
+        &root,
+        "command.container-runtime",
+        "source ./tools.sh && source ../outside/env.sh && pytest -q",
+    );
+    assert_eq!(beside, alone);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// An earlier `cd` reads the file from somewhere else. `cd elsewhere &&
+/// source ./setup.sh` runs `elsewhere/setup.sh`, not the `setup.sh` this scan
+/// resolves beside the command, so a relative target after a directory change
+/// keeps the evaluation failure rather than trading the file that actually
+/// runs for a review card.
+#[test]
+fn a_directory_change_before_the_sourcing_keeps_the_evaluation_failure() {
+    let root = project("moved", ACTIVATE);
+    std::fs::write(
+        root.join("project").join("setup.sh"),
+        "export PATH=/tmp:$PATH\n",
+    )
+    .unwrap();
+    let elsewhere = root.join("project").join("elsewhere");
+    std::fs::create_dir_all(&elsewhere).unwrap();
+    std::fs::write(elsewhere.join("setup.sh"), "docker ps\n").unwrap();
+    let (action, code) = reviewed(&root, "cd elsewhere && source ./setup.sh && pytest -q");
+    assert_ne!(code, "native_command_review_required");
+    assert_ne!(action, "allow", "{code}");
+    let _ = std::fs::remove_dir_all(&root);
+}
