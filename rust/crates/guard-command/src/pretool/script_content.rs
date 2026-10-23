@@ -324,15 +324,30 @@ pub(crate) fn sourcing_shape_is_reviewable(
             return false;
         }
         let read = resolve(target, context).as_deref().and_then(read_text);
-        if read.is_none()
-            && !outside_the_workspace(target, context)
-            && !(absent(target, context) && !named_earlier(prior, target))
-        {
+        if read.is_none() && !reviewable_unread(target, context, prior) {
             return false;
         }
         sourcing = true;
     }
     sourcing
+}
+
+/// Whether a sourced file whose words this scan does not have may still stand
+/// behind an approval card.
+///
+/// A path the read screen keeps out of reach is already given up by the floor
+/// this feeds, and a path that holds no file hides nothing - unless an earlier
+/// segment of the same command names it, which is the command writing the words
+/// it then runs.
+fn reviewable_unread(
+    target: &str,
+    context: PathContext<'_>,
+    prior: &[crate::CommandSegmentV1],
+) -> bool {
+    if outside_the_workspace(target, context) {
+        return true;
+    }
+    absent(target, context) && !named_earlier(prior, target)
 }
 
 /// Whether the path a sourcing names holds no file at all.
