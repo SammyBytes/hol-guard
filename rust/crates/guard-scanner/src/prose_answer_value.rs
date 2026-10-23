@@ -85,6 +85,11 @@ const MIN_VALUE_RUN: usize = 8;
 /// characters, so a letter run past that was not typed as prose.
 const MAX_WORD_RUN: usize = 20;
 
+/// Shortest run of digits alone taken for a value. Longer than `MIN_VALUE_RUN`
+/// because a report writes out dates, counts and issue numbers, none of which
+/// reach the length of an account number or a numeric key.
+const MIN_DIGIT_RUN: usize = 10;
+
 /// How much of the line in front of a match can make its field a question.
 const MAX_FIELD_LEAD_CHARS: usize = 48;
 
@@ -158,18 +163,17 @@ fn reports_about_field(preceding: &str, field: &str) -> bool {
 /// at a space, `"`, `'`, `,` or `}`, so anything else directly after the match
 /// is more of the same value and the answer wording proves nothing about it.
 ///
-/// A space is the case worth care. The arm stops there too, so `password: no
-/// q7Lm2Xv9Rt4Kp8Wz` matches `no` alone and the value after it is never looked
-/// at. The answer only holds when nothing on the rest of that line is shaped
-/// like a secret, so `Password: not set` still reads as a report.
+/// Where the arm did stop, the value after it is never looked at: `password:
+/// no q7Lm2Xv9Rt4Kp8Wz` matches `no` alone, and so does `password: no,
+/// q7Lm2Xv9Rt4Kp8Wz`. The answer only holds when nothing on the rest of that
+/// line is shaped like a secret, so `Password: not set` still reads as a
+/// report. Which character ended the value does not change that: a credential
+/// written after a comma is a credential.
 fn ends_value(tail: &str) -> bool {
     let Some(next) = tail.chars().next() else {
         return true;
     };
-    if matches!(next, ',' | '}' | ')' | ']' | ';') {
-        return true;
-    }
-    next.is_whitespace() && !carries_value(tail)
+    (next.is_whitespace() || matches!(next, ',' | '}' | ')' | ']' | ';')) && !carries_value(tail)
 }
 
 /// Whether the rest of the line holds a token shaped like a credential. `-` and
@@ -186,16 +190,23 @@ fn carries_value(tail: &str) -> bool {
 }
 
 /// Whether one token on that line is a chosen value rather than more prose.
-/// It has to be long enough and carry letters, and then either mix digits in or
-/// run past any word. Case is not read either way: an operator's `DB_PASSWORD`
-/// and an access key id are both upper case.
+/// A token carrying letters has to be long enough and then either mix digits
+/// in or run past any word. Case is not read either way: an operator's
+/// `DB_PASSWORD` and an access key id are both upper case.
+///
+/// Digits alone are a value too, at a greater length: an account number, a PIN
+/// or a numeric key. The extra length leaves a report free to carry a date, a
+/// count or an issue number beside its answer.
 fn holds_value(token: &str) -> bool {
     let run: String = token
         .chars()
         .filter(|character| character.is_ascii_alphanumeric())
         .collect();
-    if run.len() < MIN_VALUE_RUN || !run.bytes().any(|byte| byte.is_ascii_alphabetic()) {
+    if run.len() < MIN_VALUE_RUN {
         return false;
+    }
+    if !run.bytes().any(|byte| byte.is_ascii_alphabetic()) {
+        return run.len() >= MIN_DIGIT_RUN;
     }
     run.bytes().any(|byte| byte.is_ascii_digit()) || run.len() > MAX_WORD_RUN
 }
@@ -308,6 +319,32 @@ mod tests {
             " in this read-only-by-design file",
             ""
         ));
+    }
+
+    #[test]
+    fn digits_alone_after_an_answer_are_a_value() {
+        assert!(!is_prose_answer("api_key: none", " 482919375521", ""));
+        assert!(credential_assignment("api_key: none 482919375521\n"));
+        assert!(!is_prose_answer("pin: not", " set 8675309123", ""));
+        // A date, a count or an issue number beside the answer is still prose.
+        assert!(is_prose_answer("Token: none", " as of 2026-10-23", ""));
+        assert!(is_prose_answer("Password: none", " in 1284 files", ""));
+        assert!(!credential_assignment("Token: none as of 2026-10-23\n"));
+    }
+
+    #[test]
+    fn a_value_after_a_comma_reads_like_one_after_a_space() {
+        assert!(!is_prose_answer("password: no", ", q7Lm2Xv9Rt4Kp8Wz", ""));
+        assert!(credential_assignment("password: no, q7Lm2Xv9Rt4Kp8Wz\n"));
+        assert!(!is_prose_answer(
+            "token: none",
+            "} ghp_AbCdEfGhIjKlMnOpQrSt",
+            ""
+        ));
+        // A second field answered on the same line is still prose.
+        assert!(is_prose_answer("Token: none", ", password: none", ""));
+        assert!(is_prose_answer("credential: absent", ";", ""));
+        assert!(!credential_assignment("Token: none, password: none\n"));
     }
 
     #[test]
