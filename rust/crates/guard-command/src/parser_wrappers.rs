@@ -220,14 +220,23 @@ pub(super) fn is_file_shell_invocation(executable: Option<&str>, arguments: &[St
 /// path the shell expands. A directory is not a script either, and a leading
 /// `-` is an option. A space is none of that: the word reaches here already
 /// split, so `sh -- './pre flight.sh'` names one file the shell opens.
+///
+/// Braces and a leading `=` are expansions the word carries inside itself, so
+/// they are refused with the rest of the syntax rather than read as part of a
+/// name. `sh ./build{,}` runs `sh ./build ./build` and `sh =make` runs whatever
+/// `make` resolves to on this `PATH`; reading either as one file would bind an
+/// approval, and the credential scan behind it, to a path that is never opened.
 fn names_a_script_file(script: &str) -> bool {
     !script.is_empty()
         && !script.starts_with('-')
         && !script.starts_with('~')
+        && !script.starts_with('=')
         && !script.ends_with('/')
         && script != "."
         && script != ".."
-        && !script.contains(['$', '*', '?', '[', ']', '`', '"', '\'', '\\', '\n', '\t'])
+        && !script.contains([
+            '$', '*', '?', '[', ']', '{', '}', '`', '"', '\'', '\\', '\n', '\t', '\r', '\0',
+        ])
 }
 
 pub(super) fn is_encoded_stdin_shell(
@@ -382,6 +391,13 @@ mod tests {
             "scripts/",
             ".",
             "..",
+            // Brace expansion rewrites the word into several, so `sh ./build{,}`
+            // runs `./build` twice and never opens the name as written.
+            "build{,}",
+            "./ok{a,b}.sh",
+            "./ok{,.sh}",
+            // zsh resolves a leading `=` against `PATH`.
+            "=make",
         ] {
             assert!(!super::names_a_script_file(script), "{script}");
         }
