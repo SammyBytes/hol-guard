@@ -69,6 +69,11 @@ fn recorded_python_vectors_match_the_resident() {
                     "REGEN|{kind}/{name}|{}",
                     serde_json::to_string(&recorded).unwrap()
                 );
+                eprintln!(
+                    "HAVE|{kind}/{name}|{}|{}",
+                    vector["summary"],
+                    serde_json::to_string(&vector["expected"]).unwrap()
+                );
             }
             failures.push(format!("{kind} / {name}"));
         }

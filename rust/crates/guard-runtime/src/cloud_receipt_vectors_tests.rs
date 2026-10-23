@@ -29,6 +29,11 @@ fn recorded_python_receipts_match_the_resident() {
                     vector["name"].as_str().unwrap(),
                     serde_json::to_string(actual).unwrap()
                 );
+                eprintln!(
+                    "HAVE|{}|{}",
+                    vector["name"].as_str().unwrap(),
+                    serde_json::to_string(&vector["expected"]).unwrap()
+                );
             }
             failures.push(vector["name"].as_str().unwrap().to_owned());
         }
