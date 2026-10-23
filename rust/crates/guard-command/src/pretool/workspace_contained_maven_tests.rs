@@ -73,12 +73,19 @@ fn the_fetching_verbs_and_a_bare_directory_keep_their_review() {
         // These refresh a dependency from the remote repository.
         "mvn -U test",
         "mvn --update-snapshots verify",
-        // Without a phase Maven prints its help, and a bare option is no
-        // evidence of local work either.
-        "mvn",
-        "mvn -version",
         "mvn test && mvn deploy",
     ] {
+        for harness in ["codex", "claude-code", "omp"] {
+            let (reason, minimum) = outcome(harness, command, &ws);
+            assert_ne!(reason, CONTAINED, "{harness}: {command}");
+            // Not contained is only half of it: the firewall these verbs
+            // belong to must still queue the review, not let them through.
+            assert_eq!(minimum, "review", "{reason} {harness}: {command}");
+        }
+    }
+    // Without a phase Maven prints its help, and a bare option is no evidence
+    // of local work either, so neither reaches the sandbox.
+    for command in ["mvn", "mvn -version"] {
         for harness in ["codex", "claude-code", "omp"] {
             let (reason, _) = outcome(harness, command, &ws);
             assert_ne!(reason, CONTAINED, "{harness}: {command}");
@@ -102,8 +109,9 @@ fn gradle_keeps_its_review() {
     std::fs::write(ws.join("build.gradle"), "plugins { id 'java' }\n").unwrap();
     for command in ["gradle build", "./gradlew :app:test", "gradle test"] {
         for harness in ["codex", "claude-code", "omp"] {
-            let (reason, _) = outcome(harness, command, &ws);
+            let (reason, minimum) = outcome(harness, command, &ws);
             assert_ne!(reason, CONTAINED, "{harness}: {command}");
+            assert_eq!(minimum, "review", "{reason} {harness}: {command}");
         }
     }
 }

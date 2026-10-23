@@ -254,6 +254,15 @@ pub(super) fn filter(
             "MAVEN_OPTS".to_owned(),
             format!("-Dmaven.repo.local={repository}"),
         );
+        // A project's `mvnw` runs the Maven the project pins, which the
+        // wrapper looks for below its Maven user home. The real one is out of
+        // reach, so the run gets its own, holding a link to each distribution
+        // the host has already unpacked. Without it the wrapper would try to
+        // download the distribution and fail, because there is no network.
+        result.insert(
+            "MAVEN_USER_HOME".to_owned(),
+            maven_user_home(private_tmp).to_string_lossy().into_owned(),
+        );
     }
     // A linked user site is read through the private HOME; otherwise it stays off.
     if !user_site {
@@ -267,6 +276,13 @@ pub(super) fn filter(
 /// the host's fetched groups are linked in below it.
 pub(super) fn maven_repository(private_tmp: &Path) -> PathBuf {
     private_tmp.join("maven-repository")
+}
+
+/// The private Maven user home a contained run uses. A wrapper run resolves
+/// its distribution below this directory; the host's unpacked distributions
+/// are linked in below it.
+pub(super) fn maven_user_home(private_tmp: &Path) -> PathBuf {
+    private_tmp.join("maven-home")
 }
 
 /// The private `CARGO_HOME` a contained run uses. Cargo writes its locks and

@@ -28,7 +28,10 @@
 //! repository with that one linked in, so Maven takes its locks and writes
 //! its own state inside the private tree, and runs offline, which turns an
 //! artifact the host has not fetched into an immediate error rather than a
-//! download the firewall never saw.
+//! download the firewall never saw. A `mvnw` run executes the Maven the
+//! project pins, which the wrapper looks for below its Maven user home: the
+//! run gets its own, holding a link to each distribution the host has already
+//! unpacked in `~/.m2/wrapper/dists`, also granted read-only.
 
 use std::path::Path;
 
