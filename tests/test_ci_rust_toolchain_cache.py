@@ -277,6 +277,7 @@ def test_normalization_is_opt_in_and_precedes_full_environment_hashing() -> None
 
 def test_release_normalization_is_hosted_windows_only_after_install_before_cache() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/release-native-prepare.yml").read_text())
+    assert "scripts/ci/normalize_rust_toolchains.py" in workflow[True]["push"]["paths"]
     steps = workflow["jobs"]["compile"]["steps"]
     normalizers = [step for step in steps if "normalize_rust_toolchains.py" in step.get("run", "")]
     assert len(normalizers) == 1

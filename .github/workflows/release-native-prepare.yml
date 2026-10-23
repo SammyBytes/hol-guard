@@ -8,6 +8,7 @@ on:
       - scripts/release/native_cache_key.py
       - scripts/release/native_artifact.py
       - scripts/ci/native_cache_environment.py
+      - scripts/ci/normalize_rust_toolchains.py
       - rust/**
       - contracts/**
       - contributions/command-sources/**
