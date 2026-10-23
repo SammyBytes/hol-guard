@@ -1679,6 +1679,25 @@
     "rust/crates/guard-command/src/extension_control.rs",
     "rust/crates/guard-runtime/src/extension_control_op.rs"
    ]
+  },
+  {
+   "path": "src/codex_plugin_scanner/guard/inventory_contract_scans.py",
+   "module": "codex_plugin_scanner.guard.inventory_contract_scans",
+   "source_sha256": "4a1b289d0ecf207a9b6cebaf9f0b9e7afc0c971c14e4d6434a7ed6074d4a8863",
+   "forbidden_symbols": [
+    "_cisco_inventory_findings",
+    "_cisco_inventory_sources",
+    "_cisco_source",
+    "_inventory_severity",
+    "_score_delta_for_severity",
+    "_artifact_id_for_cisco_finding",
+    "_source_status_for_cisco_status",
+    "_symlink_findings_from_items"
+   ],
+   "native_replacements": [
+    "rust/crates/guard-command/src/inventory_contract.rs",
+    "rust/crates/guard-runtime/src/inventory_scan_findings_op.rs"
+   ]
   }
  ],
  "retired_test_paths": [
@@ -2244,6 +2263,24 @@
    ],
    "native_replacements": [
     "rust/crates/guard-command/src/shell_execution_context_support.rs"
+   ]
+  },
+  {
+   "path": "src/codex_plugin_scanner/guard/inventory_contract_metadata.py",
+   "source_sha256": "33d04296fa0f81e2dfdc261f047aa4bdab6918efeed1ffc09c47340d20594e70",
+   "forbidden_symbols": [
+    "_bind_skill_document_evidence",
+    "_canonical_inventory_content_hash",
+    "_capabilities_for_artifact",
+    "_discard_unverified_skill_directory_hash",
+    "_item_kind",
+    "_resolve_item_content_hash",
+    "_risk_level"
+   ],
+   "native_replacements": [
+    "rust/crates/guard-contracts/src/inventory_item_classification.rs",
+    "rust/crates/guard-command/src/inventory_item_metadata.rs",
+    "rust/crates/guard-runtime/src/inventory_item_classification_op.rs"
    ]
   }
  ]
