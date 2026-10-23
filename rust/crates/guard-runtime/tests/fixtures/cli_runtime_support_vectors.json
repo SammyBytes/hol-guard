@@ -2761,12 +2761,512 @@
         "preferred": "ide",
         "tool_name": "mcp_"
       }
+    },
+    {
+      "expected": "https://example.test/path?token=redacted&page=2",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?token=abc123&page=2"
+      }
+    },
+    {
+      "expected": "https://example.test/path?TOKEN=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?TOKEN=abc123"
+      }
+    },
+    {
+      "expected": "https://example.test/path?api-key=redacted&api_key=redacted&apiXkey=ghi",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?api-key=abc&api_key=def&apiXkey=ghi"
+      }
+    },
+    {
+      "expected": "https://example.test/path?authorization=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?authorization=Bearer+abc"
+      }
+    },
+    {
+      "expected": "https://example.test/path",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://user:hunter2@example.test/path"
+      }
+    },
+    {
+      "expected": "https://example.test:8443/path?a=1&b=2",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test:8443/path?a=1;b=2"
+      }
+    },
+    {
+      "expected": "https://example.test/path?blank=&novalue=&=orphan",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?blank=&novalue&=orphan"
+      }
+    },
+    {
+      "expected": "https://example.test/path?credent%C4%B1al=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?credent%C4%B1al=hunter2"
+      }
+    },
+    {
+      "expected": "https://example.test/path?t%C4%B1ken=hunter2",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?t%C4%B1ken=hunter2"
+      }
+    },
+    {
+      "expected": "https://example.test/path?name=a+b%2Bc",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?name=a%20b%2Bc"
+      }
+    },
+    {
+      "expected": "https://example.test/path?name=%C3%A9caf%C3%A9",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?name=%C3%A9caf%C3%A9"
+      }
+    },
+    {
+      "expected": "https://example.test/path?name=%EF%BF%BD%C3%A9",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?name=%C3\u00e9"
+      }
+    },
+    {
+      "expected": "https://example.test/path?name=%25zz",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?name=%zz"
+      }
+    },
+    {
+      "expected": "https://example.test/path?name=a+b",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?name=a+b"
+      }
+    },
+    {
+      "expected": "https://example.test/path?secret=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path?secret=%F0%9F%94%91"
+      }
+    },
+    {
+      "expected": "https://[::1]:9000/path?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://[::1]:9000/path?token=x"
+      }
+    },
+    {
+      "expected": "https://example.test/path?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test:99999/path?token=x"
+      }
+    },
+    {
+      "expected": "malformed_url_redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://[::1/unclosed?token=x"
+      }
+    },
+    {
+      "expected": "malformed_url_redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://exam\u2100ple.test/path"
+      }
+    },
+    {
+      "expected": "ftp://example.test/pub",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "ftp://example.test/pub"
+      }
+    },
+    {
+      "expected": "unknownscheme://example.test/path?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "unknownscheme://example.test/path?token=x"
+      }
+    },
+    {
+      "expected": "mailto:person@example.test",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "mailto:person@example.test"
+      }
+    },
+    {
+      "expected": "/relative/path?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "/relative/path?token=x"
+      }
+    },
+    {
+      "expected": "//example.test/scheme-relative?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "//example.test/scheme-relative?token=x"
+      }
+    },
+    {
+      "expected": "https://example.test/path#frag?not-a-query",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/path#frag?not-a-query"
+      }
+    },
+    {
+      "expected": "https://example.test/sp ace?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https://example.test/sp ace?token=x"
+      }
+    },
+    {
+      "expected": "https:////double-slash-path?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https:////double-slash-path?token=x"
+      }
+    },
+    {
+      "expected": "https:relative-path?token=redacted",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": "https:relative-path?token=x"
+      }
+    },
+    {
+      "expected": "",
+      "operation": "inventory_redact_url",
+      "params": {
+        "value": ""
+      }
+    },
+    {
+      "expected": "none",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": null
+      }
+    },
+    {
+      "expected": "none",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": ""
+      }
+    },
+    {
+      "expected": "local_loopback",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "https://localhost:3000/api"
+      }
+    },
+    {
+      "expected": "local_loopback",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://127.0.0.1/api"
+      }
+    },
+    {
+      "expected": "local_loopback",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://[::1]/api"
+      }
+    },
+    {
+      "expected": "local_loopback",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://LOCALHOST/api"
+      }
+    },
+    {
+      "expected": "local_private",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://10.0.0.5/api"
+      }
+    },
+    {
+      "expected": "local_private",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://172.16.0.1/api"
+      }
+    },
+    {
+      "expected": "local_private",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://192.168.1.1/api"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://192.0.0.9/api"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://192.0.0.10/api"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://8.8.8.8/api"
+      }
+    },
+    {
+      "expected": "local_private",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://[fd00::1]/api"
+      }
+    },
+    {
+      "expected": "local_private",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://[fe80::1]/api"
+      }
+    },
+    {
+      "expected": "local_private",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://[::ffff:10.0.0.1]/api"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://[::ffff:8.8.8.8]/api"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://[2001:4860:4860::8888]/api"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "https://example.test/api"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "https://[::1/unclosed"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://127.0.0.01/leading-zero-octet"
+      }
+    },
+    {
+      "expected": "remote_public",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "not-a-url"
+      }
+    },
+    {
+      "expected": "local_private",
+      "operation": "inventory_endpoint_host_class",
+      "params": {
+        "value": "http://[fe80::1%25eth0]/zone"
+      }
+    },
+    {
+      "expected": [],
+      "operation": "inventory_redact_headers",
+      "params": {
+        "names": []
+      }
+    },
+    {
+      "expected": [
+        [
+          "content-type",
+          "present"
+        ],
+        [
+          "accept",
+          "present"
+        ]
+      ],
+      "operation": "inventory_redact_headers",
+      "params": {
+        "names": [
+          "Content-Type",
+          "Accept"
+        ]
+      }
+    },
+    {
+      "expected": [
+        [
+          "authorization",
+          "present_redacted"
+        ],
+        [
+          "x-api-key",
+          "present_redacted"
+        ],
+        [
+          "cookie",
+          "present"
+        ]
+      ],
+      "operation": "inventory_redact_headers",
+      "params": {
+        "names": [
+          "Authorization",
+          "X-Api-Key",
+          "Cookie"
+        ]
+      }
+    },
+    {
+      "expected": [
+        [
+          "authorization",
+          "present_redacted"
+        ]
+      ],
+      "operation": "inventory_redact_headers",
+      "params": {
+        "names": [
+          "Authorization",
+          "authorization"
+        ]
+      }
+    },
+    {
+      "expected": [
+        [
+          "x-auth-token",
+          "present_redacted"
+        ],
+        [
+          "x-bearer",
+          "present_redacted"
+        ],
+        [
+          "x-password",
+          "present_redacted"
+        ],
+        [
+          "x-credential",
+          "present_redacted"
+        ],
+        [
+          "x-secret",
+          "present_redacted"
+        ]
+      ],
+      "operation": "inventory_redact_headers",
+      "params": {
+        "names": [
+          "X-Auth-Token",
+          "x-bearer",
+          "x-password",
+          "x-credential",
+          "x-secret"
+        ]
+      }
+    },
+    {
+      "expected": [
+        [
+          "apixkey",
+          "present"
+        ],
+        [
+          "api-key",
+          "present_redacted"
+        ],
+        [
+          "api_key",
+          "present_redacted"
+        ]
+      ],
+      "operation": "inventory_redact_headers",
+      "params": {
+        "names": [
+          "apiXkey",
+          "api-key",
+          "api_key"
+        ]
+      }
+    },
+    {
+      "expected": [
+        [
+          "x-credent\u0131al",
+          "present_redacted"
+        ],
+        [
+          "x-t\u0131ken",
+          "present"
+        ]
+      ],
+      "operation": "inventory_redact_headers",
+      "params": {
+        "names": [
+          "X-Credent\u0131al",
+          "X-T\u0131ken"
+        ]
+      }
     }
   ],
   "schema": "guard-cli-runtime-support-parity.v1",
   "source": "src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py",
   "source_hashes": {
     "src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py": "8336a2fff0dfde8c6666251bf7754d6e4ea3799272d1ffdcc2ad41073f95a944",
+    "src/codex_plugin_scanner/guard/inventory_contract_redaction.py": "175318dfc9a0e747c01fe43db4a153206bddc0e948e1e9cecd482a5738930751",
     "src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py": "545d2a53a975c58a54268403e454bb5905ed95e8d626c2d6eeb57a0095b03440"
   },
   "source_identifiers": {
@@ -2982,6 +3482,85 @@
       "value_end",
       "value_start",
       "workspace"
+    ],
+    "src/codex_plugin_scanner/guard/inventory_contract_redaction.py": [
+      "Literal",
+      "OSError",
+      "Path",
+      "RuntimeError",
+      "ValueError",
+      "_SAFE_SERIALIZED_MARKERS",
+      "_SENSITIVE_KEY_RE",
+      "_SENSITIVE_VALUE_RE",
+      "_SERIALIZER_REDACTED_VALUE",
+      "_SERIALIZER_SECRET_ASSIGNMENT_RE",
+      "_SERIALIZER_UNSAFE_PATH_RE",
+      "_assert_serialized_inventory_payload_safe",
+      "_redact_command_value",
+      "_redact_known_path",
+      "_safe_artifact_metadata",
+      "_safe_finding_text",
+      "_safe_json",
+      "_safe_source_detail",
+      "_sanitize_paths",
+      "_sanitize_serializer_string",
+      "artifact",
+      "artifact_type",
+      "bool",
+      "candidate",
+      "classify_endpoint_host",
+      "command",
+      "config_path",
+      "dict",
+      "encoded",
+      "finding_count",
+      "getattr",
+      "headers",
+      "home_dir",
+      "home_redacted",
+      "host",
+      "hostname",
+      "int",
+      "ipaddress",
+      "isinstance",
+      "item",
+      "json",
+      "key",
+      "key_sensitive",
+      "list",
+      "match",
+      "metadata",
+      "netloc",
+      "object",
+      "parent_key",
+      "parent_sensitive",
+      "parse_qsl",
+      "parsed",
+      "path",
+      "payload",
+      "port",
+      "raw_metadata",
+      "re",
+      "redact_headers",
+      "redact_local_path",
+      "redact_url",
+      "redacted",
+      "redacted_pairs",
+      "relative",
+      "run",
+      "separate_untrusted_adapter_trust_metadata",
+      "status",
+      "str",
+      "string_key",
+      "suffix",
+      "transport",
+      "tuple",
+      "url",
+      "urlencode",
+      "urlsplit",
+      "urlunsplit",
+      "value",
+      "workspace_dir"
     ],
     "src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py": [
       "AttributeError",

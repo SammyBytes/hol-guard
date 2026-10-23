@@ -250,6 +250,20 @@ evidence; it no longer recomputes the view or compares verdicts. A head the
 resident cannot read, or one whose managed policy has moved, refuses the
 migration with no Python fallback.
 
+The URL grammar that redacts an exported inventory endpoint now answers out
+of the resident (`inventory_redact_url`, `inventory_endpoint_host_class`,
+`inventory_redact_headers` in `cli_runtime_support_op.rs`, over
+`guard-command/src/inventory_redaction.rs` and its CPython-faithful
+`python_url.rs` splitter). Python ships the raw value and keeps the answer
+intact: it does not reparse an authority, re-split a query, re-test a host
+against a private range, or repair a result it dislikes. A host class outside
+the four the contract names, or a non-string answer, raises rather than
+degrading to a local reading. The parity corpus under
+`guard-command/testdata/inventory_url_parity.json` stays CPython truth because
+`scripts/ci/generate_inventory_url_parity.py` executes the retired bodies out
+of git history by digest instead of importing the live facade, so a rebuilt
+corpus can never record the port's own answers.
+
 ## Harness route inventory
 
 The v2 contract maps all harnesses in `HARNESS_CONTRACTS`, including harnesses

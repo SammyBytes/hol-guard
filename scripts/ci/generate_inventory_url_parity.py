@@ -32,16 +32,70 @@ fixture would still look green:
 
 from __future__ import annotations
 
+import ast
+import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
-from codex_plugin_scanner.guard.inventory_contract_redaction import (
-    classify_endpoint_host,
-    redact_headers,
-    redact_url,
+from codex_plugin_scanner.guard import inventory_contract_constants as constants
+
+#: The revision of the redaction module that still carried these bodies in
+#: CPython. `redact_url`, `classify_endpoint_host` and `redact_headers` now
+#: answer out of the native runtime, so importing the live module would record
+#: the port's own answers and this fixture would stop being evidence of
+#: anything. The generator executes the retired source instead, identified by
+#: the digest `docs/guard/contracts/python-capability-ownership.v1.json`
+#: records for it.
+RETIRED_MODULE = "src/codex_plugin_scanner/guard/inventory_contract_redaction.py"
+RETIRED_SHA256 = "175318dfc9a0e747c01fe43db4a153206bddc0e948e1e9cecd482a5738930751"
+
+#: The names the retired bodies read out of their own package. They are not
+#: part of the port, so the live definitions are the right ones to supply.
+RETIRED_IMPORTS = (
+    "_SAFE_SERIALIZED_MARKERS",
+    "_SENSITIVE_KEY_RE",
+    "_SENSITIVE_VALUE_RE",
+    "_SERIALIZER_REDACTED_VALUE",
+    "_SERIALIZER_SECRET_ASSIGNMENT_RE",
+    "_SERIALIZER_UNSAFE_PATH_RE",
 )
+
+
+def _retired_grammar() -> dict[str, Any]:
+    """Execute the retired CPython bodies without importing the live facade."""
+    revisions = subprocess.run(
+        ["git", "log", "--format=%H", "--", RETIRED_MODULE],
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.split()
+    for revision in revisions:
+        source = subprocess.run(
+            ["git", "show", f"{revision}:{RETIRED_MODULE}"],
+            capture_output=True,
+            check=True,
+        ).stdout
+        if hashlib.sha256(source).hexdigest() == RETIRED_SHA256:
+            break
+    else:
+        raise SystemExit(f"no revision of {RETIRED_MODULE} carries {RETIRED_SHA256}")
+    tree = ast.parse(source)
+    # The package-relative imports would pull the live facade back in; every
+    # name they bind is supplied directly instead.
+    tree.body = [node for node in tree.body if not (isinstance(node, ast.ImportFrom) and node.level)]
+    namespace: dict[str, Any] = {name: getattr(constants, name) for name in RETIRED_IMPORTS}
+    exec(compile(tree, RETIRED_MODULE, "exec"), namespace)
+    return namespace
+
+
+_RETIRED = _retired_grammar()
+classify_endpoint_host = _RETIRED["classify_endpoint_host"]
+redact_headers = _RETIRED["redact_headers"]
+redact_url = _RETIRED["redact_url"]
 
 FIXTURE = Path("rust/crates/guard-command/testdata/inventory_url_parity.json")
 SCRIPT = "scripts/ci/generate_inventory_url_parity.py"

@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import ipaddress
 import json
 import re
 from pathlib import Path
 from typing import Literal
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .inventory_contract_constants import (
     _SAFE_SERIALIZED_MARKERS,
@@ -17,6 +15,21 @@ from .inventory_contract_constants import (
     _SERIALIZER_SECRET_ASSIGNMENT_RE,
     _SERIALIZER_UNSAFE_PATH_RE,
 )
+from .native_cli_runtime_support import cli_runtime_support
+
+_ENDPOINT_HOST_CLASSES = frozenset({"none", "local_loopback", "local_private", "remote_public"})
+
+
+def _bound_text(operation: str, params: dict[str, object]) -> str:
+    """Ask the resident for one inventory redaction answer and keep it intact.
+
+    The grammar that produces the answer lives in the native runtime. Nothing
+    here repairs, re-parses or falls back to a local reading of the value.
+    """
+    result = cli_runtime_support(operation, params)
+    if not isinstance(result, str):
+        raise ValueError("native_cli_runtime_support_result_invalid")
+    return result
 
 
 def redact_local_path(path: str | Path, *, home_dir: Path | None = None) -> str:
@@ -33,49 +46,23 @@ def redact_local_path(path: str | Path, *, home_dir: Path | None = None) -> str:
 
 def redact_headers(headers: dict[str, str]) -> dict[str, str]:
     """Preserve header names while redacting credential-bearing header values."""
-    return {key.lower(): "present_redacted" if _SENSITIVE_KEY_RE.search(key) else "present" for key in headers}
+    presence = cli_runtime_support("inventory_redact_headers", {"names": list(headers)})
+    if not isinstance(presence, list):
+        raise ValueError("native_cli_runtime_support_result_invalid")
+    return {str(name): str(state) for name, state in presence}
 
 
 def redact_url(value: str) -> str:
     """Remove sensitive URL credentials and query values before exporting an endpoint."""
-    try:
-        parsed = urlsplit(value)
-    except ValueError:
-        return "malformed_url_redacted"
-    hostname = parsed.hostname or ""
-    if ":" in hostname and not hostname.startswith("["):
-        hostname = f"[{hostname}]"
-    netloc = hostname
-    try:
-        port = parsed.port
-    except ValueError:
-        port = None
-    if port is not None:
-        netloc = f"{netloc}:{port}"
-    redacted_pairs = [
-        (key, "redacted" if _SENSITIVE_KEY_RE.search(key) else item)
-        for key, item in parse_qsl(parsed.query.replace(";", "&"), keep_blank_values=True)
-    ]
-    return urlunsplit((parsed.scheme, netloc, parsed.path, urlencode(redacted_pairs), parsed.fragment))
+    return _bound_text("inventory_redact_url", {"value": value})
 
 
 def classify_endpoint_host(value: str | None) -> Literal["none", "local_loopback", "local_private", "remote_public"]:
     """Classify an endpoint host without making a network request."""
-    if not value:
-        return "none"
-    try:
-        parsed = urlsplit(value)
-    except ValueError:
-        return "remote_public"
-    host = (parsed.hostname or "").lower()
-    if host in {"localhost", "127.0.0.1", "::1"}:
-        return "local_loopback"
-    try:
-        if ipaddress.ip_address(host).is_private:
-            return "local_private"
-    except ValueError:
-        pass
-    return "remote_public"
+    host_class = _bound_text("inventory_endpoint_host_class", {"value": value})
+    if host_class not in _ENDPOINT_HOST_CLASSES:
+        raise ValueError("native_cli_runtime_support_result_invalid")
+    return host_class  # type: ignore[return-value]
 
 
 def _safe_source_detail(run: object) -> str:

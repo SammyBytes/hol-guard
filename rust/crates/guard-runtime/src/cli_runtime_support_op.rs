@@ -188,6 +188,30 @@ pub(super) fn evaluate(operation: &str, params: &Value) -> Result<Value, &'stati
             .and_then(Value::as_str)
             .and_then(guard_command::normalized_remote_mcp_url)
             .map_or(Value::Null, Value::String),
+        "inventory_redact_url" => Value::String(guard_command::inventory_redaction::redact_url(
+            text(params, "value")?,
+        )),
+        "inventory_endpoint_host_class" => Value::String(
+            guard_command::inventory_redaction::classify_endpoint_host(
+                params.get("value").and_then(Value::as_str),
+            )
+            .to_owned(),
+        ),
+        "inventory_redact_headers" => {
+            let names = params
+                .get("names")
+                .and_then(Value::as_array)
+                .ok_or(INVALID)?
+                .iter()
+                .map(|name| name.as_str().map(str::to_owned).ok_or(INVALID))
+                .collect::<Result<Vec<String>, &'static str>>()?;
+            Value::Array(
+                guard_command::inventory_redaction::redact_headers(&names)
+                    .into_iter()
+                    .map(|(name, presence)| json!([name, presence]))
+                    .collect(),
+            )
+        }
         "server_fields" => server_fields(params.get("config").ok_or(INVALID)?)?,
         "tool_metadata" => tool_metadata(params)?,
         "tool_token" => {

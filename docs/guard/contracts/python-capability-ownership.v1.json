@@ -2105,6 +2105,28 @@
    "native_replacements": [
     "rust/crates/guard-runtime/src/extension_control_authority_op/installed_upgrade.rs"
    ]
+  },
+  {
+   "path": "src/codex_plugin_scanner/guard/inventory_contract_redaction.py",
+   "source_sha256": "175318dfc9a0e747c01fe43db4a153206bddc0e948e1e9cecd482a5738930751",
+   "forbidden_symbols": [
+    "host",
+    "hostname",
+    "ipaddress",
+    "netloc",
+    "parse_qsl",
+    "parsed",
+    "port",
+    "redacted_pairs",
+    "urlencode",
+    "urlsplit",
+    "urlunsplit"
+   ],
+   "native_replacements": [
+    "rust/crates/guard-command/src/inventory_redaction.rs",
+    "rust/crates/guard-command/src/python_url.rs",
+    "rust/crates/guard-runtime/src/cli_runtime_support_op.rs"
+   ]
   }
  ]
 }
