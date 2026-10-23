@@ -119,9 +119,16 @@ pub(super) fn unwrap_wrappers(
 
 /// `command X`, `time X` and `env NAME=value... X` run `X` with no other
 /// change. Bare `env X` is left alone: it only bypasses shell functions, and
-/// extension floors key on that spelling. An `env` prefix is transparent only
-/// when every assignment is inert. Any other name can retarget the program,
-/// so the `env` executable stays in place and the command remains uncertain.
+/// extension floors key on that spelling.
+///
+/// An `env` prefix carries its names the way the shell's own prefix does.
+/// `env FOO=1 npm test` and `FOO=1 npm test` run the same program with the
+/// same environment, and the second models exactly, so the first reading as a
+/// wrapper this parser does not model left ordinary work refused outright
+/// with no approval to give it. Each name joins `environment_names`, where
+/// `PATH` already marks the command as pointing the program elsewhere and the
+/// compatibility layer reads the rest; an `env` that names no program at all
+/// is still the environment dump, and keeps its own spelling.
 fn transparent_prefix(tokens: &[String], index: usize) -> Option<(usize, Vec<String>)> {
     let mut next = index + 1;
     let mut names = Vec::new();
@@ -129,9 +136,6 @@ fn transparent_prefix(tokens: &[String], index: usize) -> Option<(usize, Vec<Str
         "command" | "time" => {}
         "env" | "/usr/bin/env" | "/bin/env" => {
             while let Some(name) = tokens.get(next).and_then(|value| assignment_name(value)) {
-                if !crate::command_compatibility::inert_environment_name(name) {
-                    return None;
-                }
                 names.push(name.to_owned());
                 next += 1;
             }
@@ -437,11 +441,34 @@ mod tests {
             assert_eq!(segment.executable.as_deref(), Some(executable), "{command}");
             assert_eq!(segment.environment_names, names, "{command}");
         }
-        for command in ["env PATH=/tmp/x bun run build", "env NODE_PATH=x bun s.ts"] {
-            let model = parse(command);
-            assert_eq!(model.confidence, "uncertain", "{command}");
-            assert!(!model.path_overridden, "{command}");
+        // The `env` spelling of a prefix is the shell's own prefix written
+        // another way, so it models to the same thing, down to the names it
+        // carries and the `PATH` mark on them. Reading it as a wrapper this
+        // parser does not model refused `env FOO=1 npm test` outright while
+        // `FOO=1 npm test` ran silently.
+        for (prefixed, bare) in [
+            ("env FOO=1 npm test", "FOO=1 npm test"),
+            (
+                "env GIT_AUTHOR_NAME=x git commit -m y",
+                "GIT_AUTHOR_NAME=x git commit -m y",
+            ),
+            ("env PATH=/tmp/x bun run build", "PATH=/tmp/x bun run build"),
+            ("env NODE_PATH=x bun s.ts", "NODE_PATH=x bun s.ts"),
+        ] {
+            let model = parse(prefixed);
+            let plain = parse(bare);
+            assert_eq!(model.confidence, plain.confidence, "{prefixed}");
+            assert_eq!(model.path_overridden, plain.path_overridden, "{prefixed}");
+            assert_eq!(
+                model.segments[0].executable, plain.segments[0].executable,
+                "{prefixed}"
+            );
+            assert_eq!(
+                model.segments[0].environment_names, plain.segments[0].environment_names,
+                "{prefixed}"
+            );
         }
+        assert!(parse("env PATH=/tmp/x bun run build").path_overridden);
         let model = parse("sudo env CI=1 rm -rf build");
         assert_eq!(model.confidence, "exact");
         assert_eq!(model.wrapper_chain, ["sudo"]);
