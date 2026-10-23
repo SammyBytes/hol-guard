@@ -95,7 +95,5 @@ def _unusable(guard_home: Path) -> None:
 
     identity = native_runtime_status().identity
     if identity is not None:
-        native_record_resident_failure(
-            identity.sha256, guard_home, reason="native_local_cli_help_parse_payload"
-        )
+        native_record_resident_failure(identity.sha256, guard_home, reason="native_local_cli_help_parse_payload")
     return None

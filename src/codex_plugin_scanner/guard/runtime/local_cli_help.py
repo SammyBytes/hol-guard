@@ -150,9 +150,7 @@ def discover_local_cli_commands(
     if not discovered:
         return merge_discovered_commands(identity.name, empty), "empty"
     if len(discovered) <= _MAX_NESTED_PROBES:
-        discovered = _with_nested_commands(
-            tuple(argv), discovered, probe, program=identity.name, guard_home=guard_home
-        )
+        discovered = _with_nested_commands(tuple(argv), discovered, probe, program=identity.name, guard_home=guard_home)
     return merge_discovered_commands(identity.name, discovered), "ok"
 
 
@@ -233,9 +231,7 @@ def _with_nested_commands(
         child_output = probe((*prefix, command.name, "--help"))
         if child_output.strip() == "":
             continue
-        children = parse_cli_help_text(
-            child_output, invocation=(program, command.name), guard_home=guard_home
-        )
+        children = parse_cli_help_text(child_output, invocation=(program, command.name), guard_home=guard_home)
         if children is None:
             # The resident stopped answering. Every remaining child would wait
             # out its own timeout for the same silence, so stop probing and

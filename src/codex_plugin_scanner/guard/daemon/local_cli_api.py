@@ -1370,7 +1370,6 @@ def _discover_from_command(
     not serve.
     """
 
-
     source_path: str | None = None
     for candidate in local_cli_recognition_candidates(command, cwd=cwd, home_dir=home_dir):
         invocation = help_invocation_for_command(candidate, cwd=cwd, home_dir=home_dir)
