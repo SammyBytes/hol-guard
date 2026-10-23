@@ -182,3 +182,41 @@ def test_the_exported_seams_fail_closed_rather_than_redacting_in_python(monkeypa
         monkeypatch.setattr(native_inventory_url_redaction, name, unavailable)
     with pytest.raises(native_inventory_url_redaction.NativeInventoryUrlRedactionError, match="unavailable"):
         call()
+
+
+def test_a_host_class_outside_the_contract_is_refused(monkeypatch, tmp_path) -> None:
+    def mutate(result: dict[str, Any]) -> None:
+        result["answers"] = [{"kind": "classify_endpoint_host", "host_class": "trusted"}]
+
+    recorded = _install(monkeypatch, mutate)
+    with pytest.raises(native_inventory_url_redaction.NativeInventoryUrlRedactionError):
+        native_inventory_url_redaction.classify_endpoint_host("https://example.test", guard_home=tmp_path)
+    assert recorded == [("failure", "native_inventory_url_redaction_result")]
+
+
+def test_a_pass_answers_every_prefetched_value_in_one_request(monkeypatch, tmp_path) -> None:
+    recorded = _install(monkeypatch, lambda result: None)
+    urls = [f"https://example.test/{index}" for index in range(50)]
+    with native_inventory_url_redaction.redaction_pass():
+        native_inventory_url_redaction.prefetch([*urls, *urls], urls[:3], guard_home=tmp_path)
+        for url in urls:
+            native_inventory_url_redaction.redact_url(url, guard_home=tmp_path)
+        native_inventory_url_redaction.classify_endpoint_host(urls[0], guard_home=tmp_path)
+    assert recorded == [("success", None)]
+
+
+def test_a_pass_splits_a_prefetch_larger_than_one_request(monkeypatch, tmp_path) -> None:
+    recorded = _install(monkeypatch, lambda result: None)
+    urls = [f"https://example.test/{index}" for index in range(native_inventory_url_redaction._MAX_TASKS + 1)]
+    with native_inventory_url_redaction.redaction_pass():
+        native_inventory_url_redaction.prefetch(urls, guard_home=tmp_path)
+    assert recorded == [("success", None)] * 2
+
+
+def test_answers_are_forgotten_when_the_pass_ends(monkeypatch, tmp_path) -> None:
+    recorded = _install(monkeypatch, lambda result: None)
+    with native_inventory_url_redaction.redaction_pass():
+        native_inventory_url_redaction.redact_url("https://example.test", guard_home=tmp_path)
+    native_inventory_url_redaction.redact_url("https://example.test", guard_home=tmp_path)
+    native_inventory_url_redaction.prefetch(["https://example.test/other"], guard_home=tmp_path)
+    assert recorded == [("success", None)] * 2

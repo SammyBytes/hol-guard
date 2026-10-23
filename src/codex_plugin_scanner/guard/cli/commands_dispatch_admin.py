@@ -422,8 +422,15 @@ def _run_guard_doctor_command(
     payload["native_runtime"] = native_runtime
     payload["trust"] = build_trust_doctor_payload(store)
     payload["supply_chain"] = build_local_supply_chain_posture(store, config, now=_now())
-    with nullcontext() if args.harness else without_command_probes():
-        payload["aibom"] = build_aibom_status_payload(store, context, generated_at=_now())
+    from ..native_inventory_url_redaction import NativeInventoryUrlRedactionError
+
+    try:
+        with nullcontext() if args.harness else without_command_probes():
+            payload["aibom"] = build_aibom_status_payload(store, context, generated_at=_now())
+    except NativeInventoryUrlRedactionError as error:
+        # Doctor still reports everything else when the resident that redacts
+        # the inventory is the thing that is missing.
+        payload["aibom"] = {"available": False, "error": str(error)}
     from ..harness_posture import harness_posture_summary
     from ..protection_coverage import protection_is_in_effect
     from ..protection_posture import protection_status_fields

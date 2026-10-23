@@ -44,6 +44,43 @@ def classify_endpoint_host(value: str | None) -> str:
     return _native_url.classify_endpoint_host(value)
 
 
+_COMMAND_URL_RE = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[^\s]+")
+
+
+def _prefetch_artifact_urls(artifacts: tuple[object, ...]) -> None:
+    """Answer every URL an export of these artifacts redacts in batched requests.
+
+    The per-value redaction below then reads the pass's answers instead of
+    asking the resident once per string. A value this walk misses is still
+    redacted; it only costs its own request.
+    """
+    urls: list[str] = []
+    hosts: list[str] = []
+    for artifact in artifacts:
+        url = getattr(artifact, "url", None)
+        if isinstance(url, str) and url:
+            urls.append(url)
+            hosts.append(url)
+        command = getattr(artifact, "command", None)
+        if isinstance(command, str) and command:
+            urls.extend(match.group(0) for match in _COMMAND_URL_RE.finditer(command))
+        _collect_metadata_urls(getattr(artifact, "metadata", None), urls)
+    _native_url.prefetch(urls, hosts)
+
+
+def _collect_metadata_urls(value: object, urls: list[str]) -> None:
+    """Gather the strings ``_sanitize_paths`` will redact as URLs."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not _SENSITIVE_KEY_RE.search(str(key)):
+                _collect_metadata_urls(item, urls)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _collect_metadata_urls(item, urls)
+    elif isinstance(value, str) and "://" in value:
+        urls.append(value)
+
+
 def _safe_source_detail(run: object) -> str:
     """Redact source descriptions and record the resulting redaction counts."""
     status = str(getattr(run, "status", "unknown"))
@@ -137,11 +174,7 @@ def _redact_known_path(value: str, home_dir: Path, workspace_dir: Path | None) -
 
 def _redact_command_value(value: str, home_dir: Path, workspace_dir: Path | None) -> str:
     """Redact path and credential values from an exported command string."""
-    redacted = re.sub(
-        r"(?i)\b[a-z][a-z0-9+.-]*://[^\s]+",
-        lambda match: redact_url(match.group(0)),
-        value,
-    )
+    redacted = _COMMAND_URL_RE.sub(lambda match: redact_url(match.group(0)), value)
     redacted = re.sub(
         r"(^|\s)(/[^\s]+)",
         lambda match: f"{match.group(1)}{_redact_known_path(match.group(2), home_dir, workspace_dir)}",

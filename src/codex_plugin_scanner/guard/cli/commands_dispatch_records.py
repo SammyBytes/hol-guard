@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 
 from ..aibom_cli import _AIBOM_CLOUD_SYNC_OPTIONS, AibomCliOptions, AibomExportFormat
+from ..native_inventory_url_redaction import NativeInventoryUrlRedactionError
 from ..policy_decision_explain import matched_rule_for_receipt
 from ._commands_shared import *
 from .commands_parser_helpers import *
@@ -309,12 +310,15 @@ def _run_guard_inventory_command(
     context = _require_guard_context(context)
     generated_at = _now()
     if getattr(args, "json", False):
-        payload: dict[str, object] = build_inventory_json_payload(
-            store,
-            context,
-            generated_at=generated_at,
-            options=_aibom_cli_options_from_args(args),
-        )
+        try:
+            payload: dict[str, object] = build_inventory_json_payload(
+                store,
+                context,
+                generated_at=generated_at,
+                options=_aibom_cli_options_from_args(args),
+            )
+        except NativeInventoryUrlRedactionError as error:
+            return _inventory_redaction_unavailable("inventory", error)
     else:
         payload = {"generated_at": generated_at, "items": store.list_inventory()}
     if getattr(args, "sync", False):
@@ -324,6 +328,12 @@ def _run_guard_inventory_command(
         payload["fleet_posture"] = {"next_sync_inventory": "full"}
     _emit("inventory", payload, getattr(args, "json", False))
     return 0
+
+
+def _inventory_redaction_unavailable(kind: str, error: NativeInventoryUrlRedactionError) -> int:
+    """Refuse an export the resident could not redact, without a Python fallback."""
+    _emit(kind, {"error": str(error)}, True)
+    return 1
 
 
 def _run_guard_aibom_command(
@@ -343,12 +353,15 @@ def _run_guard_aibom_command(
     aibom_options = _aibom_cli_options_from_args(args)
     aibom_command = getattr(args, "aibom_command", None)
     if aibom_command == "status":
-        payload = build_aibom_status_payload(
-            store,
-            context,
-            generated_at=generated_at,
-            options=aibom_options,
-        )
+        try:
+            payload = build_aibom_status_payload(
+                store,
+                context,
+                generated_at=generated_at,
+                options=aibom_options,
+            )
+        except NativeInventoryUrlRedactionError as error:
+            return _inventory_redaction_unavailable("aibom.status", error)
         _emit("aibom.status", payload, getattr(args, "json", False))
         return 0
     if aibom_command == "sync":
@@ -396,13 +409,16 @@ def _run_guard_aibom_command(
         return 0
     export_format = getattr(args, "format", "json")
     resolved_format: AibomExportFormat = "markdown" if export_format == "markdown" else "json"
-    payload = build_aibom_export_payload(
-        store,
-        context,
-        generated_at=generated_at,
-        options=aibom_options,
-        export_format=resolved_format,
-    )
+    try:
+        payload = build_aibom_export_payload(
+            store,
+            context,
+            generated_at=generated_at,
+            options=aibom_options,
+            export_format=resolved_format,
+        )
+    except NativeInventoryUrlRedactionError as error:
+        return _inventory_redaction_unavailable("aibom", error)
     if resolved_format == "markdown" and not getattr(args, "json", False):
         print(str(payload.get("markdown", "")))
         return 0
