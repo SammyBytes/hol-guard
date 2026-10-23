@@ -280,6 +280,85 @@ pub(crate) fn sourcing_bounded_sources(
     sourcing.then_some(sources)
 }
 
+/// Whether a sourcing-only command's shape is one this scan can put behind an
+/// approval card.
+///
+/// [`sourcing_bounded_sources`] answers the stronger question - which programs
+/// the sourced files name, so that they join the owners - and a file that is
+/// not there answers none of it. That is the right answer for the owners and
+/// the wrong one for the card: a path the filesystem does not hold holds no
+/// words to miss either, and a shell sourcing it only reports that it could
+/// not read it. Refusing the shape over that left an ordinary
+/// `source venv/bin/activate && pytest -q`, run in a checkout whose virtualenv
+/// has not been created yet, a block with no approval to give it, while the
+/// same command one `python -m venv venv` later reviewed behind a card. The
+/// floor this opens starts at review and only rises, so an absent file never
+/// turns a command into an allow.
+///
+/// A file that exists and could not be read is not that case: padding one past
+/// the read bound or writing a byte that is not UTF-8 hides its words, and a
+/// checkout this agent did not write controls both. Neither is a file an
+/// earlier segment of this same command names. `printf '...' > run.sh &&
+/// . ./run.sh` sources words written after the scan looked, so both keep the
+/// evaluation failure they have today.
+pub(crate) fn sourcing_shape_is_reviewable(
+    model: &CanonicalCommandV1,
+    context: PathContext<'_>,
+) -> bool {
+    let Some((_, segments)) = structure(model, context) else {
+        return false;
+    };
+    if !sourcing_is_the_only_nesting(&segments) {
+        return false;
+    }
+    let mut sourcing = false;
+    for (index, segment) in segments.iter().enumerate() {
+        if !sources_a_file(segment) {
+            continue;
+        }
+        let Some(target) = sourced_file(segment) else {
+            return false;
+        };
+        let prior = &segments[..index];
+        if moved_out_of_reach(prior, target) {
+            return false;
+        }
+        let read = resolve(target, context).as_deref().and_then(read_text);
+        if read.is_none()
+            && !outside_the_workspace(target, context)
+            && !(absent(target, context) && !named_earlier(prior, target))
+        {
+            return false;
+        }
+        sourcing = true;
+    }
+    sourcing
+}
+
+/// Whether the path a sourcing names holds no file at all.
+///
+/// The read screen is not asked: a path it keeps out of reach is already given
+/// up by [`outside_the_workspace`], and the only question left here is whether
+/// there is anything to read.
+fn absent(target: &str, context: PathContext<'_>) -> bool {
+    guard_secure_fs::resolve_candidate(
+        target,
+        context.cwd.map(Path::new),
+        Path::new(context.home_dir.unwrap_or_default()),
+    )
+    .is_ok_and(|path| !path.exists())
+}
+
+/// Whether an earlier segment of the same command names the file a later one
+/// sources, which is the command writing the words it then runs.
+fn named_earlier(prior: &[crate::CommandSegmentV1], target: &str) -> bool {
+    let name = Path::new(target)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(target);
+    prior.iter().any(|segment| segment.text.contains(name))
+}
+
 /// Whether an earlier directory change moves a relative sourced path out of
 /// reach. The shell reads the file from the directory it moved to, which is
 /// not the one this scan resolves against, so the text it runs is not the text

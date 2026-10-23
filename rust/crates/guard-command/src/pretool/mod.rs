@@ -196,7 +196,7 @@ pub use safe_scalar::PsqlEnvironment;
 pub(crate) use script_content::launch_loopback_ports;
 pub(crate) use script_content::{
     activation_script_text, prefixed_launch, sole_program_sources, sourced_program_sources,
-    sourcing_bounded_sources,
+    sourcing_bounded_sources, sourcing_shape_is_reviewable,
 };
 pub(crate) use segment_proof::{benign_command_segments, without_stderr_merge};
 pub(crate) use trailing_group::unwrap as ungrouped_command_list;
