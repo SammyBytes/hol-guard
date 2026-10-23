@@ -381,6 +381,9 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
             ResidentOperationV1::PackageIntentParse(request) => {
                 crate::package_authority_op::evaluate_package_intent_parse(&request)
             }
+            ResidentOperationV1::PackageIntentExtract(request) => {
+                crate::package_intent_extract_op::evaluate_package_intent_extract(&request)
+            }
             ResidentOperationV1::PackageRequestArtifact(request) => {
                 crate::package_authority_op::evaluate_package_request_artifact_request(&request)
             }
@@ -713,6 +716,10 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
             }
             ResidentOperationV1::AibomReportSummaries(request) => {
                 crate::aibom_report_summaries_op::evaluate_aibom_report_summaries(&request)
+            }
+            // Diagnostic correlation only: the lineage never authorizes an action.
+            ResidentOperationV1::RetryLineageCapture(request) => {
+                crate::retry_lineage_capture_op::evaluate_retry_lineage_capture(&request)
             }
             #[cfg(not(unix))]
             ResidentOperationV1::ContainedNodeExecute(_)
