@@ -29,7 +29,8 @@ pub(super) fn printed_globs_listable(
 
 /// Each glob a binding holds is one a listing may show. Quotes in a binding
 /// keep `~` literal, which the listing proof would expand, so a quoted glob
-/// binding has no proof.
+/// binding has no proof. The listing proof screens every match, so the
+/// pattern itself needs no name screen.
 pub(super) fn bound_globs_listable<'a>(
     segment: &CommandSegmentV1,
     values: impl IntoIterator<Item = &'a str>,
@@ -38,11 +39,7 @@ pub(super) fn bound_globs_listable<'a>(
     values
         .into_iter()
         .filter(|value| value.contains(GLOB))
-        .all(|value| {
-            !segment.text.contains(['\'', '"', '\\'])
-                && !super::sensitive_read_path_argument(value)
-                && listable(value, context)
-        })
+        .all(|value| !segment.text.contains(['\'', '"', '\\']) && listable(value, context))
 }
 
 /// A printed or bound glob that reaches into a hidden directory reads may not
@@ -110,9 +107,13 @@ fn hidden_reach(value: &str) -> bool {
     pattern.starts_with('.') || (!directory.is_empty() && hidden_path(directory))
 }
 
+/// The literal part of `value`, before any glob, names a hidden or sensitive
+/// location. The name screen sees only that part: a wildcard can spell a
+/// credential name anywhere, so screening it would flag every project glob.
 fn hidden_path(value: &str) -> bool {
-    !guard_secure_fs::hidden_read_parts_allowed(Path::new(value))
-        || super::sensitive_read_path_argument(value)
+    let literal = value.find(GLOB).map_or(value, |first| &value[..first]);
+    !guard_secure_fs::hidden_read_parts_allowed(Path::new(literal))
+        || super::sensitive_read_path_argument(literal)
 }
 
 /// The arguments the shell globs. Without a quote map every glob character
