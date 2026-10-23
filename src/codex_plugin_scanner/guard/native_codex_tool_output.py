@@ -37,9 +37,11 @@ from .native_runtime_resilience import (
 )
 
 _MAX_REQUEST_BYTES = 256 * 1024
-# Mirrors ``CODEX_POST_TOOL_OUTPUT_MAX_BYTES``, which is itself held under the
-# transport's own frame limit so an oversized request is refused for its size
-# rather than as a malformed frame.
+# The largest envelope a post-tool review will frame, which is more than
+# ``CODEX_POST_TOOL_OUTPUT_MAX_BYTES``: that bound counts the op's own canonical
+# request and this counts the envelope around it. Held under the transport's
+# frame limit so a request past it is refused for its size rather than as a
+# malformed frame.
 _MAX_POST_TOOL_REQUEST_BYTES = 6 * 1024 * 1024 - 64 * 1024
 _RESIDENT_PROTOCOL_FEATURE = "resident-protocol-v2"
 _FEATURE = "codex-tool-output-v1"
