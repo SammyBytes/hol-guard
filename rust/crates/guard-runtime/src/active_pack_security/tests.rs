@@ -76,10 +76,15 @@ fn prior_closed_marker_upgrade_binds_authenticated_pack_program() {
 
 const SOURCE: &str = "1111111111111111111111111111111111111111";
 
-fn activation(key: &[u8]) -> Value {
+/// The installed activation a release admits for `bundle`.
+fn activation(key: &[u8], bundle: &(String, Value)) -> Value {
+    let identity = &bundle.1;
     let bytes = serde_json::to_string(&json!({"purpose":"command-pack-activation.v1",
         "authority_schema_version":1, "schema":"guard.command-pack-activation.v2",
-        "program_digest":"d".repeat(64)}))
+        "authority_profile":"installed", "program_digest":"d".repeat(64),
+        "engine":identity["engine"], "source_sha":identity["source"],
+        "root_digest":identity["root"], "authority_epoch":identity["authority"],
+        "revocation_epoch":identity["revocation"]}))
     .unwrap();
     let purpose = hex::decode(mac(
         key,
@@ -106,7 +111,18 @@ fn installed(engine: char, version: &str, authority: u64) -> (String, Value) {
 }
 
 fn begin(key: &[u8], record: Option<&str>, floor: &str, bundle: &(String, Value)) -> Value {
-    let mut input = activation(key);
+    begin_under(key, record, floor, bundle, bundle)
+}
+
+/// `begin` for `bundle` while the release `active` is the admitted activation.
+fn begin_under(
+    key: &[u8],
+    record: Option<&str>,
+    floor: &str,
+    bundle: &(String, Value),
+    active: &(String, Value),
+) -> Value {
+    let mut input = activation(key, active);
     input["key"] = hex::encode(key).into();
     input["operation"] = "begin".into();
     input["profile"] = "installed".into();
@@ -175,4 +191,25 @@ fn only_a_release_under_the_same_authority_is_restored() {
         &installed('a', "3.55.1", 4),
     );
     assert_eq!(claimed, json!({"error":"pack_lifecycle_version_rollback"}));
+}
+
+#[test]
+fn only_the_release_the_activation_admits_is_restored() {
+    let key = [7; 32];
+    let previous = installed('a', "3.55.1", 3);
+    let upgrade = installed('b', "3.56.0a3", 3);
+    let floor = crate::pack_lifecycle::enrolled_floor(&previous.1, &key);
+    let upgraded = begin(&key, None, &floor, &upgrade);
+    let upgraded_record = upgraded["record"].as_str();
+
+    // A still older release under the same authority and revocations is not
+    // the one the running activation admitted, so it stays a rollback.
+    let unrelated = installed('c', "3.40.0", 3);
+    let replaced = begin_under(&key, upgraded_record, &floor, &unrelated, &previous);
+    assert_eq!(replaced, json!({"error":"pack_lifecycle_version_rollback"}));
+
+    // Nor does the restored release replace the root while the upgrade is
+    // still the admitted activation.
+    let early = begin_under(&key, upgraded_record, &floor, &previous, &upgrade);
+    assert_eq!(early, json!({"error":"pack_lifecycle_version_rollback"}));
 }
