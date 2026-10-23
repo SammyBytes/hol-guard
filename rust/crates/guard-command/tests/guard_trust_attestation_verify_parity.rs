@@ -100,7 +100,9 @@ fn recorded_verifier_decisions_replay() {
     );
     let cases = document["cases"].as_array().expect("cases");
     let mut accepted = 0usize;
-    let mut divergent = 0usize;
+    // A refusal Python words through a library may be reached from more than
+    // one case, so the replay counts the distinct wordings rather than cases.
+    let mut divergent = std::collections::BTreeSet::new();
     for case in cases {
         let name = text(case, "name").expect("name");
         // `rust_error` marks a refusal Python words through a library; the
@@ -108,7 +110,7 @@ fn recorded_verifier_decisions_replay() {
         let expected = match (text(case, "replay_key"), text(case, "rust_error")) {
             (Some(replay_key), _) => Ok(replay_key),
             (None, Some(rust_error)) => {
-                divergent += 1;
+                divergent.insert(rust_error);
                 Err(rust_error)
             }
             (None, None) => Err(text(case, "error").expect("a case records an outcome")),
@@ -121,7 +123,7 @@ fn recorded_verifier_decisions_replay() {
         "the fixture must keep recording attestations that verify"
     );
     assert!(
-        divergent == 2,
+        divergent.len() == 2,
         "the two refusals Python words through a library are no longer recorded"
     );
     assert!(
