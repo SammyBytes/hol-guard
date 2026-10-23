@@ -510,6 +510,13 @@ fn allows_bounded_pipeline_consumers() {
         "git status --short | tail -f",
         "git status --short | head -n",
         "git status --short | head -n $(whoami)",
+        // The Korn shell reads `|&` as a coprocess rather than as a pipe with
+        // standard error merged into it. Naming a shell keeps the command out
+        // of this allow either way: the text it is handed is not the text this
+        // scan read, so no spelling of the pipe inside it is benign here.
+        "ksh -c 'git status --short |& head -2'",
+        "ksh -c 'git status --short 2>&1 | head -2'",
+        "ksh ./build.sh |& head -2",
     ] {
         let decision = evaluate_pre_tool(&request(command)).unwrap();
         assert!(!decision.explicitly_benign, "{command}");
