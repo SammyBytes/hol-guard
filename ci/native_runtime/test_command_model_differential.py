@@ -62,6 +62,7 @@ LAUNCHER_FIXTURES = (
     ("stdbuf -o0 tool", "tool"),
     ("stdbuf -oL -e0 tool --flag", "tool --flag"),
     ("nice -n 10 tool", "tool"),
+    ("exec rm -rf /tmp/example", "rm -rf /tmp/example"),
 )
 UNCERTAIN_FIXTURES = (
     "echo $(uname)",
@@ -78,7 +79,8 @@ UNCERTAIN_FIXTURES = (
     "nohup tool",
     "setsid tool",
     "eval 'rm -rf /tmp/example'",
-    "exec rm -rf /tmp/example",
+    "exec -a worker rm -rf /tmp/example",
+    "exec bash -lc 'rm -rf /tmp/example'",
     "source ./script.sh",
     ". ./script.sh",
     "if true; then echo yes; fi",
