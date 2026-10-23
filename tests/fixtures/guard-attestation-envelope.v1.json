@@ -21,7 +21,8 @@
         "public_key_pem": "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----",
         "fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "public_jwk_thumbprint": "thumb",
-        "signature": "c2lnbmF0dXJl"
+        "signature": "c2lnbmF0dXJl",
+        "signed_at": "2026-01-02T03:04:05+00:00"
       }
     },
     {
@@ -44,7 +45,8 @@
         "public_key_pem": "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----",
         "fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "public_jwk_thumbprint": "thumb",
-        "signature": "c2lnbmF0dXJl"
+        "signature": "c2lnbmF0dXJl",
+        "signed_at": "2026-01-02T03:04:05+00:00"
       }
     },
     {
@@ -66,7 +68,8 @@
         "public_key_pem": "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----",
         "fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "public_jwk_thumbprint": "thumb",
-        "signature": "c2lnbmF0dXJl"
+        "signature": "c2lnbmF0dXJl",
+        "signed_at": null
       }
     },
     {
@@ -88,7 +91,8 @@
         "public_key_pem": "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----",
         "fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "public_jwk_thumbprint": null,
-        "signature": "c2lnbmF0dXJl"
+        "signature": "c2lnbmF0dXJl",
+        "signed_at": "2026-01-02T03:04:05+00:00"
       }
     },
     {
@@ -111,7 +115,8 @@
         "public_key_pem": "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----",
         "fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "public_jwk_thumbprint": null,
-        "signature": "c2lnbmF0dXJl"
+        "signature": "c2lnbmF0dXJl",
+        "signed_at": "2026-01-02T03:04:05+00:00"
       }
     },
     {

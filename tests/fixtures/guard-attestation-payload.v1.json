@@ -66,6 +66,59 @@
       }
     },
     {
+      "name": "the ascii separators str.strip removes are stripped too",
+      "payload": {
+        "payloadVersion": "guard-aibom-trust-attestation.v3",
+        "domainSeparator": "hol-guard:aibom-trust-attestation:v3",
+        "agentId": "\u001c\u001f agent-1 \u001e",
+        "itemId": "item-1",
+        "itemKind": "skill",
+        "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "capturedAt": "2026-10-23T12:00:00Z",
+        "claimHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "evidenceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "scope": "trust_resolution"
+      },
+      "rules": {
+        "require_signed_at": false,
+        "require_nonce": false,
+        "require_subject_bindings": false
+      },
+      "normalized": {
+        "payloadVersion": "guard-aibom-trust-attestation.v3",
+        "domainSeparator": "hol-guard:aibom-trust-attestation:v3",
+        "agentId": "agent-1",
+        "itemId": "item-1",
+        "itemKind": "skill",
+        "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "capturedAt": "2026-10-23T12:00:00Z",
+        "claimHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "evidenceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "scope": "trust_resolution"
+      }
+    },
+    {
+      "name": "a field of only ascii separators is refused as blank",
+      "payload": {
+        "payloadVersion": "guard-aibom-trust-attestation.v3",
+        "domainSeparator": "hol-guard:aibom-trust-attestation:v3",
+        "agentId": "\u001c\u001d\u001e\u001f",
+        "itemId": "item-1",
+        "itemKind": "skill",
+        "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "capturedAt": "2026-10-23T12:00:00Z",
+        "claimHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "evidenceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "scope": "trust_resolution"
+      },
+      "rules": {
+        "require_signed_at": false,
+        "require_nonce": false,
+        "require_subject_bindings": false
+      },
+      "error": "Trust attestation payload field agentId must be a non-empty string"
+    },
+    {
       "name": "an unknown field is refused",
       "payload": {
         "payloadVersion": "guard-aibom-trust-attestation.v3",

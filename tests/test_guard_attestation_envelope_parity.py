@@ -37,6 +37,30 @@ def _refusal(envelope: dict[str, object]) -> str:
     return str(raised.value)
 
 
+def _read(envelope: dict[str, object]) -> dict[str, object]:
+    """The fields ``verify_trust_attestation`` reads out of an envelope it accepted.
+
+    It reads them inline, so there is nothing to call; this repeats the same
+    reads so the recorded ``accepted`` block is Python's answer and not only
+    the Rust twin's.
+    """
+
+    thumbprint = envelope.get("publicJwkThumbprint")
+    signed_at = envelope.get("signedAt")
+    return {
+        "payload_hash": envelope.get("payloadHash"),
+        "signature_algorithm": envelope.get("signatureAlgorithm"),
+        "key_id": envelope.get("keyId"),
+        "public_key_pem": envelope.get("publicKeyPem"),
+        "fingerprint_sha256": envelope.get("fingerprintSha256"),
+        "public_jwk_thumbprint": thumbprint if isinstance(thumbprint, str) else None,
+        "signature": envelope.get("signature"),
+        # ``_payload_with_signed_at`` keeps the envelope's signing time only
+        # when it is text and not blank; anything else leaves the payload's own.
+        "signed_at": signed_at if isinstance(signed_at, str) and signed_at else None,
+    }
+
+
 def test_the_fixture_covers_both_verdicts() -> None:
     assert _VECTORS["schema"] == "guard-attestation-envelope-parity.v1"
     cases = _VECTORS["cases"]
@@ -52,6 +76,7 @@ def test_a_recorded_envelope_is_accepted_or_refused_as_recorded(case: dict[str, 
 
     if "accepted" in case:
         assert message.startswith(_PAST_ENVELOPE)
+        assert _read(dict(case["envelope"])) == case["accepted"]
     else:
         assert message == case["error"]
 

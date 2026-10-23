@@ -42,6 +42,11 @@ pub struct TrustAttestationVerificationPolicy {
     pub minimum_sequence: Option<i64>,
     pub seen_replay_keys: BTreeSet<String>,
     pub now: Option<String>,
+    /// The verifier's own nonce policy, which Python defaults to false.
+    ///
+    /// This is not the nonce a signed payload must carry: that one is
+    /// mandatory, and `AttestationPayloadRules::SIGNED` has already demanded
+    /// it by the time a payload reaches here.
     pub require_nonce: bool,
 }
 

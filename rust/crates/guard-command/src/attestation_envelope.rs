@@ -6,18 +6,12 @@
 //! this inline at the top of `verify_trust_attestation`, and the wording of
 //! each rejection is reproduced here so a receipt reads the same whichever
 //! side refused it.
-//!
-//! `normalize_pem` and `public_key_fingerprint` trim with Rust's definition of
-//! whitespace, which omits the four ASCII separators U+001C to U+001F that
-//! Python's `str.strip` also removes. A PEM padded with one of those would
-//! fingerprint differently on the two sides, and the side that computed the
-//! other digest refuses the envelope, so the difference can only reject an
-//! attestation, never admit one.
 
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::attestation_payload::GUARD_TRUST_ATTESTATION_PAYLOAD_VERSION_V3;
+use crate::attestation_timestamp::python_strip;
 
 /// The RSA-PSS algorithm a signing key uses by default.
 pub const GUARD_TRUST_ATTESTATION_SIGNATURE_ALGORITHM: &str = "rsa-pss-sha256";
@@ -55,6 +49,9 @@ pub struct TrustAttestationEnvelope {
     pub fingerprint_sha256: String,
     pub public_jwk_thumbprint: Option<String>,
     pub signature: String,
+    /// The signing time the envelope declares, which overrides whatever the
+    /// payload carries. Absent, blank or non-text reads as `None`.
+    pub signed_at: Option<String>,
 }
 
 /// Why an envelope was refused, in the wording Python uses.
@@ -147,29 +144,37 @@ pub fn validated_trust_attestation_envelope(
             .and_then(Value::as_str)
             .map(str::to_owned),
         signature: text("signature"),
+        signed_at: non_empty_text(envelope, "signedAt").map(str::to_owned),
     })
 }
 
 /// Carry the envelope's signing time into the payload the signature covers.
+///
+/// Python validates `_payload_with_signed_at(payload, envelope.get("signedAt"))`,
+/// so the time the signature is checked against is the envelope's, not the one
+/// the payload arrived carrying. Taking the envelope itself rather than a loose
+/// value keeps a caller from handing over the payload's own copy by mistake.
 #[must_use]
 pub fn payload_with_signed_at(
     payload: &Map<String, Value>,
-    signed_at: Option<&Value>,
+    envelope: &TrustAttestationEnvelope,
 ) -> Map<String, Value> {
     let mut enriched = payload.clone();
-    if let Some(text) = signed_at
-        .and_then(Value::as_str)
-        .filter(|text| !text.is_empty())
-    {
-        enriched.insert("signedAt".to_owned(), Value::String(text.to_owned()));
+    if let Some(signed_at) = &envelope.signed_at {
+        enriched.insert("signedAt".to_owned(), Value::String(signed_at.clone()));
     }
     enriched
 }
 
 /// Read a PEM the way both sides hash it: Unix line endings, no outer blanks.
+///
+/// Python's `_normalize_pem` ends in `str.strip`, which also removes the four
+/// ASCII separators U+001C to U+001F that `char::is_whitespace` leaves alone,
+/// so the padding has to go by Python's rule or the two sides fingerprint the
+/// same key differently.
 #[must_use]
 pub fn normalize_pem(value: &str) -> String {
-    value.replace("\r\n", "\n").trim().to_owned()
+    python_strip(&value.replace("\r\n", "\n")).to_owned()
 }
 
 /// The digest an envelope has to carry for the public key it ships.

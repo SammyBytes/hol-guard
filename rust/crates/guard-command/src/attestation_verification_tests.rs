@@ -41,6 +41,7 @@ fn envelope(payload: &Map<String, Value>) -> TrustAttestationEnvelope {
         fingerprint_sha256: public_key_fingerprint(PEM),
         public_jwk_thumbprint: None,
         signature: "c2lnbmF0dXJl".to_owned(),
+        signed_at: None,
     }
 }
 

@@ -1,4 +1,4 @@
-//! The rules this parser inherits from `datetime.fromisoformat`.
+//! The one timestamp shape an attestation may carry, and the instant it names.
 
 use super::attestation_timestamp::parse_attestation_timestamp;
 
@@ -18,11 +18,25 @@ fn a_trailing_zulu_is_an_utc_instant() {
         parse_attestation_timestamp("  2026-10-23T12:00:00Z  "),
         Some(NOON)
     );
+    assert_eq!(parse_attestation_timestamp("2026-10-23 12:00Z"), Some(NOON));
+}
+
+#[test]
+fn padding_python_strips_is_stripped() {
+    // `str.strip` removes U+001C..U+001F; `char::is_whitespace` does not.
+    assert_eq!(
+        parse_attestation_timestamp("\u{1f}2026-10-23T12:00:00Z\u{1c}"),
+        Some(NOON)
+    );
+    assert_eq!(
+        parse_attestation_timestamp("\u{3000}2026-10-23T12:00:00Z\u{85}"),
+        Some(NOON)
+    );
+    assert_eq!(parse_attestation_timestamp("\u{1d}\u{1e}"), None);
 }
 
 #[test]
 fn a_naive_instant_is_rejected() {
-    // Nothing says which instant this names, so the claim has no capture time.
     assert_eq!(parse_attestation_timestamp("2026-10-23T12:00:00"), None);
     assert_eq!(parse_attestation_timestamp("2026-10-23"), None);
     assert_eq!(parse_attestation_timestamp(""), None);
@@ -30,60 +44,37 @@ fn a_naive_instant_is_rejected() {
 }
 
 #[test]
-fn the_date_and_time_may_drop_their_separators() {
-    assert_eq!(parse_attestation_timestamp("20261023T120000Z"), Some(NOON));
-    assert_eq!(parse_attestation_timestamp("2026-10-23T1200Z"), Some(NOON));
-    assert_eq!(parse_attestation_timestamp("2026-10-23T12Z"), Some(NOON));
+fn spellings_outside_the_shape_are_refused() {
+    // Each of these parses on some interpreter and not on another.
+    for spelling in [
+        "20261023T120000Z",
+        "2026-10-23T1200Z",
+        "2026-10-23T12Z",
+        "2026-W43-5T12:00:00Z",
+        "2026-10-23X12:00:00Z",
+        "2026-10-23\u{2603}12:00:00+00:00",
+        "2026-10-23T12:00.5Z",
+        "2026-10-23T12:00:00,5Z",
+        "2026-10-23T12:00:00.5Z",
+        "2026-10-23T12:00:00.1234Z",
+        "2026-10-23T12:00:00+0530",
+        "2026-10-23T12:00:00+05",
+        "2026-10-23T12:00:00Z+00:00",
+        "2026-10-23T24:00:00Z",
+    ] {
+        assert_eq!(parse_attestation_timestamp(spelling), None, "{spelling:?}");
+    }
 }
 
 #[test]
-fn any_single_character_separates_the_date_from_the_time() {
-    // The separator is found by the shape of the date, not by looking for `T`.
+fn a_fraction_has_three_or_six_digits() {
     assert_eq!(
-        parse_attestation_timestamp("2026-10-23 12:00:00Z"),
-        Some(NOON)
-    );
-    assert_eq!(
-        parse_attestation_timestamp("2026-10-23X12:00:00Z"),
-        Some(NOON)
-    );
-    assert_eq!(
-        parse_attestation_timestamp("2026-10-23_12:00:00Z"),
-        Some(NOON)
-    );
-}
-
-#[test]
-fn a_week_date_names_the_same_day() {
-    assert_eq!(
-        parse_attestation_timestamp("2026-W43-5T12:00:00Z"),
-        Some(NOON)
-    );
-    assert_eq!(parse_attestation_timestamp("2026W435T120000Z"), Some(NOON));
-    // Week 53 exists only in a long ISO year.
-    assert!(parse_attestation_timestamp("2026-W53-1T12:00:00Z").is_some());
-    assert_eq!(parse_attestation_timestamp("2026-W43-8T12:00:00Z"), None);
-}
-
-#[test]
-fn a_fraction_may_use_either_separator_and_is_truncated() {
-    assert_eq!(
-        parse_attestation_timestamp("2026-10-23T12:00:00,5Z"),
+        parse_attestation_timestamp("2026-10-23T12:00:00.500Z"),
         Some(NOON + 500_000)
     );
     assert_eq!(
-        parse_attestation_timestamp("2026-10-23T12:00:00.1Z"),
-        Some(NOON + 100_000)
-    );
-    // Digits past the sixth are dropped, not rounded.
-    assert_eq!(
-        parse_attestation_timestamp("2026-10-23T12:00:00.123456789Z"),
+        parse_attestation_timestamp("2026-10-23T12:00:00.123456Z"),
         Some(NOON + 123_456)
-    );
-    // A separator with nothing after it is a zero fraction.
-    assert_eq!(
-        parse_attestation_timestamp("2026-10-23T12:00:00.Z"),
-        Some(NOON)
     );
 }
 
@@ -94,8 +85,13 @@ fn an_offset_may_carry_seconds() {
         Some(NOON - 30_000_000)
     );
     assert_eq!(
-        parse_attestation_timestamp("2026-10-23T12:00:00+0530"),
+        parse_attestation_timestamp("2026-10-23T12:00:00+05:30"),
         Some(NOON - 19_800_000_000)
+    );
+    // CPython reads an offset with no whole seconds as UTC, fraction or not.
+    assert_eq!(
+        parse_attestation_timestamp("2026-10-23T12:00:00-00:00:00.000001"),
+        Some(NOON)
     );
     // A whole day of offset is not an offset.
     assert_eq!(
@@ -105,21 +101,11 @@ fn an_offset_may_carry_seconds() {
 }
 
 #[test]
-fn midnight_at_the_end_of_the_day_is_the_next_one() {
-    assert_eq!(
-        parse_attestation_timestamp("2026-10-23T24:00:00Z"),
-        Some(NOON + 12 * 3_600 * 1_000_000)
-    );
-    // Only exactly midnight wraps.
-    assert_eq!(parse_attestation_timestamp("2026-10-23T24:00:01Z"), None);
-    assert_eq!(parse_attestation_timestamp("2026-10-23T24:00:00.1Z"), None);
-}
-
-#[test]
 fn a_date_that_does_not_exist_is_rejected() {
     assert_eq!(parse_attestation_timestamp("2026-02-30T00:00:00Z"), None);
     assert_eq!(parse_attestation_timestamp("2026-13-01T00:00:00Z"), None);
     assert_eq!(parse_attestation_timestamp("2026-10-23T12:00:60Z"), None);
+    assert_eq!(parse_attestation_timestamp("2026-10-23T12:60:00Z"), None);
     assert!(parse_attestation_timestamp("2024-02-29T00:00:00Z").is_some());
 }
 
@@ -133,8 +119,8 @@ fn a_non_ascii_digit_is_not_a_digit() {
 
 #[test]
 fn an_instant_outside_the_calendar_is_refused() {
-    // Python raises `OverflowError` shifting this to UTC; neither side yields
-    // an instant, so neither side names a claim.
+    // Python catches the `OverflowError` the shift to UTC raises here, so
+    // neither side yields an instant.
     assert_eq!(
         parse_attestation_timestamp("0001-01-01T00:00:00+01:00"),
         None

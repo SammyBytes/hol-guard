@@ -73,6 +73,11 @@ fn recorded_envelopes_are_accepted_or_refused_as_python_records() {
                     expected["signature"].as_str(),
                     "{name}"
                 );
+                assert_eq!(
+                    read.signed_at.as_deref(),
+                    expected["signed_at"].as_str(),
+                    "{name}"
+                );
             }
             (None, Some(expected)) => {
                 let error = read.expect_err(name);
