@@ -932,6 +932,90 @@
       ],
       "sample_basis_points": 10000,
       "schema_version": "guard.command-shadow-control.v1"
+    },
+    {
+      "disabled_cohorts": [],
+      "enabled": true,
+      "env": {
+        "HOL_GUARD_DECISION_SHADOW_SAMPLE_BASIS_POINTS": "５００"
+      },
+      "generation": 1,
+      "kill_switch": false,
+      "release_cohorts": [
+        "baseline"
+      ],
+      "sample_basis_points": 0,
+      "schema_version": "guard.command-shadow-control.v1"
+    },
+    {
+      "disabled_cohorts": [],
+      "enabled": true,
+      "env": {
+        "HOL_GUARD_DECISION_SHADOW_SAMPLE_BASIS_POINTS": "٥٠٠"
+      },
+      "generation": 1,
+      "kill_switch": false,
+      "release_cohorts": [
+        "baseline"
+      ],
+      "sample_basis_points": 0,
+      "schema_version": "guard.command-shadow-control.v1"
+    },
+    {
+      "disabled_cohorts": [],
+      "enabled": true,
+      "env": {
+        "HOL_GUARD_DECISION_SHADOW_SAMPLE_BASIS_POINTS": "٥00"
+      },
+      "generation": 1,
+      "kill_switch": false,
+      "release_cohorts": [
+        "baseline"
+      ],
+      "sample_basis_points": 0,
+      "schema_version": "guard.command-shadow-control.v1"
+    },
+    {
+      "disabled_cohorts": [],
+      "enabled": true,
+      "env": {
+        "HOL_GUARD_DECISION_SHADOW_SAMPLE_BASIS_POINTS": "\u001f500"
+      },
+      "generation": 1,
+      "kill_switch": false,
+      "release_cohorts": [
+        "baseline"
+      ],
+      "sample_basis_points": 0,
+      "schema_version": "guard.command-shadow-control.v1"
+    },
+    {
+      "disabled_cohorts": [],
+      "enabled": true,
+      "env": {
+        "HOL_GUARD_DECISION_SHADOW_SAMPLE_BASIS_POINTS": " 500 "
+      },
+      "generation": 1,
+      "kill_switch": false,
+      "release_cohorts": [
+        "baseline"
+      ],
+      "sample_basis_points": 500,
+      "schema_version": "guard.command-shadow-control.v1"
+    },
+    {
+      "disabled_cohorts": [],
+      "enabled": true,
+      "env": {
+        "HOL_GUARD_DECISION_SHADOW_SAMPLE_BASIS_POINTS": "1_000"
+      },
+      "generation": 1,
+      "kill_switch": false,
+      "release_cohorts": [
+        "baseline"
+      ],
+      "sample_basis_points": 1000,
+      "schema_version": "guard.command-shadow-control.v1"
     }
   ],
   "dispositions": [

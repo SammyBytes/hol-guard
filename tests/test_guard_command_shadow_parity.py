@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from codex_plugin_scanner.guard.runtime.command_shadow_evaluation import (
+    COMMAND_SHADOW_SAMPLE_BASIS_POINTS_ENV,
     CommandShadowCohort,
     _comparison,
     _disposition_matches,
@@ -85,3 +86,25 @@ def test_recorded_disposition_match_still_holds(row: dict[str, Any]) -> None:
 
 def test_the_fixture_keeps_recording_selections_that_sample_in() -> None:
     assert any(row["selected"] for row in _rows("selections"))
+
+
+def test_the_fixture_keeps_the_sampling_rates_the_two_halves_read_differently() -> None:
+    """A sampling rate is read the same way on both sides, digit for digit.
+
+    ``int()`` reads any Unicode decimal digit, so ``int("５００")`` is 500, while
+    the native parser the Rust twin runs reads ASCII digits only. Both halves
+    now refuse a rate spelled that way. They already agreed about padding: the
+    characters ``str.strip()`` removes and ``str::trim`` leaves — U+001C through
+    U+001F — are the ones ``int()`` itself refuses, so a rate carrying them is
+    nothing on either side.
+    """
+
+    rates = {
+        row["env"][COMMAND_SHADOW_SAMPLE_BASIS_POINTS_ENV]: row["sample_basis_points"]
+        for row in _rows("controls")
+        if COMMAND_SHADOW_SAMPLE_BASIS_POINTS_ENV in row["env"]
+    }
+    for spelling in ("\uff15\uff10\uff10", "\u0665\u0660\u0660", "\u066500", "\x1f500"):
+        assert rates.get(spelling) == 0, ascii(spelling)
+    assert rates.get("\xa0500\xa0") == 500
+    assert rates.get("1_000") == 1000

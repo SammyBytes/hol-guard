@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use guard_command::command_shadow::{
     command_shadow_comparison, disposition_matches, load_command_shadow_control, sample_bucket,
-    CommandShadowCohort,
+    CommandShadowCohort, COMMAND_SHADOW_SAMPLE_BASIS_POINTS_ENV,
 };
 use guard_command::effect_decision::{FinalDisposition, GuardAction};
 use serde_json::Value;
@@ -216,4 +216,39 @@ fn recorded_disposition_matches_replay() {
             "disposition match disagrees for {action_name} / {disposition_name}"
         );
     }
+}
+
+#[test]
+fn the_fixture_keeps_the_sampling_rates_the_two_halves_read_differently() {
+    // Python's `int()` reads any Unicode decimal digit and this parser reads
+    // ASCII, so a rate spelled in another script has to come to nothing on both
+    // sides. Padding already agreed: the characters `str.strip()` removes and
+    // `str::trim` leaves behind are the ones `int()` itself refuses.
+    let document = fixture();
+    let rates: BTreeMap<&str, u64> = rows(&document, "controls")
+        .iter()
+        .filter_map(|row| {
+            let raw = row["env"]
+                .get(COMMAND_SHADOW_SAMPLE_BASIS_POINTS_ENV)?
+                .as_str()?;
+            Some((
+                raw,
+                row["sample_basis_points"].as_u64().expect("basis points"),
+            ))
+        })
+        .collect();
+    for spelling in [
+        "\u{ff15}\u{ff10}\u{ff10}",
+        "\u{665}\u{660}\u{660}",
+        "\u{665}00",
+        "\u{1f}500",
+    ] {
+        assert_eq!(
+            rates.get(spelling),
+            Some(&0),
+            "{spelling:?} should sample nothing"
+        );
+    }
+    assert_eq!(rates.get("\u{a0}500\u{a0}"), Some(&500));
+    assert_eq!(rates.get("1_000"), Some(&1000));
 }

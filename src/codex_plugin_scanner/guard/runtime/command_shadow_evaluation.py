@@ -293,6 +293,13 @@ def _sample_basis_points(raw: str | None) -> int:
         parsed = int(raw)
     except ValueError:
         return 0
+    # `int()` also reads Unicode decimal digits, so `int("５００")` is 500. No
+    # operator sets a sampling rate that way, and reading one would mean
+    # carrying a Unicode digit table into the native runtime this mirrors, so
+    # the rate is held to ASCII digits. Surrounding whitespace is untouched:
+    # `int()` and the native parser strip the same characters.
+    if not raw.strip().isascii():
+        return 0
     return parsed if 0 <= parsed <= _BASIS_POINTS_MAX else 0
 
 
