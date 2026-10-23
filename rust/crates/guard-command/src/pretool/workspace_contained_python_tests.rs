@@ -403,3 +403,45 @@ fn a_poetry_read_beside_an_install_keeps_the_whole_command_out() {
         }
     }
 }
+
+#[test]
+fn a_venv_that_holds_no_environment_keeps_the_runner_out() {
+    // A directory named `.venv` is not proof of anything: without `pyvenv.cfg`
+    // the runner goes looking for an environment elsewhere, and one built
+    // against the developer's own site packages answers for a home the sandbox
+    // replaces. Both are the wrong environment to launch a program out of, and
+    // `uv pip` is already kept out for the same two reasons.
+    let bare = workspace("runner-hollow-venv", true);
+    std::fs::write(bare.join("pyproject.toml"), PROJECT).unwrap();
+    std::fs::write(bare.join("poetry.lock"), "# generated\n").unwrap();
+    std::fs::write(bare.join("Pipfile"), "[packages]\n").unwrap();
+    std::fs::create_dir_all(bare.join(".venv/bin")).unwrap();
+    for command in ["poetry run pytest -q", "pipenv run pytest -q"] {
+        for harness in ["codex", "claude-code", "omp"] {
+            let (reason, _) = outcome(harness, command, &bare);
+            assert_ne!(reason, CONTAINED, "{harness}: {command}");
+        }
+    }
+    std::fs::write(
+        bare.join(".venv/pyvenv.cfg"),
+        "home = /usr/bin\ninclude-system-site-packages = true\n",
+    )
+    .unwrap();
+    for command in ["poetry run pytest -q", "pipenv run pytest -q"] {
+        for harness in ["codex", "claude-code", "omp"] {
+            let (reason, _) = outcome(harness, command, &bare);
+            assert_ne!(reason, CONTAINED, "{harness}: {command}");
+        }
+    }
+    // The same environment written the ordinary way is the one the runner is
+    // admitted on.
+    std::fs::write(
+        bare.join(".venv/pyvenv.cfg"),
+        "home = /usr/bin\nversion = 3.12.3\n",
+    )
+    .unwrap();
+    for harness in ["codex", "claude-code", "omp"] {
+        let (reason, _) = outcome(harness, "poetry run pytest -q", &bare);
+        assert_eq!(reason == CONTAINED, host(), "{reason} {harness}");
+    }
+}

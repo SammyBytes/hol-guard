@@ -133,7 +133,10 @@ fn local_pipenv_work(arguments: &[String], directory: &Path) -> bool {
 /// `uv run` on. Without it the runner materializes an environment before it
 /// runs anything, which needs the network the sandbox withholds, and a
 /// virtualenv kept under the runner's own cache home is one the contained
-/// `HOME` replaces — both keep the review they have today.
+/// `HOME` replaces — both keep the review they have today. The directory has
+/// to hold an environment, not just carry the name: an empty `.venv`, or one
+/// built against the developer's own site packages, sends the runner looking
+/// for an environment elsewhere, and that is the wrong one to launch out of.
 fn launches_a_materialized_environment(tail: &[&str], directory: &Path) -> bool {
     let tail = match tail.split_first() {
         Some((first, rest)) if *first == "--" => rest,
@@ -142,7 +145,7 @@ fn launches_a_materialized_environment(tail: &[&str], directory: &Path) -> bool 
     let Some(program) = tail.first() else {
         return false;
     };
-    !program.starts_with('-') && directory.join(".venv").is_dir()
+    !program.starts_with('-') && isolated_virtual_environment(&directory.join(".venv"))
 }
 
 /// Whether a read's words are only the one option it reports differently for
