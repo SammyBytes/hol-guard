@@ -342,7 +342,10 @@ fn a_scan_whose_answer_will_not_fit_is_refused_by_name() {
         evaluate_inventory_scan_findings_request(&parse(&wire)).expect("encoded response");
     let result: InventoryScanFindingsResultV1 = serde_json::from_slice(&encoded).expect("result");
     assert_eq!(result.status, "error");
-    assert_eq!(result.code, "native_inventory_scan_findings_reply_too_large");
+    assert_eq!(
+        result.code,
+        "native_inventory_scan_findings_reply_too_large"
+    );
     assert!(result.payload.is_none());
     // The refusal itself has to reach the caller, so it is framed like any
     // other reply.
