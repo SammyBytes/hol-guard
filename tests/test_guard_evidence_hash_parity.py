@@ -38,7 +38,7 @@ def test_recorded_payloads_hash_to_their_recorded_digest(case: dict[str, object]
 
 
 def test_the_canonical_payload_sorts_keys_and_escapes_non_ascii() -> None:
-    assert canonical_guard_evidence_payload({"b": 1, "a": "café"}) == r'{"a":"café","b":1}'
+    assert canonical_guard_evidence_payload({"b": 1, "a": "café"}) == '{"a":"caf\\u00e9","b":1}'
 
 
 def test_insertion_order_does_not_change_the_digest() -> None:

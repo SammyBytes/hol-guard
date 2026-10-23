@@ -16,7 +16,7 @@ fn the_canonical_payload_sorts_keys_and_escapes_non_ascii() {
     let encoded = canonical_guard_evidence_payload(&payload(json!({"b": 1, "a": "café"})));
     assert_eq!(
         String::from_utf8(encoded).expect("utf-8"),
-        r#"{"a":"café","b":1}"#
+        r#"{"a":"caf\u00e9","b":1}"#
     );
 }
 
