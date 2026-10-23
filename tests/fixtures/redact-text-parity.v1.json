@@ -204,14 +204,16 @@
       ]
     },
     {
-      "name": "an exported assignment is not a secret env line",
+      "name": "an exported assignment is a secret env line",
       "input": [
         "export API_SECRET=",
         "abc"
       ],
-      "text": "export API_SECRET=abc",
-      "count": 0,
-      "classifiers": []
+      "text": "export API_SECRET=*****",
+      "count": 1,
+      "classifiers": [
+        "secret-env"
+      ]
     },
     {
       "name": "connection env assignment",
