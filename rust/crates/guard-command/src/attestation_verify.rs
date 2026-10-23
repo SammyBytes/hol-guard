@@ -25,7 +25,11 @@
 //!   surfaces `binascii.Error`'s own text. This side reports
 //!   `Trust attestation signature is not base64`. Which strings count as
 //!   base64 is Python's: canonical padding is required, and a final character
-//!   whose unused bits are set still decodes.
+//!   whose unused bits are set still decodes. CPython tightened its padding
+//!   checks in 3.12, so an unpadded group followed by a stray `=` decodes on
+//!   3.10 and 3.11 and is refused from 3.12 on. This side holds every version
+//!   to the 3.12 rule, which refuses a signature the older interpreters would
+//!   have accepted rather than the other way around.
 //!
 //! A caller that has to reproduce Python's exact text in those two cases cannot
 //! read it off this function.
@@ -124,4 +128,42 @@ pub fn verify_trust_attestation(
     .map_err(|error| TrustAttestationError(error.message().to_owned()))?;
 
     Ok(under_signature.replay_key)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PYTHON_BASE64;
+    use base64::Engine;
+
+    #[test]
+    fn padding_must_be_exactly_what_the_last_group_needs() {
+        // A 72-byte ECDSA DER signature encodes to 96 characters and needs no
+        // padding at all.
+        let unpadded = "A".repeat(96);
+        assert_eq!(
+            PYTHON_BASE64.decode(&unpadded).map(|bytes| bytes.len()),
+            Ok(72)
+        );
+        // The same characters with padding they do not need are not base64,
+        // the rule CPython has applied since 3.12.
+        assert!(PYTHON_BASE64.decode(format!("{unpadded}=")).is_err());
+        assert!(PYTHON_BASE64.decode(format!("{unpadded}==")).is_err());
+
+        // A three-character group takes one `=`, and only one.
+        assert_eq!(PYTHON_BASE64.decode("AAAAQUJ=").map(|bytes| bytes.len()), Ok(5));
+        assert!(PYTHON_BASE64.decode("AAAAQUJ==").is_err());
+
+        // A two-character group takes two, and nothing shorter will do.
+        assert_eq!(PYTHON_BASE64.decode("AAAAQU==").map(|bytes| bytes.len()), Ok(4));
+        assert!(PYTHON_BASE64.decode("AAAAQU=").is_err());
+    }
+
+    #[test]
+    fn a_final_character_carrying_unused_bits_still_decodes() {
+        // `cryptography` hands Python whatever `b64decode` returns, and
+        // `b64decode` ignores the bits a final character cannot spend.
+        assert_eq!(PYTHON_BASE64.decode("QUJE").map(|bytes| bytes.len()), Ok(3));
+        assert_eq!(PYTHON_BASE64.decode("QUJ/").map(|bytes| bytes.len()), Ok(3));
+        assert_eq!(PYTHON_BASE64.decode("QU==").map(|bytes| bytes.len()), Ok(1));
+    }
 }
