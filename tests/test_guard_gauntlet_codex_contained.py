@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -113,6 +115,19 @@ def test_a_bound_route_is_the_contained_success_shape(tmp_path: Path) -> None:
     assert routed_calls("allow", case) == ({CALL_ID}, None)
     result = assess_harness_case(SCENARIO, case)
     assert (result["outcome"], result["interruptions"]["events"]) == ("pass", [])
+
+
+def test_the_proof_hashes_the_bytes_the_hook_writes(tmp_path: Path) -> None:
+    # The Rust hook serializes the snapshot compactly, in this key order.
+    workspace = json.dumps(str(tmp_path.resolve()))
+    written = (
+        f'{{"schema":"guard-contained-test-request.v1","workspace":{workspace},"payload":'
+        f'{{"hook_event_name":"PreToolUse","tool_name":"bash","tool_input":{{"command":"{COMMAND}"}},'
+        f'"cwd":{workspace},"session_id":"session-1","tool_call_id":"{CALL_ID}"}}}}'
+    )
+    assert request_proofs([_pre(str(tmp_path))]) == [
+        {"tool_call_id": CALL_ID, "request_sha256": hashlib.sha256(written.encode()).hexdigest()}
+    ]
 
 
 def test_the_digest_must_be_the_reviewed_input(tmp_path: Path) -> None:

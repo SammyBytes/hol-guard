@@ -112,7 +112,8 @@ def request_proofs(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
                 "tool_call_id": payload.get("tool_call_id", payload.get("toolCallId", payload.get("tool_use_id"))),
             },
         }
-        digest = hashlib.sha256(json.dumps(snapshot).encode()).hexdigest()
+        # The hook writes compact, ASCII-escaped JSON in this key order.
+        digest = hashlib.sha256(json.dumps(snapshot, separators=(",", ":")).encode()).hexdigest()
         proofs.append({"tool_call_id": call_id, "request_sha256": digest})
     return proofs
 
