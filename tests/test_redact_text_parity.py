@@ -42,12 +42,21 @@ _CLASSIFIERS = {
 
 def test_the_fixture_is_the_shape_both_sides_read() -> None:
     assert _VECTORS["schema"] == "redact-text-parity.v1"
-    assert len(_VECTORS["cases"]) >= 27
+    assert len(_VECTORS["cases"]) >= 32
 
 
 def test_every_rule_has_a_recorded_case() -> None:
     fired = {classifier for case in _VECTORS["cases"] for classifier in case["classifiers"]}
     assert fired == _CLASSIFIERS
+
+
+def test_a_quoted_value_keeps_the_operators_inside_it() -> None:
+    """The quoted alternative is why a value may hold `&&` and still be masked whole."""
+    quoted = [case for case in _VECTORS["cases"] if "quoted value keeps an operator" in case["name"]]
+    assert len(quoted) == 2, [case["name"] for case in _VECTORS["cases"]]
+    for case in quoted:
+        assert case["text"].count("*****") == 1, case["name"]
+        assert case["text"].endswith("run"), case["name"]
 
 
 @pytest.mark.parametrize("case", _VECTORS["cases"], ids=lambda case: case["name"])
