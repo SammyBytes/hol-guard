@@ -110,7 +110,7 @@ fn recorded_verifier_decisions_replay() {
         let expected = match (text(case, "replay_key"), text(case, "rust_error")) {
             (Some(replay_key), _) => Ok(replay_key),
             (None, Some(rust_error)) => {
-                divergent.insert(rust_error);
+                divergent.insert(rust_error.clone());
                 Err(rust_error)
             }
             (None, None) => Err(text(case, "error").expect("a case records an outcome")),
