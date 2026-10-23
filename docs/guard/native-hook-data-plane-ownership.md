@@ -379,13 +379,17 @@ earns, and the edits that bind a skill's document evidence or drop a directory
 hash nothing proved. The answer is edits — the keys to remove and the pairs to
 write — rather than a rebuilt map, so the caller keeps its own insertion order
 and an exported snapshot does not churn. The kind rides back from
-`inventory-source-evidence-v2`, the first question asked about an artifact,
+`inventory-source-evidence-v3`, the first question asked about an artifact,
 because the caller needs it to enrich metadata before it can ask anything else.
-The version marks the entry shape: a v2 client sends no kind of its own, and a
-v1 resident refuses an entry that leaves the field out, so the client asks for
-v2 and treats a resident that only advertises v1 as unavailable. The runtime
-keeps advertising v1 as well, because a client built before the change still
-sends its own kind and the resident ignores it. Python computed all of this; the copies are gone, the ownership
+That answer also names the instruction role an overlay's configured path stands
+for, read from the same grammar in `aibom_paths.rs` that the discovery walk
+applies, so the role a snapshot records cannot drift from the role discovery
+assigned. The version marks what the answer carries, not the wire schema: a v3
+resident reads the role, a v2 one derives the kind but leaves the role out, and
+a v1 one refuses an entry that does not spell its own kind. The client asks for
+v3 and treats anything older as unavailable rather than accepting a thinner
+answer. The runtime keeps advertising v2 and v1 as well, because a client built
+before either change still speaks this schema. Python computed all of this; the copies are gone, the ownership
 contract names the symbols so they cannot return, and
 `scripts/ci/inventory_item_metadata_reference.py` keeps the retired CPython only
 to regenerate the parity corpus the port is pinned to.
@@ -411,6 +415,25 @@ Nothing expands `~`, which the Python this replaced did not do either. Python
 no longer picks targets at all: when the resident cannot answer,
 the pass reports each enabled scanner as unavailable rather than reporting a
 clean scan of configurations nothing opened.
+
+A Codex hook's canonical identity is the resident's too
+(`codex-hook-identity-v1`, in `codex_hook_identity_op.rs`). The digest decides
+whether an approval the user already gave still covers the hook in front of us,
+so a second implementation would be a second answer to that question. One call
+carries a batch of entries and answers each with a handler identity, a group
+identity, the conflict keys a group's handler slots must not collapse onto, or
+the argv a command reduces to when its shell tokenization is provably
+uncomplicated. The canonical form is CPython's: mappings sorted by key, floats
+that happen to be whole written as integers, and the payload hashed as
+`json.dumps(..., sort_keys=True, separators=(",", ":"), ensure_ascii=False)`
+writes it. A hook definition is read from TOML and JSON, so it holds scalars a
+JSON request cannot name - datetimes, dates, times, non-finite floats and
+integers wider than the resident's number type. Each travels as a token drawn
+from a per-request random prefix that is verified to match no string in the
+payload, with its meaning in a separate map, so a config file cannot spell a
+token itself and nothing it contains can pass as a substituted scalar.
+`codex_hook_identity.py` now only names what is being identified;
+`native_codex_hook_identity.py` ships it across and fails closed.
 
 ## Harness route inventory
 
