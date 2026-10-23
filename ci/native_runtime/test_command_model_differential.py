@@ -62,8 +62,10 @@ LAUNCHER_FIXTURES = (
     ("stdbuf -o0 tool", "tool"),
     ("stdbuf -oL -e0 tool --flag", "tool --flag"),
     ("nice -n 10 tool", "tool"),
-    ("exec rm -rf /tmp/example", "rm -rf /tmp/example"),
 )
+# The parser reads `exec` as a launcher, but wrapper normalization does not
+# strip it, so only the native model is compared with the bare command.
+EXEC_LAUNCHER_FIXTURES = (("exec rm -rf /tmp/example", "rm -rf /tmp/example"),)
 UNCERTAIN_FIXTURES = (
     "echo $(uname)",
     "echo `uname`",
@@ -198,6 +200,14 @@ def main() -> int:
         assert _programs(native_model) == _programs(python_model), fixture
         assert _programs(native_model) == _programs(direct_model), fixture
 
+    for fixture, program in EXEC_LAUNCHER_FIXTURES:
+        native_model = _native(args.binary, fixture)
+        direct_model = _native(args.binary, program)
+        assert native_model["confidence"] == "exact", fixture
+        assert direct_model["confidence"] == "exact", program
+        assert native_model["wrapper_chain"] == [], fixture
+        assert _programs(native_model) == _programs(direct_model), fixture
+
     for fixture in UNCERTAIN_FIXTURES:
         native_model = _native(args.binary, fixture)
         assert native_model["confidence"] == "uncertain", fixture
@@ -211,6 +221,7 @@ def main() -> int:
                 "normalized_wrapper_fixture_count": len(NORMALIZED_WRAPPER_FIXTURES),
                 "inline_script_fixture_count": len(INLINE_SCRIPT_FIXTURES),
                 "launcher_fixture_count": len(LAUNCHER_FIXTURES),
+                "exec_launcher_fixture_count": len(EXEC_LAUNCHER_FIXTURES),
                 "uncertain_fixture_count": len(UNCERTAIN_FIXTURES),
                 "status": "ok",
             },
