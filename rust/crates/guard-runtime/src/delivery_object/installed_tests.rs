@@ -57,6 +57,7 @@ fn a_member_is_read_from_the_installed_container() {
     let bundle = bundle();
     let reply = ask(&bundle, member(&bundle), bundle.data.len() as u64).unwrap();
     assert_eq!(reply["data"], STANDARD.encode(bundle.data));
+    assert_eq!(reply["directory"], slot());
 }
 
 #[test]

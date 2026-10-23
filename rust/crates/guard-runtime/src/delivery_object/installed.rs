@@ -107,12 +107,16 @@ pub(super) fn fetch(input: &Value) -> Outcome {
     }
     let path = path(&input["root"], &plan)?;
     check_tag(&path)?;
-    container::member(&json!({
+    let mut reply = container::member(&json!({
         "path": path.to_string_lossy(),
         "asset": plan["asset"],
         "name": plan["name"],
         "length": length,
-    }))
+    }))?;
+    // The caller keys its answer cache on the file this read, so it learns
+    // the directory from here rather than mapping the tag a second time.
+    reply["directory"] = plan["directory"].clone();
+    Ok(reply)
 }
 
 fn path(root: &Value, plan: &Value) -> Result<PathBuf, String> {

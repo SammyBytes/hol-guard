@@ -4,13 +4,28 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from pathlib import Path
 
 from extension_delivery_objects import entries
 from extension_delivery_policy_lookup import lookup
 
-from codex_plugin_scanner.guard.catalog_delivery.installed_bundle import tag_directory
+
+def tag_directory(tag, *, source_sha):
+    """The directory under ``assets`` that holds an installed tag's assets.
+
+    Every installed tag is ``extension-data-<source>-0.0-<batch>``, so only the
+    batch varies and the directory is named for it alone. The full tag would put
+    wheel members past the 260-character path limit of a stock Windows install.
+    The native reader maps tags the same way and tells the runtime which
+    directory it read, so only the build needs this.
+    """
+    prefix = f"extension-data-{source_sha}-0.0-"
+    batch = tag[len(prefix) :] if isinstance(tag, str) and tag.startswith(prefix) else ""
+    if re.fullmatch(r"[0-9]{6}", batch) is None:
+        raise ValueError("installed bundle asset path invalid")
+    return batch
 
 
 def validate_resident_core(root):

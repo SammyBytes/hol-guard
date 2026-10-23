@@ -189,13 +189,16 @@ def test_complete_root_shape_is_strict(fault):
         validate(data, source_sha=SOURCE, engine=ENGINE)
 
 
-def test_installed_asset_paths_fit_a_stock_windows_install():
+def test_installed_asset_paths_fit_a_stock_windows_install(monkeypatch):
     # A default pipx or uv install puts site-packages about 90 characters deep;
     # Windows refuses longer paths than 259 unless long paths are enabled.
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
+    from installed_bundle_assets import tag_directory
+
     longest = (
         installed.PREFIX
         + "assets/"
-        + installed.tag_directory(f"extension-data-{SOURCE}-0.0-000000", source_sha=SOURCE)
+        + tag_directory(f"extension-data-{SOURCE}-0.0-000000", source_sha=SOURCE)
         + f"/pack-{'a' * 64}.zip"
     )
     installed.asset_path(longest.removeprefix(installed.PREFIX))
@@ -208,7 +211,7 @@ def test_installed_asset_paths_fit_a_stock_windows_install():
         f"extension-data-{SOURCE}-0.0-../000",
     ):
         with pytest.raises(ValueError):
-            installed.tag_directory(tag, source_sha=SOURCE)
+            tag_directory(tag, source_sha=SOURCE)
 
 
 @pytest.mark.parametrize("fault", ["files", "bytes", "path", "orphan"])
