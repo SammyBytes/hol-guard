@@ -14,6 +14,9 @@ mod attestation_envelope_tests;
 pub mod attestation_payload;
 #[cfg(test)]
 mod attestation_payload_tests;
+pub mod attestation_signature;
+#[cfg(test)]
+mod attestation_signature_tests;
 pub mod attestation_timestamp;
 #[cfg(test)]
 mod attestation_timestamp_tests;

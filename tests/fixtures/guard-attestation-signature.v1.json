@@ -1,0 +1,149 @@
+{
+  "schema": "guard-attestation-signature-parity.v1",
+  "cases": [
+    {
+      "name": "rsa-2048-valid",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtP44scBOSeBLW4jnJZ9K\nGgMdZ2xp4ONxB87Gl7E6PqQWbtARMtSf1Mjko5E+j2wNsMXSSEL4ppUUC7QpGPZb\nawavFZGMCWiLV64268nrMo9m8IBnhIAqLDNsvg1vrk9wNLIR2Xko9IasktSLHtMZ\n4p4l0umbCXChbXN4sl2wNVrH736Exrbg2+VLGVFjoc7QcL/c2wO3/NUmfn+C4yE5\n0gpzVYqvN0s/gpumL0oWoUWDOhto9YWGcbRaYRwHFKKb6IeqWt9FxvrdnL2A8O+H\nUMgpu9AEI/nUi9AmF2ScQ7ElCe+bb/ABwZgFztqrxFxQugnfN7Ep9pPrQ9w86Yh/\nwwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "ok"
+    },
+    {
+      "name": "rsa-3072-valid",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAnY906bH+2LSyDDgcjjQ6\npPAh6gBQu4/WaC7gDye25hmoTEZ49YhcOkX+5SWyoGefPJ4n8P1Lt5/rku0iIfvk\nL2DUWgxi5dSn9KSehEFO+FmlG6QvW4duWoFWW+lQ1XlojrL3hfNqRAVqVgytwOqk\nKlOEoKRarVA/hhnwyY5+QGuu+DwhzMZ8Y82j77P+3fmMYkjumYmK8ZXO9XyUUueJ\nPF/hPgAVyI9rS+osZ+4AORVYyybHnRG7RSiCgoagNJWz6ztHT/KduidU4YKiQKSa\ncwTj0+oil3+wSS0IGUn09TrWi+TfSYB6J4RO1e+3VjEXwXjMqrb63Y3UlsHF71bu\nK7HXF+36SXcWt0SdscS34kaL88XVH2AcIxSAVz6onOuiHl81P/MxHaD6yiJsHfSt\nQ7pnl1BcPxjb0KXDh/YpqOj7pQMZsIXd9CNRkFViFRwmxEcb8IXdPXF+Mq0CrFOb\nUwma8wfs+6zVRtvHi98X7W2sD3iG+6OYykgUJHuXuS+BAgMBAAE=\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "TWrhByhRlESmNcWPUm1ScauBkwvo/jWE/VZCYwDVcRptuJJyA3ADxuNEpUM7j55HJTdCkESB6gqhAxMTQD7SipuI4pApfSNmTZllP+bRd5rK0DPDtysIUFd7wHqLP1ilMmgg09AM44gcqNuxyoADsF5CA3/uD6q/yTzIVhicX4AbDXAb8AJ1i9AuitL5YR50oU88hgnylbJmOSS0s2t6Q/ucHSx0rsuBBKtu5pD8K6/IDSkN6K/x/pcxZCrqMasrRJOjtk6Xrwd0d70Nvdx0JM8NFb7MY2bPiASl9EpcqBk5wcPhnZGXmmardeaYsxa8YrBzTDO3X1dJJ+gT5ft8gq1JNkpYG5rmi9lbgjpjyZmPMinCT4NAuFc+C4WmyW4IFVZ6vj3AYa3mbWiUpd/S5p7t95sUct60ozqlzeaVzTWfSLCdc6Y7KAxRrlvwEF1OWV4Bh12dQvYAJ8GIGEgztnfzGmyROpZk+yz5x33s0dKWQnKv5CQ8lPxSZ+DX0zjr",
+      "expected": "ok"
+    },
+    {
+      "name": "rsa-pkcs1-pem-valid",
+      "public_key_pem": "-----BEGIN RSA PUBLIC KEY-----\nMIIBCgKCAQEAtP44scBOSeBLW4jnJZ9KGgMdZ2xp4ONxB87Gl7E6PqQWbtARMtSf\n1Mjko5E+j2wNsMXSSEL4ppUUC7QpGPZbawavFZGMCWiLV64268nrMo9m8IBnhIAq\nLDNsvg1vrk9wNLIR2Xko9IasktSLHtMZ4p4l0umbCXChbXN4sl2wNVrH736Exrbg\n2+VLGVFjoc7QcL/c2wO3/NUmfn+C4yE50gpzVYqvN0s/gpumL0oWoUWDOhto9YWG\ncbRaYRwHFKKb6IeqWt9FxvrdnL2A8O+HUMgpu9AEI/nUi9AmF2ScQ7ElCe+bb/AB\nwZgFztqrxFxQugnfN7Ep9pPrQ9w86Yh/wwIDAQAB\n-----END RSA PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "ok"
+    },
+    {
+      "name": "rsa-wrong-payload",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtP44scBOSeBLW4jnJZ9K\nGgMdZ2xp4ONxB87Gl7E6PqQWbtARMtSf1Mjko5E+j2wNsMXSSEL4ppUUC7QpGPZb\nawavFZGMCWiLV64268nrMo9m8IBnhIAqLDNsvg1vrk9wNLIR2Xko9IasktSLHtMZ\n4p4l0umbCXChbXN4sl2wNVrH736Exrbg2+VLGVFjoc7QcL/c2wO3/NUmfn+C4yE5\n0gpzVYqvN0s/gpumL0oWoUWDOhto9YWGcbRaYRwHFKKb6IeqWt9FxvrdnL2A8O+H\nUMgpu9AEI/nUi9AmF2ScQ7ElCe+bb/ABwZgFztqrxFxQugnfN7Ep9pPrQ9w86Yh/\nwwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJkZWNhZmYiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "Trust attestation signature verification failed"
+    },
+    {
+      "name": "rsa-tampered-signature",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtP44scBOSeBLW4jnJZ9K\nGgMdZ2xp4ONxB87Gl7E6PqQWbtARMtSf1Mjko5E+j2wNsMXSSEL4ppUUC7QpGPZb\nawavFZGMCWiLV64268nrMo9m8IBnhIAqLDNsvg1vrk9wNLIR2Xko9IasktSLHtMZ\n4p4l0umbCXChbXN4sl2wNVrH736Exrbg2+VLGVFjoc7QcL/c2wO3/NUmfn+C4yE5\n0gpzVYqvN0s/gpumL0oWoUWDOhto9YWGcbRaYRwHFKKb6IeqWt9FxvrdnL2A8O+H\nUMgpu9AEI/nUi9AmF2ScQ7ElCe+bb/ABwZgFztqrxFxQugnfN7Ep9pPrQ9w86Yh/\nwwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oE2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "Trust attestation signature verification failed"
+    },
+    {
+      "name": "rsa-empty-signature",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtP44scBOSeBLW4jnJZ9K\nGgMdZ2xp4ONxB87Gl7E6PqQWbtARMtSf1Mjko5E+j2wNsMXSSEL4ppUUC7QpGPZb\nawavFZGMCWiLV64268nrMo9m8IBnhIAqLDNsvg1vrk9wNLIR2Xko9IasktSLHtMZ\n4p4l0umbCXChbXN4sl2wNVrH736Exrbg2+VLGVFjoc7QcL/c2wO3/NUmfn+C4yE5\n0gpzVYqvN0s/gpumL0oWoUWDOhto9YWGcbRaYRwHFKKb6IeqWt9FxvrdnL2A8O+H\nUMgpu9AEI/nUi9AmF2ScQ7ElCe+bb/ABwZgFztqrxFxQugnfN7Ep9pPrQ9w86Yh/\nwwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "",
+      "expected": "Trust attestation signature verification failed"
+    },
+    {
+      "name": "rsa-wrong-key",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAnY906bH+2LSyDDgcjjQ6\npPAh6gBQu4/WaC7gDye25hmoTEZ49YhcOkX+5SWyoGefPJ4n8P1Lt5/rku0iIfvk\nL2DUWgxi5dSn9KSehEFO+FmlG6QvW4duWoFWW+lQ1XlojrL3hfNqRAVqVgytwOqk\nKlOEoKRarVA/hhnwyY5+QGuu+DwhzMZ8Y82j77P+3fmMYkjumYmK8ZXO9XyUUueJ\nPF/hPgAVyI9rS+osZ+4AORVYyybHnRG7RSiCgoagNJWz6ztHT/KduidU4YKiQKSa\ncwTj0+oil3+wSS0IGUn09TrWi+TfSYB6J4RO1e+3VjEXwXjMqrb63Y3UlsHF71bu\nK7HXF+36SXcWt0SdscS34kaL88XVH2AcIxSAVz6onOuiHl81P/MxHaD6yiJsHfSt\nQ7pnl1BcPxjb0KXDh/YpqOj7pQMZsIXd9CNRkFViFRwmxEcb8IXdPXF+Mq0CrFOb\nUwma8wfs+6zVRtvHi98X7W2sD3iG+6OYykgUJHuXuS+BAgMBAAE=\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "Trust attestation signature verification failed"
+    },
+    {
+      "name": "p256-valid",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+sr/H8GYM2pwOLaNpMBejDRUrg/A\n9Sz8em0UQRJ8ZghBBgxcSMCfBA/0qvJxGrwUHj1czMrlOEjoDIvQiL5uEA==\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "MEUCIAKXTZEPPdf4U2vtGbbymfErxhof8+XLQMXuKUqJMVDAAiEAuLp6mFuyRaYl8i3r2BRhvLcpEzPluDhY/CG/ToH37P4=",
+      "expected": "ok"
+    },
+    {
+      "name": "p256-wrong-payload",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+sr/H8GYM2pwOLaNpMBejDRUrg/A\n9Sz8em0UQRJ8ZghBBgxcSMCfBA/0qvJxGrwUHj1czMrlOEjoDIvQiL5uEA==\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJkZWNhZmYiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "MEUCIAKXTZEPPdf4U2vtGbbymfErxhof8+XLQMXuKUqJMVDAAiEAuLp6mFuyRaYl8i3r2BRhvLcpEzPluDhY/CG/ToH37P4=",
+      "expected": "Trust attestation signature verification failed"
+    },
+    {
+      "name": "p256-tampered-signature",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+sr/H8GYM2pwOLaNpMBejDRUrg/A\n9Sz8em0UQRJ8ZghBBgxcSMCfBA/0qvJxGrwUHj1czMrlOEjoDIvQiL5uEA==\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "MEUCIAKXTZEPPdf4U2vtGbbymfErxhof8+XLQMXuKUqJMVDAAiEAuLp6mFuyRaYl8i3r2BRhvLcpEzPluDhY/CG/ToH37P8=",
+      "expected": "Trust attestation signature verification failed"
+    },
+    {
+      "name": "p256-empty-signature",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+sr/H8GYM2pwOLaNpMBejDRUrg/A\n9Sz8em0UQRJ8ZghBBgxcSMCfBA/0qvJxGrwUHj1czMrlOEjoDIvQiL5uEA==\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "",
+      "expected": "Trust attestation signature verification failed"
+    },
+    {
+      "name": "rsa-key-ecdsa-algorithm",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtP44scBOSeBLW4jnJZ9K\nGgMdZ2xp4ONxB87Gl7E6PqQWbtARMtSf1Mjko5E+j2wNsMXSSEL4ppUUC7QpGPZb\nawavFZGMCWiLV64268nrMo9m8IBnhIAqLDNsvg1vrk9wNLIR2Xko9IasktSLHtMZ\n4p4l0umbCXChbXN4sl2wNVrH736Exrbg2+VLGVFjoc7QcL/c2wO3/NUmfn+C4yE5\n0gpzVYqvN0s/gpumL0oWoUWDOhto9YWGcbRaYRwHFKKb6IeqWt9FxvrdnL2A8O+H\nUMgpu9AEI/nUi9AmF2ScQ7ElCe+bb/ABwZgFztqrxFxQugnfN7Ep9pPrQ9w86Yh/\nwwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "MEUCIAKXTZEPPdf4U2vtGbbymfErxhof8+XLQMXuKUqJMVDAAiEAuLp6mFuyRaYl8i3r2BRhvLcpEzPluDhY/CG/ToH37P4=",
+      "expected": "Trust attestation public key must be EC"
+    },
+    {
+      "name": "p256-key-rsa-algorithm",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+sr/H8GYM2pwOLaNpMBejDRUrg/A\n9Sz8em0UQRJ8ZghBBgxcSMCfBA/0qvJxGrwUHj1czMrlOEjoDIvQiL5uEA==\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "Trust attestation public key must be RSA"
+    },
+    {
+      "name": "p384-key-ecdsa-algorithm",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEyiKUdXOnaxAiyU2IrTrurd5StrknEEv/\n+aUi3xM+Lsv0JdWWrMp/1yC/NQCD221vrUOg/GEEQJN6O8wyRVE41FKSvyoUYiqg\nC3AMtzW/ZPvScUvozs4urkWCOfy0u8wU\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "MGYCMQCPaCC+xlJ5O0l6YuA2XnLtc0d1GcqtFDxdXZtjD7IfyR2ozodvGDc/9XfKbyqfvZcCMQDH7lpZmx18mHVk+glvI5OxvgBH10x9+cLjzxrZ9FyZoThmn+EEZlzfxYZZ2h8QEfM=",
+      "expected": "Trust attestation EC public key must use P-256"
+    },
+    {
+      "name": "ed25519-key",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAIexwTof0kxmFWHHGOJYy/F2uLq0yFSQ83Yf1eXZWp/Q=\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "MEUCIAKXTZEPPdf4U2vtGbbymfErxhof8+XLQMXuKUqJMVDAAiEAuLp6mFuyRaYl8i3r2BRhvLcpEzPluDhY/CG/ToH37P4=",
+      "expected": "Trust attestation public key must be RSA or EC"
+    },
+    {
+      "name": "not-a-pem",
+      "public_key_pem": "not a key",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "Trust attestation public key must be RSA or EC"
+    },
+    {
+      "name": "pem-body-is-not-der",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nQUJD\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "rsa-pss-sha256",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "Trust attestation public key must be RSA or EC"
+    },
+    {
+      "name": "unsupported-algorithm",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtP44scBOSeBLW4jnJZ9K\nGgMdZ2xp4ONxB87Gl7E6PqQWbtARMtSf1Mjko5E+j2wNsMXSSEL4ppUUC7QpGPZb\nawavFZGMCWiLV64268nrMo9m8IBnhIAqLDNsvg1vrk9wNLIR2Xko9IasktSLHtMZ\n4p4l0umbCXChbXN4sl2wNVrH736Exrbg2+VLGVFjoc7QcL/c2wO3/NUmfn+C4yE5\n0gpzVYqvN0s/gpumL0oWoUWDOhto9YWGcbRaYRwHFKKb6IeqWt9FxvrdnL2A8O+H\nUMgpu9AEI/nUi9AmF2ScQ7ElCe+bb/ABwZgFztqrxFxQugnfN7Ep9pPrQ9w86Yh/\nwwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "signature_algorithm": "ed25519",
+      "canonical_payload_base64": "eyJjbGFpbUhhc2giOiJjMGZmZWUiLCJzY29wZSI6InRydXN0X2xheWVyIn0=",
+      "signature_base64": "oU2fq5Eh+zoAJbUdVOcfv37PZrb8g1GupSe+sD7lSSSdZ6LH249hxi2F3Et6H+ZyDO0BDdMfMn4v3bIHeNXKUuTmfgrBXUpby4dgcgDvGIX7paK+iUMwzV0TO/a9sCHYV+yO7tfW04oUw00SuYaMsuuVn4VaOuYcjVIYis+LabfsFXWA0lMsm5RwMHknjRniWso8IhVLRxYjb4Y60ggXh7C7yurdfxo0av+pmXe40EaGwLI7WIs6K3iGIPg85BTUdi+EAlFWVRzSm0R+E/PU8uyApFFLr0KxbGPTnO2ztz2wsyvqKQMbCZ4ivuxvIGFkYv/OtjEB/2qhU2nXKAeZ6w==",
+      "expected": "Unsupported trust attestation signature algorithm"
+    }
+  ]
+}

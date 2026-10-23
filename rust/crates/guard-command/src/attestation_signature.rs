@@ -1,0 +1,283 @@
+//! The last check a trust attestation faces: its signature.
+//!
+//! [`attestation_verification`](crate::attestation_verification) hands back the
+//! canonical bytes the signature covers once every key-free question has been
+//! answered. This module loads the advertised public key out of its PEM and
+//! checks those bytes against the signature the envelope carries.
+//!
+//! Python reaches the same point through `cryptography`: it loads the PEM, it
+//! refuses anything that is not an RSA or EC key, and then it dispatches on the
+//! declared algorithm — RSA-PSS over SHA-256 with a maximum-length salt, or
+//! ECDSA over SHA-256 on P-256. A key that does not match the declared
+//! algorithm is refused before any verification happens, and every refusal here
+//! carries Python's wording.
+
+use base64ct::{Base64, Encoding};
+use ring::signature;
+use rsa::pkcs1::DecodeRsaPublicKey;
+use rsa::pkcs8::DecodePublicKey;
+use rsa::pss::{Signature as RsaPssSignature, VerifyingKey as RsaPssVerifyingKey};
+use rsa::signature::Verifier;
+use rsa::traits::PublicKeyParts;
+use rsa::RsaPublicKey;
+use sha2::{Digest, Sha256};
+
+use crate::attestation_envelope::{
+    GUARD_TRUST_ATTESTATION_SIGNATURE_ALGORITHM,
+    GUARD_TRUST_ATTESTATION_SIGNATURE_ALGORITHM_ECDSA_P256,
+};
+
+/// `1.2.840.113549.1.1.1` — an RSA public key.
+const OID_RSA_ENCRYPTION: &[u8] = &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01];
+/// `1.2.840.10045.2.1` — an elliptic-curve public key.
+const OID_EC_PUBLIC_KEY: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01];
+/// `1.2.840.10045.3.1.7` — the P-256 (secp256r1) named curve.
+const OID_PRIME256V1: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
+
+/// Why a signature was refused, in the wording Python uses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttestationSignatureError(String);
+
+impl AttestationSignatureError {
+    /// The refusal text, identical to the `ValueError` Python raises.
+    pub fn message(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for AttestationSignatureError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for AttestationSignatureError {}
+
+fn refuse<T>(message: &str) -> Result<T, AttestationSignatureError> {
+    Err(AttestationSignatureError(message.to_owned()))
+}
+
+/// A public key an attestation can be checked against.
+///
+/// Python keeps `RSAPublicKey` and `EllipticCurvePublicKey` and refuses
+/// everything else, so the two shapes it accepts are the only ones here. The
+/// EC arm holds the uncompressed point exactly as the SPKI carried it, which is
+/// the form `ring` verifies against.
+#[derive(Debug, Clone)]
+pub enum AttestationPublicKey {
+    /// An RSA key, for `rsa-pss-sha256`.
+    Rsa(Box<RsaPublicKey>),
+    /// A P-256 key's uncompressed point, for `ecdsa-p256-sha256`.
+    EcP256(Vec<u8>),
+    /// An EC key on some other curve. Python keeps it — the curve is only
+    /// rejected once the algorithm asks for P-256 — so this arm keeps it too.
+    EcOtherCurve,
+}
+
+/// One DER element: its tag, its contents, and where the next element starts.
+struct DerElement<'a> {
+    tag: u8,
+    contents: &'a [u8],
+    rest: &'a [u8],
+}
+
+/// Read a single DER tag-length-value element off the front of `der`.
+///
+/// Only the definite-length form matters here: a PEM-wrapped SPKI is always
+/// DER, which forbids the indefinite form, and a length that does not fit in a
+/// `usize` cannot describe a key this process is holding in memory.
+fn read_der(der: &[u8]) -> Option<DerElement<'_>> {
+    let tag = *der.first()?;
+    let first_length = *der.get(1)?;
+    let (length, header) = if first_length < 0x80 {
+        (usize::from(first_length), 2)
+    } else {
+        let count = usize::from(first_length & 0x7f);
+        if count == 0 || count > std::mem::size_of::<usize>() {
+            return None;
+        }
+        let mut length = 0usize;
+        for index in 0..count {
+            length = (length << 8) | usize::from(*der.get(2 + index)?);
+        }
+        (length, 2 + count)
+    };
+    let contents = der.get(header..header.checked_add(length)?)?;
+    Some(DerElement {
+        tag,
+        contents,
+        rest: &der[header + length..],
+    })
+}
+
+/// Read the single DER element `der` holds, refusing trailing bytes.
+fn read_only_der(der: &[u8]) -> Option<DerElement<'_>> {
+    let element = read_der(der)?;
+    element.rest.is_empty().then_some(element)
+}
+
+/// Pull the one base64 body a PEM carries, with its label.
+///
+/// Python's loader accepts the usual armour and ignores what surrounds it;
+/// this keeps to the first `-----BEGIN x-----` / `-----END x-----` pair so a
+/// file holding a key plus a comment still loads.
+fn pem_body(pem: &str) -> Option<(String, Vec<u8>)> {
+    let normalized = pem.replace("\r\n", "\n");
+    let mut label: Option<String> = None;
+    let mut body = String::new();
+    for line in normalized.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("-----BEGIN ") {
+            if label.is_some() {
+                return None;
+            }
+            label = Some(rest.strip_suffix("-----")?.to_owned());
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("-----END ") {
+            let closing = rest.strip_suffix("-----")?;
+            if label.as_deref() != Some(closing) {
+                return None;
+            }
+            let der = Base64::decode_vec(&body).ok()?;
+            return Some((closing.to_owned(), der));
+        }
+        if label.is_some() {
+            body.push_str(trimmed);
+        }
+    }
+    None
+}
+
+/// Read a SubjectPublicKeyInfo and say which key it carries.
+fn public_key_from_spki(der: &[u8]) -> Option<AttestationPublicKey> {
+    let outer = read_only_der(der)?;
+    if outer.tag != 0x30 {
+        return None;
+    }
+    let algorithm = read_der(outer.contents)?;
+    if algorithm.tag != 0x30 {
+        return None;
+    }
+    let key_bits = read_der(algorithm.rest)?;
+    if key_bits.tag != 0x03 || !key_bits.rest.is_empty() {
+        return None;
+    }
+    // A BIT STRING's first content byte counts the unused trailing bits. A key
+    // is always a whole number of bytes, so anything but zero is malformed.
+    let (unused_bits, key_bytes) = key_bits.contents.split_first()?;
+    if *unused_bits != 0 {
+        return None;
+    }
+    let oid = read_der(algorithm.contents)?;
+    if oid.tag != 0x06 {
+        return None;
+    }
+    if oid.contents == OID_RSA_ENCRYPTION {
+        return RsaPublicKey::from_public_key_der(der)
+            .ok()
+            .map(|key| AttestationPublicKey::Rsa(Box::new(key)));
+    }
+    if oid.contents != OID_EC_PUBLIC_KEY {
+        return None;
+    }
+    let parameters = read_der(oid.rest)?;
+    if parameters.tag != 0x06 || parameters.contents != OID_PRIME256V1 {
+        return Some(AttestationPublicKey::EcOtherCurve);
+    }
+    Some(AttestationPublicKey::EcP256(key_bytes.to_vec()))
+}
+
+/// Load the public key a trust attestation advertises.
+///
+/// Mirrors Python's `serialization.load_pem_public_key` followed by its
+/// `isinstance` check: a PEM that will not parse, or that carries a key which
+/// is neither RSA nor EC, is refused with the same message.
+pub fn load_attestation_public_key(
+    public_key_pem: &str,
+) -> Result<AttestationPublicKey, AttestationSignatureError> {
+    let Some((label, der)) = pem_body(public_key_pem) else {
+        return refuse("Trust attestation public key must be RSA or EC");
+    };
+    if label == "RSA PUBLIC KEY" {
+        return match RsaPublicKey::from_pkcs1_der(&der) {
+            Ok(key) => Ok(AttestationPublicKey::Rsa(Box::new(key))),
+            Err(_) => refuse("Trust attestation public key must be RSA or EC"),
+        };
+    }
+    if label != "PUBLIC KEY" {
+        return refuse("Trust attestation public key must be RSA or EC");
+    }
+    match public_key_from_spki(&der) {
+        Some(key) => Ok(key),
+        None => refuse("Trust attestation public key must be RSA or EC"),
+    }
+}
+
+/// Verify RSA-PSS over SHA-256 with a maximum-length salt.
+///
+/// Python signs and verifies with `padding.PSS.MAX_LENGTH`, which is the
+/// largest salt the modulus leaves room for: the encoded message is one bit
+/// shorter than the modulus, and the digest plus the trailing `0xbc` byte take
+/// the rest.
+fn verify_rsa_pss(
+    public_key: &RsaPublicKey,
+    canonical_payload: &[u8],
+    signature: &[u8],
+) -> Result<(), AttestationSignatureError> {
+    let modulus_bits = public_key.n().bits();
+    let encoded_message_len = modulus_bits.saturating_sub(1).div_ceil(8);
+    let Some(salt_len) = encoded_message_len.checked_sub(Sha256::output_size() + 2) else {
+        return refuse("Trust attestation signature verification failed");
+    };
+    let verifying_key =
+        RsaPssVerifyingKey::<Sha256>::new_with_salt_len(public_key.clone(), salt_len);
+    let Ok(parsed) = RsaPssSignature::try_from(signature) else {
+        return refuse("Trust attestation signature verification failed");
+    };
+    match verifying_key.verify(canonical_payload, &parsed) {
+        Ok(()) => Ok(()),
+        Err(_) => refuse("Trust attestation signature verification failed"),
+    }
+}
+
+/// Check an attestation's signature over the bytes the payload canonicalises to.
+///
+/// Python's `_verify_signature`: the declared algorithm picks the scheme, the
+/// key must match it, and `InvalidSignature` becomes the verification-failed
+/// refusal the caller raises. An algorithm the envelope reader already rejects
+/// cannot reach here, but the fallthrough keeps Python's message anyway.
+pub fn verify_attestation_signature(
+    public_key: &AttestationPublicKey,
+    canonical_payload: &[u8],
+    signature: &[u8],
+    signature_algorithm: &str,
+) -> Result<(), AttestationSignatureError> {
+    if signature_algorithm == GUARD_TRUST_ATTESTATION_SIGNATURE_ALGORITHM {
+        let AttestationPublicKey::Rsa(key) = public_key else {
+            return refuse("Trust attestation public key must be RSA");
+        };
+        return verify_rsa_pss(key, canonical_payload, signature);
+    }
+    if signature_algorithm == GUARD_TRUST_ATTESTATION_SIGNATURE_ALGORITHM_ECDSA_P256 {
+        let point = match public_key {
+            AttestationPublicKey::Rsa(_) => {
+                return refuse("Trust attestation public key must be EC")
+            }
+            AttestationPublicKey::EcOtherCurve => {
+                return refuse("Trust attestation EC public key must use P-256")
+            }
+            AttestationPublicKey::EcP256(point) => point,
+        };
+        return match signature::UnparsedPublicKey::new(
+            &signature::ECDSA_P256_SHA256_ASN1,
+            point.as_slice(),
+        )
+        .verify(canonical_payload, signature)
+        {
+            Ok(()) => Ok(()),
+            Err(_) => refuse("Trust attestation signature verification failed"),
+        };
+    }
+    refuse("Unsupported trust attestation signature algorithm")
+}
