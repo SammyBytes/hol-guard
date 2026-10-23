@@ -13,12 +13,22 @@
 //! list, and a label holding an expansion, a substitution or a redirect could
 //! name something of its own; either keeps the refusal it had.
 //!
-//! The words have to be the construct's own. `case` and `in` are keywords only
-//! where the shell reads a command, so `echo case in` opens nothing, and a `#`
-//! comment runs to the end of its line, so neither the keywords nor the `)` a
-//! comment holds take a label. Without both, `echo case in; /usr/bin/pyth?n3
-//! -c 'import os' # )` would have blanked away the one word the shell builds
-//! at run time and handed the command the review card it was refused.
+//! The words have to be the construct's own. `case` is a keyword only where
+//! the shell still reads one, which is at the start of a command and after a
+//! reserved word, never after a program such as `command`, `builtin` or
+//! `nohup`: the shell reads `nohup case` as the program `case`, so it opens
+//! nothing here either. A `#` comment runs to the end of its line, so neither
+//! the keywords nor the `)` a comment holds take a label. Without both,
+//! `echo case in; /usr/bin/pyth?n3 -c 'import os' # )` would have blanked away
+//! the one word the shell builds at run time and handed the command the review
+//! card it was refused.
+
+/// The words after which the shell still reads a reserved word. A program that
+/// runs another, `nohup` among them, is not one of them: after it the shell
+/// reads a program name, so a `case` written there opens no construct.
+const KEYWORD_POSITION: &[&str] = &[
+    "do", "then", "else", "elif", "while", "until", "if", "!", "time", "{",
+];
 
 #[derive(Clone, Copy, PartialEq)]
 enum Quote {
@@ -70,9 +80,9 @@ pub(super) fn without_case_labels(text: &str) -> String {
                     }
                     _ => {}
                 }
-                // Only a word the shell itself reads before a command keeps
-                // the next word in command position.
-                command_position = super::SHELL_PREFIXES.contains(&keyword.as_str());
+                // Only a reserved word keeps the next word where the shell
+                // still reads a reserved word.
+                command_position = KEYWORD_POSITION.contains(&keyword.as_str());
             }
         } else if current.is_some_and(|character| !character.is_whitespace()) && word.is_none() {
             word = Some(index);
@@ -133,7 +143,8 @@ pub(super) fn without_case_labels(text: &str) -> String {
 /// A label is left alone, and the whole text with it, when it holds anything
 /// the shell could read as more than a pattern. A pattern never holds a
 /// command separator or a comment, so a span that does is a run of commands
-/// that only looks like one.
+/// that only looks like one, and the span has to read as a label list besides:
+/// one pattern, or several with a `|` between them, and nothing else.
 fn take_label(blanked: &mut [char], characters: &[char], start: usize, end: usize) -> bool {
     if characters[start..end]
         .iter()
@@ -141,11 +152,27 @@ fn take_label(blanked: &mut [char], characters: &[char], start: usize, end: usiz
     {
         return false;
     }
+    let span: String = characters[start..end].iter().collect();
+    if !reads_as_a_label_list(&span) {
+        return false;
+    }
     for slot in &mut blanked[start..end] {
         *slot = ' ';
     }
     blanked[end] = ';';
     true
+}
+
+/// Whether the span between `in` and its `)` is a label list: `a`, or
+/// `*.ts | *.tsx`, and nothing else. A pattern is a single word, so blanks
+/// belong only around the `|` that separates two of them. A span holding
+/// whitespace-separated words is a run of commands wearing a label's shape,
+/// and one holding `{` or a nested keyword is a construct of its own.
+fn reads_as_a_label_list(span: &str) -> bool {
+    span.split('|').all(|pattern| {
+        let pattern = pattern.trim();
+        !pattern.is_empty() && !pattern.chars().any(char::is_whitespace)
+    })
 }
 
 #[cfg(test)]

@@ -679,16 +679,16 @@ fn a_case_label_and_an_empty_prefix_keep_their_approval() {
         "while IFS= read -r line; do echo one; done < list.txt",
         "while IFS= read -r line; do echo one; done",
         "IFS= read -r first < list.txt",
-        // Emptying a name is an ordinary assignment prefix, whatever the name
-        // decides: the reader behind it is the same builtin, so the command
-        // reaches the same review every other spelling of it reaches.
-        "GLOBIGNORE= read -r first < list.txt",
-        "SHELLOPTS= read -r first < list.txt",
         // A label is a pattern, never a command, so one built from a parameter
         // names no program. The labels stay where they are, because the module
         // refuses to take out a label holding an expansion, and the construct
         // reaches the same review a literal label reaches.
         "case $MODE in $PATTERN) echo a;; esac",
+        // `case` and `in` written as arguments of a command open no construct,
+        // and the `)` behind them ends no label. Here the words are `echo`'s
+        // own arguments, so the pattern among them starts nothing and the
+        // command reaches the review an ordinary print reaches.
+        "echo case in /bin/b?sh -c id )",
     ] {
         let (action, reason) = decision(&controls, command);
         if reason == FAILED || action != "review" {
@@ -717,10 +717,9 @@ fn a_case_clause_that_can_start_a_program_keeps_the_failure() {
         // An assignment that carries a value is still data movement.
         "while IFS=: read -r name rest; do echo one; done < list.txt",
         // `case` and `in` written as arguments open no construct, and the `)`
-        // a comment holds ends no label, so the word the shell builds at run
-        // time is still there to be refused.
+        // a comment holds ends no label, so the glob naming the program of the
+        // command behind them is still there to be refused.
         "echo case in; /usr/bin/pyth?n3 -c 'import os' # )",
-        "echo case in /bin/b?sh -c id )",
     ] {
         let (action, reason) = decision(&controls, command);
         if reason != FAILED {

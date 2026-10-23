@@ -126,3 +126,51 @@ fn a_construct_after_a_separator_still_opens() {
         "if true; then case $MODE in  ; echo a;; esac; fi"
     );
 }
+
+/// `case` is a keyword only where the shell still reads one. After a program
+/// that runs another it is an ordinary word, so `nohup case` opens nothing and
+/// the label a fake construct would have started cannot blank away the command
+/// standing between it and the real construct's own label.
+#[test]
+fn a_case_after_a_program_that_runs_another_opens_nothing() {
+    assert_eq!(
+        without_case_labels(
+            "nohup case x | echo in | /bin/b?sh -c id | { case y in y) echo;; esac; }"
+        ),
+        "nohup case x | echo in | /bin/b?sh -c id | { case y in  ; echo;; esac; }"
+    );
+    for text in [
+        "command case x in a) echo a;; esac",
+        "builtin case x in a) echo a;; esac",
+    ] {
+        assert_eq!(without_case_labels(text), text, "{text}");
+    }
+}
+
+/// A brace group is a reserved word of its own, so a construct written inside
+/// one is still the construct it looks like.
+#[test]
+fn a_construct_inside_a_brace_group_still_opens() {
+    assert_eq!(
+        without_case_labels("{ case $MODE in a) echo a;; esac; }"),
+        "{ case $MODE in  ; echo a;; esac; }"
+    );
+}
+
+/// A label list is one pattern, or several with a `|` between them. A span
+/// holding whitespace-separated words is a run of commands wearing a label's
+/// shape, so the text keeps the refusal it had, while the blanks a real list
+/// carries around its `|` are read as the list they belong to.
+#[test]
+fn only_a_pattern_list_is_taken_for_a_label() {
+    for text in [
+        "case x in a b) echo a;; esac",
+        "case x in a |) echo a;; esac",
+    ] {
+        assert_eq!(without_case_labels(text), text, "{text}");
+    }
+    assert_eq!(
+        without_case_labels("case \"$f\" in *.ts | *.tsx) echo ts;; esac"),
+        "case \"$f\" in             ; echo ts;; esac"
+    );
+}
