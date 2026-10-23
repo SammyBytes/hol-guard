@@ -326,6 +326,23 @@ are gone from this side and the retirement ledger names the locals they used so
 a second reading cannot grow back. The home directory is resolved here and sent
 as text, so the answer never depends on the resident's own environment.
 
+Classifying one inventory artifact is the resident's too
+(`inventory-item-classification-v1`, in `inventory_item_classification_op.rs`
+over `guard-command/src/inventory_item_metadata.rs`). One call carries the whole
+artifact set and answers, per entry, the item kind its type maps onto, the
+content hash it settles on, the capability set and risk level its metadata
+earns, and the edits that bind a skill's document evidence or drop a directory
+hash nothing proved. The answer is edits — the keys to remove and the pairs to
+write — rather than a rebuilt map, so the caller keeps its own insertion order
+and an exported snapshot does not churn. The kind rides back from
+`inventory-source-evidence-v1`, the first question asked about an artifact,
+because the caller needs it to enrich metadata before it can ask anything else;
+a client built before that change may still send its own and the resident
+ignores it. Python computed all of this; the copies are gone, the ownership
+contract names the symbols so they cannot return, and
+`scripts/ci/inventory_item_metadata_reference.py` keeps the retired CPython only
+to regenerate the parity corpus the port is pinned to.
+
 ## Harness route inventory
 
 The v2 contract maps all harnesses in `HARNESS_CONTRACTS`, including harnesses

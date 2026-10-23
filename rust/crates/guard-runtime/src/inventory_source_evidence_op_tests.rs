@@ -290,3 +290,37 @@ mod links {
         assert_eq!(evidence(&wire)[0]["source_of_truth"], Value::Null);
     }
 }
+
+#[test]
+fn answers_the_item_kind_the_artifact_type_maps_onto() {
+    let wire = json!({
+        "schema": INVENTORY_SOURCE_EVIDENCE_REQUEST_SCHEMA,
+        "request_id": "",
+        "home_dir": "/home/example",
+        "include_symlinks": false,
+        "follow_unsafe_symlinks": false,
+        "entries": [
+            {"harness": "claude", "artifact_type": "instruction"},
+            {"harness": "claude", "artifact_type": "gateway_config"},
+        ],
+    });
+    let kinds: Vec<&str> = evidence(&wire)
+        .iter()
+        .map(|answer| answer["item_kind"].as_str().expect("item_kind"))
+        .collect();
+    assert_eq!(kinds, vec!["overlay", "agent"]);
+}
+
+#[test]
+fn accepts_an_entry_that_leaves_the_item_kind_to_the_resident() {
+    let wire = json!({
+        "schema": INVENTORY_SOURCE_EVIDENCE_REQUEST_SCHEMA,
+        "request_id": "",
+        "home_dir": "/home/example",
+        "include_symlinks": false,
+        "follow_unsafe_symlinks": false,
+        "entries": [{"harness": "claude", "artifact_type": "skill"}],
+    });
+    assert_eq!(parse(&wire).entries[0].item_kind, "");
+    assert_eq!(evidence(&wire)[0]["item_kind"], json!("skill"));
+}

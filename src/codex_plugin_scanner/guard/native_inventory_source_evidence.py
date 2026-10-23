@@ -61,8 +61,9 @@ def native_inventory_source_evidence(
 ) -> list[dict[str, object]]:
     """Return one evidence mapping per entry, in order.
 
-    Each answer carries ``source_of_truth`` (the metadata block for a symlinked
-    config path, or ``None``) and ``primary_content_hash`` (``sha256:…`` for a
+    Each answer carries ``item_kind`` (the snapshot kind the artifact type
+    maps onto), ``source_of_truth`` (the metadata block for a symlinked config
+    path, or ``None``) and ``primary_content_hash`` (``sha256:…`` for a
     document the artifact is allowed to hash, or ``None``).
 
     Raises ``InventorySourceEvidenceUnavailableError`` when the resident cannot
@@ -157,11 +158,14 @@ def _batch_timeout_seconds(entry_count: int) -> float:
 
 
 def _entry_wire(entry: Mapping[str, object], cwd: Path) -> dict[str, object]:
-    """Ship an entry's identity, leaving out a config path it does not carry."""
+    """Ship an entry's identity, leaving out a config path it does not carry.
+
+    The item kind is not sent: the resident maps it from the artifact type and
+    answers with it, so the caller holds no copy of that mapping.
+    """
 
     wire: dict[str, object] = {
         "harness": str(entry.get("harness", "")),
-        "item_kind": str(entry.get("item_kind", "")),
         "artifact_type": str(entry.get("artifact_type", "")),
     }
     config_path = entry.get("config_path")

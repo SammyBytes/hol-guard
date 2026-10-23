@@ -35,6 +35,12 @@ pub struct InventorySourceEvidenceEntryV1 {
     /// The harness the artifact belongs to, used to spell the source link id.
     pub harness: String,
     /// The snapshot's own kind for the artifact, used the same way.
+    ///
+    /// The op derives this from `artifact_type` and answers with it, so a
+    /// caller need not send it. The field stays accepted because a client
+    /// built before that change still sends it, and refusing the request
+    /// would cost that pairing its whole inventory.
+    #[serde(default)]
     pub item_kind: String,
     /// The artifact type, which decides whether a primary document hash is
     /// defined at all: only `skill` and `instruction` carry one.
