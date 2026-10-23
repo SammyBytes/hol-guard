@@ -59,17 +59,6 @@ fn recorded_python_vectors_match_the_resident() {
             _ => false,
         };
         if !matches {
-            if let Ok(actual) = &result {
-                let recorded = if vector["summary"] == true {
-                    summary(actual)
-                } else {
-                    actual.clone()
-                };
-                eprintln!(
-                    "REGEN\t{name}\t{}",
-                    serde_json::to_string(&recorded).unwrap()
-                );
-            }
             failures.push(format!("{kind} / {name}"));
         }
     }
