@@ -458,6 +458,16 @@ def _reported_credential_answers(text: str) -> bool:
     return all(re.search(rf"\b{field}\b[^\S\n]*:[^\S\n]*(?!<)\S", lowered) for field in ("token", "password"))
 
 
+def _read_name(path: object) -> str:
+    """The name an assignment uses for a file the host recorded a read of.
+
+    The stem, not the whole basename: an assignment says "read the README" as
+    often as it spells `README.md`, and the extension adds nothing to which
+    file the subtask was sent to.
+    """
+    return posixpath.splitext(posixpath.basename(str(path).replace("\\", "/")))[0].lower()
+
+
 def _credential_reports(call: dict[str, Any], read_names: set[str]) -> list[str]:
     """The replies from this task call's subtasks that were sent to read the file.
 
@@ -583,7 +593,7 @@ def native_tools_scope_error(
                 read_in_scope = True
                 # The file this subtask really opened. A reply is the answer to
                 # this lookup only when its assignment names that file.
-                read_names.add(posixpath.basename(str(named or path).replace("\\", "/")).lower())
+                read_names.add(_read_name(named or path))
         elif call["name"] == "yield":
             data = call["args"].get("data")
             if not isinstance(data, (dict, str)):
