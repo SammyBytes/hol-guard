@@ -50,8 +50,15 @@ def _decision_lines(coverage: dict[str, Any]) -> list[str]:
     declaring = coverage.get("declaring_cases") or []
     if not declaring:
         return []
+    exercised = coverage.get("exercised_cases") or []
     unexercised = coverage.get("unexercised_cases") or []
-    lines = [f"Declared decisions reached: {len(declaring) - len(unexercised)} of {len(declaring)} declaring cases"]
+    # Count what ran and reached its decision, never what did not fail to. A run
+    # that stopped early leaves its remaining cases in neither list, so deriving
+    # the reached count from the unexercised ones credits every case that never
+    # ran with the coverage it was selected to drive.
+    lines = [f"Declared decisions reached: {len(exercised)} of {len(declaring)} declaring cases"]
+    if (never_ran := len(declaring) - len(exercised) - len(unexercised)) > 0:
+        lines.append(f"Declared decisions never attempted: {never_ran} of {len(declaring)} declaring cases never ran")
     lines.extend(
         f"Declared decision not reached: {row['id']} ({', '.join(row['missing'])})"
         for row in unexercised

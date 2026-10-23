@@ -19,14 +19,29 @@ qualification can state the decisions its run actually reached.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
 from .catalog import Scenario
 
-# Both keys a Guard row may carry: the decision Guard returned and, where the
-# execution route answered separately, the code that route reported.
-_REASON_KEYS = ("reason_code", "execution_reason_code")
+# The one decision that hands the call to an execution route which answers
+# separately: the admission hook requires an owner, and the owner's own result
+# carries the code. The judge validates a row's ``reason_code`` and nothing
+# else, so ``execution_reason_code`` is read only on a row whose validated
+# reason code is this one. On any other row it is a field no proof stands
+# behind, and a declaration must never be satisfied by one.
+_EXECUTION_ROUTE_REASON = "native_bash_owner_required"
+
+
+def _row_paths(row: Mapping[str, Any]) -> Iterator[str]:
+    """The reason codes one Guard row proves, the decision's own code first."""
+    reason = row.get("reason_code")
+    if not isinstance(reason, str) or not reason:
+        return
+    yield reason
+    execution = row.get("execution_reason_code")
+    if reason == _EXECUTION_ROUTE_REASON and isinstance(execution, str) and execution:
+        yield execution
 
 
 def observed_paths(case: Mapping[str, Any]) -> list[str]:
@@ -34,13 +49,7 @@ def observed_paths(case: Mapping[str, Any]) -> list[str]:
     rows = case.get("guard_observations") or ()
     if not isinstance(rows, Iterable):
         return []
-    codes = {
-        value
-        for row in rows
-        if isinstance(row, Mapping)
-        for key in _REASON_KEYS
-        if isinstance(value := row.get(key), str) and value
-    }
+    codes = {code for row in rows if isinstance(row, Mapping) for code in _row_paths(row)}
     return sorted(codes)
 
 

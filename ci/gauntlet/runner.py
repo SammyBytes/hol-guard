@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import time
-from collections.abc import Callable, Container, Sequence
+from collections.abc import Callable, Container, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -109,6 +109,24 @@ def case_coverage(
         "selected_cases": len(selected),
         "executed_cases": len(selected) - len(missing),
         "unexecuted_cases": missing,
+    }
+
+
+def run_coverage(
+    selected: Sequence[Scenario], catalog: Sequence[Scenario], completed: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The catalog this run executed and the declared decisions it reached.
+
+    Built in one place because the progress report and the final report both
+    publish it: a final report that rebuilt only the catalog half would drop
+    the decision coverage every intermediate write had already stated, and the
+    summary renders from the final report alone.
+    """
+    return {
+        **case_coverage(selected, catalog, completed),
+        # Which cases reached the decisions they were written for, so a profile
+        # states the coverage it actually drove rather than the coverage it selected.
+        "decision_paths": profile_coverage(selected, completed),
     }
 
 
@@ -563,12 +581,7 @@ def run_suite(
             [scenario.id for scenario in selected if scenario.id in completed],
             superseded=output / "superseded",
         )
-        report["case_coverage"] = {
-            **case_coverage(selected, catalog, completed),
-            # Which cases reached the decisions they were written for, so a profile
-            # states the coverage it actually drove rather than the coverage it selected.
-            "decision_paths": profile_coverage(selected, completed),
-        }
+        report["case_coverage"] = run_coverage(selected, catalog, completed)
         report["case_retries"] = retries.history
         print(json.dumps({"scenario": scenario.id, **case["assessment"]}), flush=True)
         (output / "summary.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -646,7 +659,7 @@ def run_suite(
     route_failed()
     report["finished_at"] = datetime.now(timezone.utc).isoformat()
     report.setdefault("inference_usage", inference_usage(output / "cases", (), superseded=output / "superseded"))
-    report["case_coverage"] = case_coverage(selected, catalog, completed)
+    report["case_coverage"] = run_coverage(selected, catalog, completed)
     report["stopped_early"] = len(report["cases"]) < len(selected)
     report.update(report_sections(report["cases"]))
     report["pass"] = (

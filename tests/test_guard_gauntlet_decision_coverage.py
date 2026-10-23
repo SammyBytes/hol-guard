@@ -55,11 +55,35 @@ def test_a_case_declaring_nothing_is_judged_exactly_as_before():
 
 
 def test_an_execution_route_reason_code_counts_as_reached():
-    """Read the code an execution route reported, not only the decision's own."""
+    """Read the code an execution route reported, not only the decision's own.
+
+    Only the owner-required decision delegates to a route that answers for
+    itself, so only that decision's row carries a second code worth reading.
+    """
+    case = observed_case()
+    case["guard_observations"][0]["reason_code"] = "native_bash_owner_required"
+    case["guard_observations"][0]["execution_reason_code"] = CONTAINED
+    assert observed_paths(case) == ["native_bash_owner_required", "native_policy_warning", CONTAINED]
+    assert assess_case(declaring(CONTAINED), case)["outcome"] == "pass"
+
+
+def test_an_execution_code_on_an_ordinary_row_satisfies_nothing():
+    """The judge validates a row's reason code and nothing else on it.
+
+    An execution code on a row whose decision never delegated to an execution
+    route is a field no proof stands behind. Reading it would let an ordinary
+    allow declare any decision reached without Guard having made it.
+    """
     case = observed_case()
     case["guard_observations"][0]["execution_reason_code"] = CONTAINED
-    assert observed_paths(case) == ["native_policy_warning", CONTAINED]
-    assert assess_case(declaring(CONTAINED), case)["outcome"] == "pass"
+    assert observed_paths(case) == ["native_policy_warning"]
+    assert assess_case(declaring(CONTAINED), case)["outcome"] == "not-exercised"
+
+
+def test_an_execution_code_without_a_decision_of_its_own_satisfies_nothing():
+    """A row Guard never wrote a reason code on proves no decision at all."""
+    rows = {"guard_observations": [{"execution_reason_code": CONTAINED}]}
+    assert observed_paths(rows) == []
 
 
 def test_observations_that_are_not_rows_report_no_coverage():
@@ -129,3 +153,18 @@ def test_the_shipped_catalog_declares_only_codes_the_runtime_can_report():
     declared = {code for scenario in load_catalog() for code in scenario.decision_paths}
     assert declared
     assert all(code.islower() and code.isidentifier() for code in declared)
+
+
+def test_every_coverage_report_states_the_decisions_the_run_reached():
+    """Progress and final reports publish one record, so neither can drop half.
+
+    The human summary renders from the final report alone; a final report that
+    rebuilt only the catalog half would erase the decision coverage.
+    """
+    from ci.gauntlet.runner import run_coverage
+
+    quiet = Scenario("quiet", "allow", "commands", "Use the tool", ("echo fixture",))
+    selected = (declaring(CONTAINED), quiet)
+    coverage = run_coverage(selected, selected, {})
+    assert coverage["decision_paths"]["declaring_cases"] == ["ordinary"]
+    assert coverage["unexecuted_cases"] == ["ordinary", "quiet"]
