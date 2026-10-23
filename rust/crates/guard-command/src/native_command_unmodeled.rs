@@ -299,6 +299,14 @@ impl CompiledNativeCommandControls {
                 // that was never read. The module name is already in the
                 // command.
                 None if !prefix::interpreter_launch_reads_a_file(&bare, sourced_bounded) => {}
+                // A script file behind a trailing `&` is no more opaque than
+                // the same file run in the foreground, which this scan does
+                // model: `node server.js &` runs what `node server.js` runs.
+                // Refusing it here blocked an ordinary dev server outright,
+                // with no approval left to give it, while the same text
+                // without the `&` ran. The owners stay the ones this text
+                // names, so the floor it reaches is still a review.
+                None if crate::pretool::backgrounded_launch(command, context) => {}
                 None => return None,
             }
         }
