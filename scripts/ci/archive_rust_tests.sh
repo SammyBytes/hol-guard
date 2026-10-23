@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The warmer and required CI use identical, complete nextest build selections.
+# Required CI archives complete build selections, independently of test sharding.
 set -euo pipefail
 case "${1:?test partition required}" in
     core|test-core) packages=(--locked --workspace --exclude guard-command --exclude hol-guard-runtime --all-targets) ;;

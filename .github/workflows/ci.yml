@@ -155,9 +155,10 @@ jobs:
     name: Rust workspace (${{ matrix.check }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only main test jobs share the warmer's lock. PRs and Clippy stay parallel.
+    # Required main consumers are the archive producers. Only the two runtime
+    # shards share an archive; core/command and PR/Clippy work stay independent.
     concurrency:
-      group: ${{ github.ref == 'refs/heads/main' && matrix.check != 'clippy' && format('trusted-rust-tests-{0}', github.sha) || format('rust-workspace-{0}-{1}-{2}', github.run_id, github.run_attempt, matrix.check) }}
+      group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.check != 'clippy' && format('trusted-rust-tests-{0}-{1}', github.sha, matrix.check == 'test-command' && 'command' || (matrix.check == 'test-core' && 'core' || 'runtime')) || format('rust-workspace-{0}-{1}-{2}', github.run_id, github.run_attempt, matrix.check) }}
       queue: max
       cancel-in-progress: false
     strategy:
@@ -292,6 +293,9 @@ jobs:
             *) echo "Unsupported workspace check" >&2; exit 64 ;;
           esac
       - name: Save successful runtime test compilation
+        # Publish only after this consumer passes. Compared with an independent
+        # compile-only warmer, availability waits for tests and failed consumers
+        # publish nothing; either successful runtime shard can seed its archive.
         if: >-
           matrix.check != 'clippy' &&
           steps.runtime-archive.outputs.cache-hit != 'true' &&
