@@ -85,10 +85,13 @@ const MIN_VALUE_RUN: usize = 8;
 /// characters, so a letter run past that was not typed as prose.
 const MAX_WORD_RUN: usize = 20;
 
-/// Shortest run of digits alone taken for a value. Longer than `MIN_VALUE_RUN`
-/// because a report writes out dates, counts and issue numbers, none of which
-/// reach the length of an account number or a numeric key.
-const MIN_DIGIT_RUN: usize = 10;
+/// Shortest run of digits alone taken for a value. A report writes out epoch
+/// seconds, epoch milliseconds, dates, counts and issue numbers beside its
+/// answer, and the longest of those is thirteen digits, so a shorter bound read
+/// `Token: none as of 1735689600` as a credential. Sixteen is where a numeric
+/// secret starts: a card number is exactly that long, and an account number or
+/// numeric key is longer still.
+const MIN_DIGIT_RUN: usize = 16;
 
 /// How much of the line in front of a match can make its field a question.
 const MAX_FIELD_LEAD_CHARS: usize = 48;
@@ -99,8 +102,15 @@ const MAX_FIELD_LEAD_CHARS: usize = 48;
 /// Only the unquoted colon form qualifies. A quoted value (`"token": "no"`) is
 /// data a program reads, and `=` is an assignment an environment or shell file
 /// makes, so both keep their match. `tail` is the text after the match: an
-/// answer the value runs on past is not the whole value.
-pub(crate) fn is_prose_answer(matched: &str, tail: &str, preceding: &str) -> bool {
+/// answer the value runs on past is not the whole value. `value_follows` says
+/// whether a credential-shaped token comes later on the line, which the caller
+/// resolves once per line rather than per match.
+pub(crate) fn is_prose_answer(
+    matched: &str,
+    tail: &str,
+    preceding: &str,
+    value_follows: bool,
+) -> bool {
     let Some(index) = matched.find([':', '=']) else {
         return false;
     };
@@ -112,7 +122,7 @@ pub(crate) fn is_prose_answer(matched: &str, tail: &str, preceding: &str) -> boo
     {
         return false;
     }
-    if !ends_value(tail) {
+    if !ends_value(tail, value_follows) {
         return false;
     }
     let answer = value
@@ -169,24 +179,37 @@ fn reports_about_field(preceding: &str, field: &str) -> bool {
 /// line is shaped like a secret, so `Password: not set` still reads as a
 /// report. Which character ended the value does not change that: a credential
 /// written after a comma is a credential.
-fn ends_value(tail: &str) -> bool {
+fn ends_value(tail: &str, value_follows: bool) -> bool {
     let Some(next) = tail.chars().next() else {
         return true;
     };
-    (next.is_whitespace() || matches!(next, ',' | '}' | ')' | ']' | ';')) && !carries_value(tail)
+    (next.is_whitespace() || matches!(next, ',' | '}' | ')' | ']' | ';')) && !value_follows
 }
 
-/// Whether the rest of the line holds a token shaped like a credential. `-` and
-/// `_` join a run, because a key is written `ab12-cd34-ef56-gh78`, while `/` and
-/// `.` end one so a path reads as the words it is made of.
-fn carries_value(tail: &str) -> bool {
-    tail.split(['\n', '\r'])
-        .next()
-        .unwrap_or_default()
-        .split(|character: char| {
-            !(character.is_ascii_alphanumeric() || character == '-' || character == '_')
-        })
-        .any(holds_value)
+/// Where the last credential-shaped token on this line starts, as an offset
+/// into `tail`, or `None` when the line carries none. `-` and `_` join a run,
+/// because a key is written `ab12-cd34-ef56-gh78`, while `/` and `.` end one so
+/// a path reads as the words it is made of.
+///
+/// The caller resolves this once for the line and compares the offset with each
+/// match's end. Asking every match whether a value follows it would rescan the
+/// rest of the line once per match, which is quadratic on a line of repeated
+/// `password: no,` fields.
+pub(crate) fn last_value_offset(tail: &str) -> Option<usize> {
+    let line = tail.split(['\n', '\r']).next().unwrap_or_default();
+    let mut last = None;
+    let mut start = None;
+    for (index, character) in line.char_indices() {
+        if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+            start.get_or_insert(index);
+            continue;
+        }
+        last = start
+            .take()
+            .filter(|&begin| holds_value(&line[begin..index]))
+            .or(last);
+    }
+    start.filter(|&begin| holds_value(&line[begin..])).or(last)
 }
 
 /// Whether one token on that line is a chosen value rather than more prose.
@@ -213,9 +236,15 @@ fn holds_value(token: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_prose_answer;
+    use super::last_value_offset;
     use crate::scan_text;
     use guard_rules::MAX_SCAN_BYTES;
+
+    /// The scanner resolves `value_follows` once per line; a test states the
+    /// match and its tail, so it resolves the same answer from that tail.
+    fn is_prose_answer(matched: &str, tail: &str, preceding: &str) -> bool {
+        super::is_prose_answer(matched, tail, preceding, last_value_offset(tail).is_some())
+    }
 
     fn credential_assignment(text: &str) -> bool {
         scan_text(text, true, true, MAX_SCAN_BYTES, None)
@@ -323,13 +352,17 @@ mod tests {
 
     #[test]
     fn digits_alone_after_an_answer_are_a_value() {
-        assert!(!is_prose_answer("api_key: none", " 482919375521", ""));
-        assert!(credential_assignment("api_key: none 482919375521\n"));
-        assert!(!is_prose_answer("pin: not", " set 8675309123", ""));
-        // A date, a count or an issue number beside the answer is still prose.
+        assert!(!is_prose_answer("api_key: none", " 4829193755218037", ""));
+        assert!(credential_assignment("api_key: none 4829193755218037\n"));
+        assert!(!is_prose_answer("pin: not", " set 86753091234567890", ""));
+        // A date, a count, an issue number or an epoch stamp beside the answer
+        // is still prose: none of them is as long as a numeric secret.
         assert!(is_prose_answer("Token: none", " as of 2026-10-23", ""));
         assert!(is_prose_answer("Password: none", " in 1284 files", ""));
+        assert!(is_prose_answer("Token: none", " as of 1735689600", ""));
+        assert!(is_prose_answer("Token: none", " as of 1735689600123", ""));
         assert!(!credential_assignment("Token: none as of 2026-10-23\n"));
+        assert!(!credential_assignment("Token: none as of 1735689600\n"));
     }
 
     #[test]
@@ -351,5 +384,27 @@ mod tests {
     fn a_report_word_does_not_carry_past_its_own_field() {
         assert!(!is_prose_answer("password: yes", "", "Has token: no; "));
         assert!(credential_assignment("Has token: no; password: yes\n"));
+    }
+
+    #[test]
+    fn the_last_value_on_a_line_is_found_in_one_pass() {
+        assert_eq!(last_value_offset(", password: no"), None);
+        assert_eq!(last_value_offset(", q7Lm2Xv9Rt4Kp8Wz"), Some(2));
+        // The answer is the start of the last value-shaped token, not the first.
+        assert_eq!(last_value_offset(" a q7Lm2Xv9 b r3Pn6Yw1"), Some(14));
+        // A value on a later line belongs to that line.
+        assert_eq!(last_value_offset(" no\nkey: q7Lm2Xv9Rt4Kp8Wz"), None);
+    }
+
+    #[test]
+    fn a_line_of_answered_fields_stays_linear() {
+        // Reading each match's own tail would rescan the rest of the line once
+        // per field, so a line of answered fields alone used to cost its length
+        // squared. Every field here is prose and the line is left unflagged.
+        let line = format!("{}\n", vec!["password: no"; 400].join(", "));
+        assert!(!credential_assignment(&line));
+        // The same line ending in a real value flags that value.
+        let with_value = line.replace('\n', " q7Lm2Xv9Rt4Kp8Wz\n");
+        assert!(credential_assignment(&with_value));
     }
 }
