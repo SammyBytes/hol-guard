@@ -54,6 +54,11 @@ pub(super) fn answers_from_operands(arguments: &[String], text: &str) -> bool {
 /// is looked for as a quoted word in the text, after the previous match.
 /// Matching in order keeps `[ "$P" = $P ]` from reusing the first quoted
 /// spelling for the second, unquoted one.
+///
+/// The text also carries what is not an argument, such as a redirect or an
+/// assignment in front of the command, and a quoted copy there would vouch for
+/// an operand written bare: `test $P = x 2>"$P"`. So once each argument has
+/// claimed its quoted spelling, no `$` may be left anywhere else in the text.
 fn expansions_quoted(arguments: &[String], text: &str) -> bool {
     let mut rest = text;
     for word in arguments.iter().filter(|word| word.contains('$')) {
@@ -67,9 +72,12 @@ fn expansions_quoted(arguments: &[String], text: &str) -> bool {
         let Some((start, length)) = found else {
             return false;
         };
+        if rest[..start].contains('$') {
+            return false;
+        }
         rest = &rest[start + length..];
     }
-    true
+    !rest.contains('$')
 }
 
 /// A word the shell has already expanded to a plain string. A leading `-`
@@ -160,6 +168,10 @@ mod tests {
             (vec!["-z", "$DEBUG"], "test -z $DEBUG"),
             (vec!["$P", "=", "$P"], "[ \"$P\" = $P ]"),
             (vec!["$P", "=", "$P"], "[ $P = \"$P\" ]"),
+            // A quoted copy outside the arguments does not quote them.
+            (vec!["$P", "=", "x"], "test $P = x 2>\"$P\""),
+            (vec!["$P", "=", "x"], "X=\"$P\" [ $P = x ]"),
+            (vec!["$P", "=", "x"], "[ \"$P\" = x ] 2>\"$LOG\""),
         ] {
             assert!(!answers_from_operands(&arguments(&words), text), "{text}");
         }
@@ -169,6 +181,7 @@ mod tests {
             (vec!["$P", "=", "$P"], "[ \"$P\" = \"$P\" ]"),
             (vec!["$P", "=", "$P"], "[ '$P' = \"$P\" ]"),
             (vec!["x", "=", "y"], "[ x = y ]"),
+            (vec!["$P", "=", "x"], "[ \"$P\" = x ] 2>/dev/null"),
         ] {
             assert!(answers_from_operands(&arguments(&words), text), "{text}");
         }
