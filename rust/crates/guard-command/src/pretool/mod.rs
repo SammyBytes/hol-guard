@@ -780,6 +780,31 @@ pub(super) fn evaluate_pre_tool_with_execution_context(
     deadline: Option<std::time::Instant>,
     execution_environment: Option<&guard_contracts::GuardExecutionEnvironmentV1>,
 ) -> Result<PreToolDecisionV1, String> {
+    evaluate_rewritten(request, home_dir, cwd, deadline, execution_environment, 0)
+}
+
+/// How many rewrites one submission may go through. A wrapper around a loop
+/// needs two - the wrapper comes off, then the loop unrolls - and the bound
+/// stops a recognizer whose output another recognizer reads from running
+/// without end.
+const MAX_REWRITE_ROUNDS: usize = 3;
+
+/// The command list a rewrite reads this text as, in the order the
+/// recognizers are tried.
+fn rewritten_command_list(command: &str) -> Option<String> {
+    for_loop_unroll::unroll(command)
+        .or_else(|| control_flow_flatten::flatten(command))
+        .or_else(|| list_wrapper::unwrapped(command))
+}
+
+fn evaluate_rewritten(
+    request: &CommandModelRequestV1,
+    home_dir: Option<&str>,
+    cwd: Option<&str>,
+    deadline: Option<std::time::Instant>,
+    execution_environment: Option<&guard_contracts::GuardExecutionEnvironmentV1>,
+    round: usize,
+) -> Result<PreToolDecisionV1, String> {
     let decision =
         evaluate_single_command(request, home_dir, cwd, deadline, execution_environment)?;
     if request.dialect != "posix" || decision.minimum_action != "review" {
@@ -791,10 +816,7 @@ pub(super) fn evaluate_pre_tool_with_execution_context(
     // through the same proofs and replaces the construct's decision: an allow
     // there admits the construct, a block is never softened, and a review
     // carries the rewritten model so later layers judge modeled commands.
-    let Some(unrolled) = for_loop_unroll::unroll(&request.command)
-        .or_else(|| control_flow_flatten::flatten(&request.command))
-        .or_else(|| list_wrapper::unwrapped(&request.command))
-    else {
+    let Some(rewritten) = rewritten_command_list(&request.command) else {
         return Ok(ungrouped_decision(
             request,
             decision,
@@ -804,24 +826,41 @@ pub(super) fn evaluate_pre_tool_with_execution_context(
             execution_environment,
         ));
     };
-    let unrolled_request = CommandModelRequestV1 {
-        command: unrolled,
+    let rewritten_request = CommandModelRequestV1 {
+        command: rewritten,
         ..request.clone()
     };
-    match evaluate_single_command(
-        &unrolled_request,
-        home_dir,
-        cwd,
-        deadline,
-        execution_environment,
-    ) {
-        Ok(unrolled)
+    // What a rewrite leaves behind can be a construct of its own:
+    // `for f in a b; do echo "$f"; done &` is the loop once the wrapper is
+    // gone, and `! (cat Cargo.toml)` is a group. Reading the rewritten text
+    // through this same pass gives it every proof its bare spelling has,
+    // rather than only the proofs that read one plain command list.
+    let rewritten = if round + 1 < MAX_REWRITE_ROUNDS {
+        evaluate_rewritten(
+            &rewritten_request,
+            home_dir,
+            cwd,
+            deadline,
+            execution_environment,
+            round + 1,
+        )
+    } else {
+        evaluate_single_command(
+            &rewritten_request,
+            home_dir,
+            cwd,
+            deadline,
+            execution_environment,
+        )
+    };
+    match rewritten {
+        Ok(rewritten)
             if matches!(
-                unrolled.minimum_action.as_str(),
+                rewritten.minimum_action.as_str(),
                 "allow" | "review" | "block"
             ) =>
         {
-            Ok(unrolled)
+            Ok(rewritten)
         }
         _ => Ok(decision),
     }

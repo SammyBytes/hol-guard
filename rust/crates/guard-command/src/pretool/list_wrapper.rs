@@ -4,6 +4,11 @@
 //! command, so the wrapped list's commands are the unwrapped list's and the
 //! ordinary proofs can decide them. Anything this recognizer does not fully
 //! understand returns `None`, which keeps the existing review behavior.
+//!
+//! `!` is the one wrapper whose reach is narrower than the list: it negates
+//! the first pipeline, so a `&&` or `||` successor runs on the opposite
+//! outcome once it is gone. A negation is therefore only read as its list
+//! when that list is a single pipeline.
 
 use super::script_content::foreground_job;
 
@@ -35,6 +40,14 @@ fn unnegated(command: &str) -> Option<&str> {
         return None;
     }
     let rest = rest.trim_start();
+    // `! cd sub && touch ../x` runs `touch` when `cd` fails, because the `!`
+    // negates `cd` alone. The bare list runs it when `cd` succeeds, so the
+    // flow-sensitive proofs would read the successors in the wrong working
+    // directory and could admit a write the real shell makes outside the
+    // workspace. Only a list that is one pipeline reads alike both ways.
+    if rest.contains("&&") || rest.contains("||") || rest.contains([';', '\n']) {
+        return None;
+    }
     (!rest.is_empty() && !rest.starts_with('!')).then_some(rest)
 }
 

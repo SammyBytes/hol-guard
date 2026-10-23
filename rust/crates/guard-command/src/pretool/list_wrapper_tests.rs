@@ -46,6 +46,12 @@ fn text_that_wraps_nothing_or_reads_unclearly_stays_as_submitted() {
         "cat Cargo.toml & wc -l Cargo.toml &",
         "cat Cargo.toml && wc -l Cargo.toml",
         "cat <<'EOF' &",
+        // `!` negates the first pipeline, so a successor of the list runs on
+        // the opposite outcome without it.
+        "! cd src && touch ../escape.txt",
+        "! cat Cargo.toml && wc -l Cargo.toml",
+        "! make check || echo failed",
+        "! cat Cargo.toml; wc -l Cargo.toml",
     ] {
         assert_eq!(unwrapped(command), None, "{command}");
     }
@@ -87,4 +93,31 @@ fn wrapped_unsafe_work_keeps_its_verdict() {
         assert_ne!(wrapped_decision.0, "allow", "{wrapped}");
         assert_eq!(wrapped_decision, decide(list), "{wrapped}");
     }
+}
+
+/// A wrapper comes off before the loop, conditional and group recognizers
+/// read the text, so a wrapped construct reaches the proofs its bare
+/// spelling reaches instead of stopping at the one pass that reads a plain
+/// command list.
+#[test]
+fn a_wrapped_loop_or_group_decides_as_its_list() {
+    for (wrapped, list) in [
+        (
+            "for name in Cargo.toml README.md; do wc -l \"$name\"; done &",
+            "for name in Cargo.toml README.md; do wc -l \"$name\"; done",
+        ),
+        ("! (cat Cargo.toml)", "cat Cargo.toml"),
+        ("(cat Cargo.toml) &", "cat Cargo.toml"),
+    ] {
+        assert_eq!(decide(wrapped), decide(list), "{wrapped}");
+        assert_eq!(decide(wrapped).0, "allow", "{wrapped}");
+    }
+}
+
+/// A negation whose list is more than one pipeline keeps its review: the
+/// successors would otherwise be modelled in the state the bare list reaches
+/// rather than the state the shell is actually in.
+#[test]
+fn a_negated_multi_pipeline_list_keeps_its_review() {
+    assert_ne!(decide("! cd src && touch ../escape.txt").0, "allow");
 }
