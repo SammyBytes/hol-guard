@@ -112,6 +112,7 @@ pub(super) fn answer(
             Ok(token) => ExactKeys::Token(token),
             Err(reason) => ExactKeys::OnceOnly(reason),
         },
+        hint: context.hint,
     };
     let request = build(&input, result, receipt).ok_or(HookDirectDefer::ReviewQueue)?;
     if !facts.ask || (review_binding.is_none() && token.is_err()) {
