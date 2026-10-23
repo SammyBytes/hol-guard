@@ -678,6 +678,12 @@ fn a_case_label_and_an_empty_prefix_keep_their_approval() {
         "while IFS= read -r line; do echo one; done < list.txt",
         "while IFS= read -r line; do echo one; done",
         "IFS= read -r first < list.txt",
+        // A label is a pattern, never a command, so one built at run time
+        // still names no program. The labels stay where they are, because
+        // the module refuses to take out a label holding an expansion, and
+        // the construct reaches the same review a literal label reaches.
+        "case $MODE in $PATTERN) echo a;; esac",
+        "case $MODE in `echo a`) echo a;; esac",
     ] {
         let (action, reason) = decision(&controls, command);
         assert_ne!(reason, FAILED, "{command}");
@@ -689,13 +695,14 @@ fn a_case_label_and_an_empty_prefix_keep_their_approval() {
 fn a_case_clause_that_can_start_a_program_keeps_the_failure() {
     let controls = controls(serde_json::json!([]), false);
     for command in [
-        // The label itself is built at run time.
-        "case $MODE in $PATTERN) echo a;; esac",
-        "case $MODE in `echo a`) echo a;; esac",
-        // The label is plain, but the clause body names a program the command
-        // does not show: taking the label out must not hide the body.
+        // The clause body names a program the command does not show: taking
+        // the label out must not hide the body.
         "case $MODE in a) $CMD;; *) echo b;; esac",
         "case $MODE in a) echo a;; *) $CMD;; esac",
+        // A label built at run time keeps every label in place, and the body
+        // behind it is still read where it stands.
+        "case $MODE in $PATTERN) $CMD;; esac",
+        "case $MODE in `echo a`) $CMD;; esac",
         // An assignment that carries a value is still data movement.
         "while IFS=: read -r name rest; do echo one; done < list.txt",
         // Emptying a name that decides which files a pattern reaches is a
