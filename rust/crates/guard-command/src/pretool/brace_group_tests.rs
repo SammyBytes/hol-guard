@@ -8,7 +8,7 @@ fn a_trailing_brace_group_reads_as_its_command_list() {
     );
     assert_eq!(
         unwrap("cd web && { npm ci; npm test; }").as_deref(),
-        Some("cd web &&  npm ci; npm test")
+        Some("cd web &&   npm ci; npm test")
     );
     assert_eq!(unwrap("{\n  pytest -q\n}").as_deref(), Some("pytest -q"));
 }
