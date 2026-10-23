@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -173,6 +175,63 @@ def test_windows_validates_pinned_host_and_inventory_before_uninstall(
         with pytest.raises(ValueError):
             normalize.main()
         assert all(command[:3] != ["rustup", "toolchain", "uninstall"] for command in calls)
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="normalization uses Bash")
+@pytest.mark.parametrize("interpreters,valid", [("python", True), ("python3", True), ("both", True), ("python", False)])
+def test_normalization_shell_uses_available_python_and_propagates_failure(tmp_path, interpreters, valid):
+    action = yaml.safe_load((ROOT / ".github/actions/setup-rust/action.yml").read_text())
+    step = next(
+        step for step in action["runs"]["steps"] if step["name"] == "Normalize the hosted Rust compiler inventory"
+    )
+    commands = tmp_path / "commands"
+    commands.mkdir()
+    selected = tmp_path / "selected-interpreter"
+    calls = tmp_path / "rustup-calls"
+    for name in ["python", "python3"] if interpreters == "both" else [interpreters]:
+        executable = commands / name
+        executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$SELECTED_INTERPRETER"\nexec "$TEST_PYTHON" "$@"\n')
+        executable.chmod(0o755)
+    rustup = commands / "rustup"
+    active = WINDOWS_PINNED if valid else PINNED
+    unused = f"1.99.1-{WINDOWS_HOST}"
+    rustup.write_text(
+        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$RUSTUP_CALLS"\n'
+        'case "$*" in\n'
+        f'  "toolchain list") printf "%s\\n" "{active} (default)" "{unused}" ;;\n'
+        f'  "show active-toolchain") printf "%s\\n" "{active} (default)" ;;\n'
+        f'  "toolchain uninstall {unused}") ;;\n'
+        "  *) exit 91 ;;\nesac\n"
+    )
+    rustup.chmod(0o755)
+    completed = subprocess.run(
+        [shutil.which("bash"), "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "PATH": str(commands),
+            "TEST_PYTHON": sys.executable,
+            "SELECTED_INTERPRETER": str(selected),
+            "RUSTUP_CALLS": str(calls),
+            "RUST_TOOLCHAIN": "1.88.0",
+            "GITHUB_ACTIONS": "true",
+            "RUNNER_ENVIRONMENT": "github-hosted",
+            "RUNNER_OS": "Windows",
+            "RUNNER_ARCH": "X64",
+        },
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert (completed.returncode == 0) == valid, completed.stderr
+    expected = "python3" if interpreters in {"python3", "both"} else "python"
+    assert [Path(line).name for line in selected.read_text().splitlines()] == [expected]
+    assert calls.read_text().splitlines() == [
+        "toolchain list",
+        "show active-toolchain",
+        *([f"toolchain uninstall {unused}"] if valid else []),
+    ]
 
 
 def test_normalization_is_opt_in_and_precedes_full_environment_hashing() -> None:
