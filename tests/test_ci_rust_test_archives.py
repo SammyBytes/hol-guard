@@ -196,6 +196,7 @@ def test_archive_recipe_builds_all_selected_targets_and_replaces_only_its_stagin
         str(archive),
         "--zstd-level",
         "1",
+        "--timings",
     ]
     assert archive.read_text() == "new" and unrelated.read_text() == "keep"
 

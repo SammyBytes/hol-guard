@@ -19,4 +19,4 @@ if [[ -e "$archive" || -L "$archive" ]]; then
 fi
 nextest_bin="$(python3 scripts/ci/install_nextest.py)"
 PATH="$nextest_bin:$PATH" cargo nextest archive --manifest-path rust/Cargo.toml \
-    "${packages[@]}" --archive-file "$archive" --zstd-level 1
+    "${packages[@]}" --archive-file "$archive" --zstd-level 1 --timings
