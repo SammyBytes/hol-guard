@@ -88,10 +88,10 @@ const MAX_WORD_RUN: usize = 20;
 /// Shortest run of digits alone taken for a value. A report writes out epoch
 /// seconds, epoch milliseconds, dates, counts and issue numbers beside its
 /// answer, and the longest of those is thirteen digits, so a shorter bound read
-/// `Token: none as of 1735689600` as a credential. Sixteen is where a numeric
-/// secret starts: a card number is exactly that long, and an account number or
-/// numeric key is longer still.
-const MIN_DIGIT_RUN: usize = 16;
+/// `Token: none as of 1735689600` as a credential. Fourteen is the first length
+/// past that, so a numeric secret of any length a report would not write out -
+/// a card number, an account number, a numeric key - still reads as a value.
+const MIN_DIGIT_RUN: usize = 14;
 
 /// How much of the line in front of a match can make its field a question.
 const MAX_FIELD_LEAD_CHARS: usize = 48;
@@ -206,10 +206,19 @@ pub(crate) fn last_value_offset(tail: &str) -> Option<usize> {
         }
         last = start
             .take()
+            .filter(|_| !names_field(character))
             .filter(|&begin| holds_value(&line[begin..index]))
             .or(last);
     }
     start.filter(|&begin| holds_value(&line[begin..])).or(last)
+}
+
+/// Whether the character that ended a run makes it the name of the next field
+/// rather than a value of this one. `Token: none, password_v2: none` answers
+/// two fields and assigns neither, so the second field's name must not read as
+/// the first field's value.
+fn names_field(ended_by: char) -> bool {
+    matches!(ended_by, ':' | '=')
 }
 
 /// Whether one token on that line is a chosen value rather than more prose.
@@ -363,6 +372,24 @@ mod tests {
         assert!(is_prose_answer("Token: none", " as of 1735689600123", ""));
         assert!(!credential_assignment("Token: none as of 2026-10-23\n"));
         assert!(!credential_assignment("Token: none as of 1735689600\n"));
+        // One digit past an epoch in milliseconds is where a value starts, so a
+        // numeric secret shorter than a card number is still read as one.
+        assert!(!is_prose_answer("pin: none", " 48291937552180", ""));
+    }
+
+    #[test]
+    fn a_field_answered_later_on_the_line_is_not_the_first_field_s_value() {
+        assert!(is_prose_answer("Token: none", ", password_v2: none", ""));
+        assert!(!credential_assignment("Token: none, password_v2: none\n"));
+        assert!(is_prose_answer("Token: none", " (api_key_v2=none)", ""));
+        // A value written after the second field still ends both answers. The
+        // field is spelled without a credential word so the line carries one
+        // value for a scanner to read, not two.
+        assert!(!is_prose_answer(
+            "Token: none",
+            ", rotated_v2: q7Lm2Xv9Rt4Kp8Wz",
+            ""
+        ));
     }
 
     #[test]
