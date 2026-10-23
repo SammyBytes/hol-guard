@@ -357,6 +357,25 @@ pub(crate) fn evaluate(input: &Value) -> Result<Value, String> {
                     json!({"lineage_floor":lineage_floor,"lineage_source":root["source_sha"]}),
                 );
             }
+            // Desktop restores the previous runtime when an upgraded one fails
+            // to come online, after the upgraded daemon may already have
+            // observed its own bundle. The restored release reads under the
+            // same authority and revocations, so it keeps its verified program
+            // and leaves the lineage floor where the upgrade put it. Without
+            // this the newer engine stays the security root and every pack
+            // stays quarantined until that upgrade comes back.
+            Err(code)
+                if code == "pack_lifecycle_version_rollback"
+                    && input["profile"] == "installed"
+                    && old.as_ref().is_some_and(|old| {
+                        old.identity["profile"] == "installed"
+                            && old.authority == authority
+                            && old.epoch == epoch
+                            && old.root["policy"]["revocations"] == root["policy"]["revocations"]
+                    }) =>
+            {
+                lineage_floor.to_owned()
+            }
             Err(code) => return Err(code),
         };
         let mut state = old.unwrap_or(Security {
