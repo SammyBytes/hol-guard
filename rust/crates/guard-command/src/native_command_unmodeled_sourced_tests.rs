@@ -914,7 +914,7 @@ fn sourcing_a_file_that_is_not_there_reviews_instead_of_blocking() {
         ". ./missing-env.sh",
         ". ./scripts/env.sh",
     ] {
-        let (_, code) = outcome(&root, command);
+        let (_, code) = reviewed(&root, command);
         assert_ne!(code, FAILED, "{command}");
     }
     let _ = std::fs::remove_dir_all(&root);
@@ -923,7 +923,7 @@ fn sourcing_a_file_that_is_not_there_reviews_instead_of_blocking() {
 #[test]
 fn a_file_this_command_puts_there_before_sourcing_it_keeps_its_failure() {
     let root = bare("written");
-    let (_, code) = outcome(&root, "cp seed.sh run.sh && . ./run.sh");
+    let (_, code) = reviewed(&root, "cp seed.sh run.sh && . ./run.sh");
     assert_eq!(code, FAILED);
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -932,7 +932,7 @@ fn a_file_this_command_puts_there_before_sourcing_it_keeps_its_failure() {
 fn a_sourced_file_that_is_there_and_unreadable_keeps_its_failure() {
     let root = bare("unreadable");
     std::fs::write(root.join("project").join("env.sh"), [0xff, 0xfe, 0x0a]).unwrap();
-    let (_, code) = outcome(&root, ". ./env.sh && pytest -q");
+    let (_, code) = reviewed(&root, ". ./env.sh && pytest -q");
     assert_eq!(code, FAILED);
     let _ = std::fs::remove_dir_all(&root);
 }
