@@ -667,3 +667,38 @@ fn heredoc_python_with_a_coding_cookie_or_padded_terminator_keeps_the_failure() 
         assert_eq!(decision(&controls, command).1, FAILED, "{command}");
     }
 }
+
+#[test]
+fn a_case_label_and_an_empty_prefix_keep_their_approval() {
+    let controls = controls(serde_json::json!([]), false);
+    for command in [
+        "case $MODE in a) echo a;; *) echo b;; esac",
+        "case \"$f\" in *.ts|*.tsx) echo ts;; *) echo other;; esac",
+        "case $1 in start) npm run dev;; stop) npm run stop;; *) echo usage;; esac",
+        "while IFS= read -r line; do echo one; done < list.txt",
+        "while IFS= read -r line; do echo one; done",
+        "IFS= read -r first < list.txt",
+    ] {
+        let (action, reason) = decision(&controls, command);
+        assert_ne!(reason, FAILED, "{command}");
+        assert_eq!(action, "review", "{command}");
+    }
+}
+
+#[test]
+fn a_case_clause_that_can_start_a_program_keeps_the_failure() {
+    let controls = controls(serde_json::json!([]), false);
+    for command in [
+        // The label itself is built at run time.
+        "case $MODE in $PATTERN) echo a;; esac",
+        "case $MODE in `echo a`) echo a;; esac",
+        // The label is plain, but the clause body names a program the command
+        // does not show: taking the label out must not hide the body.
+        "case $MODE in a) $CMD;; *) echo b;; esac",
+        "case $MODE in a) echo a;; *) $CMD;; esac",
+        // An assignment that carries a value is still data movement.
+        "while IFS=: read -r name rest; do echo one; done < list.txt",
+    ] {
+        assert_eq!(decision(&controls, command).1, FAILED, "{command}");
+    }
+}
