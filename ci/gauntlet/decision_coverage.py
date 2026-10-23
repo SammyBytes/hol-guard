@@ -74,18 +74,27 @@ def unexercised_reason(coverage: Mapping[str, list[str]]) -> str:
 
 
 def profile_coverage(scenarios: Iterable[Scenario], completed: Mapping[str, Any]) -> dict[str, Any]:
-    """Declared decision paths across a run, and which cases reached theirs.
+    """Declared decision paths across a run, which cases reached theirs, and
+    every decision code the run's own evidence recorded.
 
     ``completed`` maps a scenario id to its finished case record. A case that
     never ran is neither exercised nor unexercised here: ``case_coverage`` in
-    the runner already lists what never executed.
+    the runner already lists what never executed. Observed codes aggregate
+    across every completed case, declaring or not, so the run states the
+    decisions it actually reached rather than only the ones it was written to.
     """
     declared, exercised, unexercised = [], [], []
+    observed: set[str] = set()
     for scenario in scenarios:
+        row = completed.get(scenario.id)
+        if isinstance(row, Mapping):
+            paths = (row.get("assessment") or {}).get("decision_paths") or {}
+            codes = paths.get("observed")
+            if isinstance(codes, list):
+                observed.update(codes)
         if not scenario.decision_paths:
             continue
         declared.append(scenario.id)
-        row = completed.get(scenario.id)
         if not isinstance(row, Mapping):
             continue
         missing = (row.get("assessment") or {}).get("decision_paths", {}).get("missing") or []
@@ -96,4 +105,5 @@ def profile_coverage(scenarios: Iterable[Scenario], completed: Mapping[str, Any]
         "declaring_cases": declared,
         "exercised_cases": exercised,
         "unexercised_cases": unexercised,
+        "observed_decisions": sorted(observed),
     }

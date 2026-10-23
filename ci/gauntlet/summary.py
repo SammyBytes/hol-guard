@@ -42,28 +42,34 @@ def inference_usage(case_dir: Path, case_ids: Iterable[str], superseded: Path | 
 
 
 def _decision_lines(coverage: dict[str, Any]) -> list[str]:
-    """State the declared Guard decisions this run reached, and the ones it did not.
+    """State the Guard decisions this run reached, declared or observed.
 
-    A case that declares nothing is left out: its pass says the model did ordinary
-    work and Guard stayed quiet, which is the whole claim it makes.
+    The declared lines cover only cases that name a decision; the observed line
+    aggregates every completed case, so a run also states the decisions it drove
+    that no case was written to reach.
     """
     declaring = coverage.get("declaring_cases") or []
-    if not declaring:
-        return []
     exercised = coverage.get("exercised_cases") or []
     unexercised = coverage.get("unexercised_cases") or []
-    # Count what ran and reached its decision, never what did not fail to. A run
-    # that stopped early leaves its remaining cases in neither list, so deriving
-    # the reached count from the unexercised ones credits every case that never
-    # ran with the coverage it was selected to drive.
-    lines = [f"Declared decisions reached: {len(exercised)} of {len(declaring)} declaring cases"]
-    if (never_ran := len(declaring) - len(exercised) - len(unexercised)) > 0:
-        lines.append(f"Declared decisions never attempted: {never_ran} of {len(declaring)} declaring cases never ran")
-    lines.extend(
-        f"Declared decision not reached: {row['id']} ({', '.join(row['missing'])})"
-        for row in unexercised
-        if isinstance(row, dict)
-    )
+    observed = coverage.get("observed_decisions") or []
+    lines = []
+    if declaring:
+        # Count what ran and reached its decision, never what did not fail to. A run
+        # that stopped early leaves its remaining cases in neither list, so deriving
+        # the reached count from the unexercised ones credits every case that never
+        # ran with the coverage it was selected to drive.
+        lines.append(f"Declared decisions reached: {len(exercised)} of {len(declaring)} declaring cases")
+        if (never_ran := len(declaring) - len(exercised) - len(unexercised)) > 0:
+            lines.append(
+                f"Declared decisions never attempted: {never_ran} of {len(declaring)} declaring cases never ran"
+            )
+        lines.extend(
+            f"Declared decision not reached: {row['id']} ({', '.join(row['missing'])})"
+            for row in unexercised
+            if isinstance(row, dict)
+        )
+    if observed:
+        lines.append(f"Observed decisions: {', '.join(observed)}")
     return lines
 
 

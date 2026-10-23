@@ -132,11 +132,13 @@ def test_the_profile_states_which_declaring_cases_reached_their_decision():
         "declaring_cases": ["ordinary"],
         "exercised_cases": [],
         "unexercised_cases": [],
+        "observed_decisions": [],
     }
     assert profile_coverage([declaring(CONTAINED)], {"ordinary": {"assessment": reached}}) == {
         "declaring_cases": ["ordinary"],
         "exercised_cases": [],
         "unexercised_cases": [{"id": "ordinary", "missing": [CONTAINED]}],
+        "observed_decisions": ["native_policy_warning"],
     }
     case = observed_case()
     case["guard_observations"][0]["reason_code"] = CONTAINED
@@ -145,7 +147,35 @@ def test_the_profile_states_which_declaring_cases_reached_their_decision():
         "declaring_cases": ["ordinary"],
         "exercised_cases": ["ordinary"],
         "unexercised_cases": [],
+        "observed_decisions": ["native_policy_warning", CONTAINED],
     }
+
+
+def test_the_profile_aggregates_observed_codes_from_undeclared_cases():
+    """A case that declares nothing still reports what the run drove past it."""
+    undeclared = observed_case()
+    undeclared["guard_observations"][0]["reason_code"] = CONTAINED
+    quiet_assessment = assess_case(declaring(), undeclared)
+    assert quiet_assessment["decision_paths"]["observed"] == ["native_policy_warning", CONTAINED]
+    coverage = profile_coverage([declaring()], {"ordinary": {"assessment": quiet_assessment}})
+    assert coverage["declaring_cases"] == []
+    assert coverage["observed_decisions"] == ["native_policy_warning", CONTAINED]
+
+
+def test_the_profile_observed_aggregate_unions_across_cases():
+    """Two completed cases contribute one sorted union, not per-case lists."""
+    quiet = Scenario("quiet", "allow", "commands", "Use the tool", ("echo fixture",))
+    first = observed_case()
+    first["guard_observations"][0]["reason_code"] = CONTAINED
+    coverage = profile_coverage(
+        [declaring(CONTAINED), quiet],
+        {
+            "ordinary": {"assessment": assess_case(declaring(CONTAINED), first)},
+            "quiet": {"assessment": assess_case(quiet, observed_case())},
+        },
+    )
+    assert coverage["observed_decisions"] == ["native_policy_warning", CONTAINED]
+    assert coverage["exercised_cases"] == ["ordinary"]
 
 
 def test_the_shipped_catalog_declares_only_codes_the_runtime_can_report():
