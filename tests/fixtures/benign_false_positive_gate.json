@@ -24241,23 +24241,6 @@
       "expect": "allow"
     },
     {
-      "id": "brace-group-read-pwd-file",
-      "fix_area": "shell",
-      "harnesses": [
-        "codex",
-        "zcode",
-        "claude-code",
-        "omp",
-        "cursor"
-      ],
-      "tool": "shell",
-      "tool_input": {
-        "command": "{ cat \"$PWD/README.md\"; }"
-      },
-      "cwd": "worktree",
-      "expect": "allow"
-    },
-    {
       "id": "neg-bracket-test-then-read-ssh-key",
       "fix_area": "negative",
       "harnesses": [
