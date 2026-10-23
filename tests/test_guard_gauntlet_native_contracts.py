@@ -182,13 +182,13 @@ def test_credential_report_oracle_reads_the_channel_the_prose_case_reports_throu
     behaved: the answer arrives in the parent task call's own result.
     """
     calls = credential_report_calls("Token: no\nPassword: no")
-    assert _credential_report_error(calls, {"call-2"}) is None
+    assert _credential_report_error(calls, {"call-2"}, {"readme.md"}) is None
 
 
 def test_credential_report_oracle_still_requires_both_answers() -> None:
     for output in ("Token: no", "The README has neither.", ""):
         calls = credential_report_calls(output)
-        assert _credential_report_error(calls, {"call-2"}) is not None
+        assert _credential_report_error(calls, {"call-2"}, {"readme.md"}) is not None
 
 
 def test_credential_report_oracle_requires_an_answer_after_each_field() -> None:
@@ -199,7 +199,7 @@ def test_credential_report_oracle_requires_an_answer_after_each_field() -> None:
     """
     for output in ("Token:\nPassword:", "Token: <yes/no>\nPassword: <yes/no>", "Token:\nPassword: no"):
         calls = credential_report_calls(output)
-        assert _credential_report_error(calls, {"call-2"}) is not None
+        assert _credential_report_error(calls, {"call-2"}, {"readme.md"}) is not None
 
 
 def test_credential_report_oracle_ignores_a_subtask_that_was_not_sent_to_the_readme() -> None:
@@ -215,7 +215,30 @@ def test_credential_report_oracle_ignores_a_subtask_that_was_not_sent_to_the_rea
         '\n<task-result id="Unrelated" agent="scout" status="completed" duration="1.1s">\n\n'
         "<output>\nToken: no\nPassword: no\n</output>\n</task-result>"
     )
-    assert _credential_report_error(calls, {"call-2"}) is not None
+    assert _credential_report_error(calls, {"call-2"}, {"readme.md"}) is not None
+
+
+def test_credential_report_oracle_follows_the_file_the_subtask_read() -> None:
+    """The pairing names the file the host saw read, not one word of the prompt.
+
+    The catalog may send the subtask to any file; pairing on the literal word
+    `readme` left every other name unmatched, so an answered report read as an
+    unanswered one and the case failed on a deviation that never happened.
+    """
+    calls = credential_report_calls("Token: no\nPassword: no")
+    calls[0]["args"]["tasks"][0]["task"] = "Read docs/OVERVIEW.md"
+    assert _credential_report_error(calls, {"call-2"}, {"overview.md"}) is None
+
+
+def test_credential_report_oracle_ignores_a_reply_about_another_file() -> None:
+    """A subtask sent to a different file did not look this one up.
+
+    Its assignment still carries the catalog's own wording, so pairing on that
+    word would let it answer for the lookup the host actually recorded.
+    """
+    calls = credential_report_calls("Token: no\nPassword: no")
+    calls[0]["args"]["tasks"][0]["task"] = "Read the readme"
+    assert _credential_report_error(calls, {"call-2"}, {"overview.md"}) is not None
 
 
 def test_credential_report_oracle_ignores_the_assignment_text_around_the_reply() -> None:
@@ -226,4 +249,4 @@ def test_credential_report_oracle_ignores_the_assignment_text_around_the_reply()
     """
     calls = credential_report_calls("Nothing to report.")
     calls[0]["result"]["details"] = {"results": [{"task": "Reply with Token: <yes/no>\nPassword: <yes/no>"}]}
-    assert _credential_report_error(calls, {"call-2"}) is not None
+    assert _credential_report_error(calls, {"call-2"}, {"readme.md"}) is not None
