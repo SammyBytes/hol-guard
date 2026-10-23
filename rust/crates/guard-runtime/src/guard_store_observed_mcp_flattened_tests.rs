@@ -78,10 +78,16 @@ fn seed(connection: &Connection, grant_state: &str, command_states: &[(&str, &st
         harness: "omp".to_owned(),
     }
     .server_identity_hash();
+    // The read verifies the schema marker's checksum, so the seed carries the
+    // recorded one rather than a made-up version.
+    let marker = &recorded["vectors"][0]["rows"]["local_cli_schema_migration"][0];
     connection
         .execute(
-            "insert into local_cli_schema_migration values (1, 11, 'test')",
-            [],
+            "insert into local_cli_schema_migration values (1, ?1, ?2)",
+            rusqlite::params![
+                marker["version"].as_i64().unwrap(),
+                marker["checksum"].as_str().unwrap(),
+            ],
         )
         .unwrap();
     connection
