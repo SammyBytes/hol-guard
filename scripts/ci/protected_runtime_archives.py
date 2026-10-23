@@ -197,6 +197,19 @@ def source_digests(client, sha):
         return dict(source_sha=sha, digests=digests)
 
 
+def still_covered(saved, fresh):
+    """Finished runs may shrink the live set without adding unprotected inputs."""
+    try:
+        known = {run["id"]: run for run in saved["runs"]}
+        return (
+            saved["main_sha"] == fresh["main_sha"]
+            and set(fresh["sources"]) <= set(saved["sources"])
+            and all(known.get(run["id"]) == run for run in fresh["runs"])
+        )
+    except (KeyError, TypeError):
+        return False
+
+
 def discover(client, derive=source_digests):
     report = dict(schema=SCHEMA, complete=False, sources=[], discovery={})
     try:
@@ -205,7 +218,7 @@ def discover(client, derive=source_digests):
         report["sources"] = [derive(client, sha) for sha in before["sources"]]
         # A source change or rerun arriving while exports are hashed leaves the
         # snapshot incomplete. Other cleanup families can still be processed.
-        if before != trusted_sources(client):
+        if not still_covered(before, trusted_sources(client)):
             raise DiscoveryError("changing_protected_sources")
         report["complete"] = True
     except (DiscoveryError, OSError, ValueError, KeyError, TypeError, AttributeError, tarfile.TarError):
@@ -220,7 +233,7 @@ def verify_plan(client, plan):
     if saved.get("complete") is True:
         try:
             fresh = trusted_sources(client)
-            outcome = "verified" if saved.get("discovery") == fresh else "source_snapshot_changed"
+            outcome = "verified" if still_covered(saved.get("discovery"), fresh) else "source_snapshot_changed"
         except (DiscoveryError, OSError, ValueError, KeyError, TypeError, AttributeError):
             outcome = "source_snapshot_unavailable"
     selected, skipped = [], []

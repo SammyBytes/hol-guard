@@ -234,6 +234,48 @@ def test_sources_changing_during_hashing_fail_closed():
     assert not protection.discover(client, change)["complete"]
 
 
+def test_run_finishing_during_hashing_keeps_the_protected_superset_authoritative():
+    client = FakeGitHub()
+    client.rows = [run()]
+
+    def finish(client, sha):
+        client.rows = []
+        return derive(client, sha)
+
+    report = protection.discover(client, finish)
+    assert report["complete"]
+    assert report["discovery"]["sources"] == [MAIN, ACTIVE]
+    assert [source["source_sha"] for source in report["sources"]] == [MAIN, ACTIVE]
+
+
+def test_run_finishing_after_plan_upload_does_not_skip_archive_deletions():
+    client = FakeGitHub()
+    client.rows = [run()]
+    saved = protection.discover(client, derive)
+    client.rows = []
+    selected = [archive(1, "d" * 64, "2026-10-23T11:00:00Z")]
+    result = protection.verify_plan(client, dict(protection=saved, selected=selected))
+    assert result["source_verification"] == "verified"
+    assert result["selected"] == selected and result["skipped_archives"] == []
+
+
+@pytest.mark.parametrize("change", ["main", "source", "run_id", "run_identity"])
+def test_snapshot_coverage_still_rejects_additions_and_identity_changes(change):
+    client = FakeGitHub()
+    client.rows = [run()]
+    saved = protection.trusted_sources(client)
+    fresh = protection.trusted_sources(client)
+    if change == "main":
+        fresh["main_sha"] = ACTIVE
+    elif change == "source":
+        fresh["sources"].append(PR)
+    elif change == "run_id":
+        fresh["runs"][0]["id"] += 1
+    else:
+        fresh["runs"][0]["workflow_id"] += 1
+    assert not protection.still_covered(saved, fresh)
+
+
 def test_paginated_discovery_reads_every_page(monkeypatch):
     client = protection.GitHub("owner/repo", time.monotonic() + 60)
     pages = []
