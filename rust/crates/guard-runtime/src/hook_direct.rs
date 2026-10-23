@@ -85,6 +85,9 @@ pub(crate) const DIRECT_HARNESSES: [&str; 14] = [
 ];
 const TRANSITION_PROBE_FIELD: &str = "guard_transition_probe";
 pub(crate) const EXECUTION_ENVIRONMENT_FIELD: &str = "guard_execution_environment";
+/// The desktop notice for a connector-setup review the resident queued: the
+/// stored request id and the CLI's name, which the evidence drain raises.
+pub(crate) const CONNECTOR_NOTICE_FIELD: &str = "connector_setup_notice";
 const ENCRYPTED_PAYLOAD_FIELD: &str = "guard_payload_ref";
 const SOURCE_REFERENCE_FIELD: &str = "guard_source_ref";
 /// The model-visible content an Oh My Pi `PostToolUse` carries, which
@@ -471,6 +474,10 @@ fn answer(
         POST_TOOL_USE => post_tool_answer(&edge)?,
         _ => prompt_answer(&edge, prompt_notice)?,
     };
+    // Not part of the hook's answer: the drain raises it with the evidence.
+    let connector_notice = answered
+        .as_object_mut()
+        .and_then(|fields| fields.remove(CONNECTOR_NOTICE_FIELD));
     if let Some(resolution) = structured_resolution {
         let result = answered["result"].clone();
         // The edge's own receipt, which the daemon mediates against once it
@@ -530,7 +537,7 @@ fn answer(
         answered["harness_response"] = blocked;
         snapshot = None;
     }
-    let evidence = json!({
+    let mut evidence = json!({
         "event": event,
         "harness": request.harness,
         "workspace": workspace, "home_dir": request_home,
@@ -538,6 +545,9 @@ fn answer(
         "receipt": answered.get("receipt").cloned().unwrap_or(Value::Null),
         "harness_response": answered["harness_response"].clone(),
     });
+    if let Some(notice) = connector_notice {
+        evidence[CONNECTOR_NOTICE_FIELD] = notice;
+    }
     let evidence = fence::with_wait(evidence, fence_wait);
     if !policy_store.direct_evidence().offer(evidence) {
         return Err(HookDirectDefer::EvidenceFull);
