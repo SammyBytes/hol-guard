@@ -84,3 +84,27 @@ fn a_commented_terminator_or_brace_is_not_a_group() {
         Some("git log --format=%h#%s")
     );
 }
+
+#[test]
+fn an_operator_on_the_line_above_still_makes_the_list_conditional() {
+    // The shell reads `make ||` and the group below it as one conditional
+    // list, so flattening it would run `git checkout .` either way.
+    assert_eq!(unwrap("make ||\n{ git checkout .; git clean -fd; }"), None);
+    assert_eq!(unwrap("cd web &&\n{ npm ci; npm test; }"), None);
+    // A comment can hold the operator the scan is looking for.
+    assert_eq!(
+        unwrap("make || # fall back\n{ git checkout .; git clean -fd; }"),
+        None
+    );
+    // A newline that is the separator itself is not conditional.
+    assert_eq!(
+        unwrap("npm ci\n{ npm run build; npm test; }").as_deref(),
+        Some("npm ci\n  npm run build; npm test")
+    );
+    // One command behind an operator on the line above means the same either
+    // way, so it is still read as its list.
+    assert_eq!(
+        unwrap("make ||\n{ npm test; }").as_deref(),
+        Some("make ||\n  npm test")
+    );
+}

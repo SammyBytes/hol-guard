@@ -479,6 +479,7 @@ mod pack_lifecycle;
 mod pack_preparation;
 // The seams the evidence writer runs on. Each is reached through
 // hook_evidence_writer_op; the readers also have their own tests.
+mod codex_hook_identity_op;
 mod command_pack_record_op;
 #[allow(dead_code)]
 mod hook_evidence_activity;
@@ -501,6 +502,7 @@ mod hook_process_spawn;
 mod hook_render_op;
 mod inventory_item_classification_op;
 mod inventory_scan_findings_op;
+mod inventory_scan_targets_op;
 mod inventory_snapshot_digest_op;
 mod inventory_source_evidence_op;
 mod inventory_url_redaction_op;

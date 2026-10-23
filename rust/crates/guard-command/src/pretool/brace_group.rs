@@ -135,16 +135,30 @@ fn starts_a_word_position(c: char) -> bool {
     matches!(c, ' ' | '\t' | '\n' | ';' | '&' | '|' | '(' | ')')
 }
 
-/// Whether the group stands behind a `&&` or a `||`, the operators that make
-/// what follows conditional. The opening brace has already been placed at the
-/// start of a list element, so an operator character there is one of those two.
+/// Whether the group may stand behind a `&&` or a `||`, the operators that
+/// make what follows conditional. The opening brace has already been placed at
+/// the start of a list element, so an operator character there is one of those
+/// two.
+///
+/// A newline is skipped with the other blanks: the shell reads `make ||` and
+/// the group on the next line as one conditional list, and stopping at the
+/// newline would have called that list unconditional and flattened it. A
+/// newline that is the separator itself lands this scan on the end of the
+/// command before it, which is not an operator.
+///
+/// A `#` anywhere before the brace hides whatever it comments out, including
+/// the operator this scan is looking for, so the group keeps its review rather
+/// than being flattened on a reading this scan cannot make.
 fn follows_a_conditional(chars: &[char], open: usize) -> bool {
+    if chars[..open].contains(&'#') {
+        return true;
+    }
     matches!(
         chars[..open]
             .iter()
             .rev()
             .copied()
-            .find(|c| !matches!(c, ' ' | '\t')),
+            .find(|c| !matches!(c, ' ' | '\t' | '\n')),
         Some('&' | '|')
     )
 }
