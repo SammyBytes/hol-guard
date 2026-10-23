@@ -507,6 +507,16 @@ pub(crate) fn evaluate_resident_bytes_with_cancellation(
             ResidentOperationV1::HookArtifactFacts(request) => {
                 crate::hook_artifact_facts_op::evaluate_hook_artifact_facts_request(&request)
             }
+            ResidentOperationV1::InventoryItemClassification(request) => {
+                crate::inventory_item_classification_op::evaluate_inventory_item_classification_request(
+                    &request,
+                )
+            }
+            ResidentOperationV1::InventorySnapshotDigest(request) => {
+                crate::inventory_snapshot_digest_op::evaluate_inventory_snapshot_digest_request(
+                    &request,
+                )
+            }
             ResidentOperationV1::InventorySourceEvidence(request) => {
                 crate::inventory_source_evidence_op::evaluate_inventory_source_evidence_request(
                     &request,
