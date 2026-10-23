@@ -13,8 +13,12 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .extension_catalog_pages import PreparedCatalogView
+
+if TYPE_CHECKING:
+    from .extension_catalog_sync import ExtensionCatalogWire
 
 _MAX_AGE_SECONDS = 600.0
 
@@ -27,13 +31,13 @@ class _Entry:
     enforcement_digest: str
     guard_version: str
     view: PreparedCatalogView
-    catalog: dict[str, object] | None
+    catalog: ExtensionCatalogWire | None
     stored_at: float
 
 
 def reusable(
     guard_home: Path, *, enforcement_digest: str, guard_version: str
-) -> tuple[PreparedCatalogView, dict[str, object] | None] | None:
+) -> tuple[PreparedCatalogView, ExtensionCatalogWire | None] | None:
     """The cached view and legacy catalog, or None when they must be rebuilt."""
 
     key = str(guard_home.absolute())
@@ -71,7 +75,7 @@ def remember(
     enforcement_digest: str,
     guard_version: str,
     view: object,
-    catalog: dict[str, object] | None,
+    catalog: ExtensionCatalogWire | None,
 ) -> None:
     if not isinstance(view, PreparedCatalogView):
         return
