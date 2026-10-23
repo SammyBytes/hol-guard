@@ -150,11 +150,17 @@ mod tests {
         assert!(PYTHON_BASE64.decode(format!("{unpadded}==")).is_err());
 
         // A three-character group takes one `=`, and only one.
-        assert_eq!(PYTHON_BASE64.decode("AAAAQUJ=").map(|bytes| bytes.len()), Ok(5));
+        assert_eq!(
+            PYTHON_BASE64.decode("AAAAQUJ=").map(|bytes| bytes.len()),
+            Ok(5)
+        );
         assert!(PYTHON_BASE64.decode("AAAAQUJ==").is_err());
 
         // A two-character group takes two, and nothing shorter will do.
-        assert_eq!(PYTHON_BASE64.decode("AAAAQU==").map(|bytes| bytes.len()), Ok(4));
+        assert_eq!(
+            PYTHON_BASE64.decode("AAAAQU==").map(|bytes| bytes.len()),
+            Ok(4)
+        );
         assert!(PYTHON_BASE64.decode("AAAAQU=").is_err());
     }
 
