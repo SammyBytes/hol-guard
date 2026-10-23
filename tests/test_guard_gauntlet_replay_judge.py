@@ -184,6 +184,12 @@ def test_only_the_marked_cases_may_pass_on_containment() -> None:
         # these keep the in-worktree shape on record, where the write cannot leave the
         # workspace and the contained run is the designed outcome.
         "neg-sort-output-file-in-worktree",
+        # A trailing subshell group now carries its command list's decision, so a key read
+        # or a piped remote script written inside one routes the same way the bare list
+        # does: a contained run has no home access and no network, so it reads no key
+        # material and fetches no script.
+        "neg-subshell-reads-private-key",
+        "neg-subshell-remote-script-pipes-shell",
         "neg-tr-file-operand",
         "neg-uniq-output-operand-in-worktree",
     }
