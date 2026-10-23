@@ -8,7 +8,6 @@ import { fetchReleaseDetail, fetchReleaseIndex } from "./releases-api";
 import {
   dismissWhatsNew,
   failureCopy,
-  installedRelease,
   installedStanding,
   isRetryable,
   isWhatsNewDismissed,
@@ -149,19 +148,6 @@ export function ReleasesWorkspace({ installedVersion }: { installedVersion?: str
     return () => controller.abort();
   }, [selectedSlug, detailToken]);
 
-  const installed =
-    indexState.kind === "ready" ? installedRelease(indexState.index.releases, installedVersion) : null;
-  const installedLabel = installed?.versionLabel ?? null;
-
-  // Read during render, not in an effect: an effect would paint the card once
-  // before hiding it, so a reader who dismissed it last week sees it flash on
-  // every visit.
-  const dismissedBefore = useMemo(
-    () => (installedLabel === null ? false : isWhatsNewDismissed(installedLabel)),
-    [installedLabel],
-  );
-  const whatsNewDismissed = dismissedBefore || dismissedLabel === installedLabel;
-
   const standing: InstalledStanding = useMemo(
     () =>
       indexState.kind === "ready"
@@ -169,6 +155,11 @@ export function ReleasesWorkspace({ installedVersion }: { installedVersion?: str
         : { kind: "unknown" },
     [indexState, installedVersion],
   );
+
+  // The standing already found this device's row on the page in hand; the
+  // archive and the detail panel mark the same row.
+  const installed =
+    standing.kind === "current" || standing.kind === "behind" ? standing.release : null;
 
   const handleSelect = useCallback((slug: string, options?: { scroll?: boolean }) => {
     readerChose.current = true;
@@ -185,23 +176,36 @@ export function ReleasesWorkspace({ installedVersion }: { installedVersion?: str
       : standing.kind === "current"
         ? standing.release
         : null;
+  // Dismissal belongs to the release the button names, not to the one this
+  // device runs. Saved under the installed version, a reader who dismissed
+  // the call for 3.53.0 would never be offered 3.54.0 while they stayed put.
+  const targetLabel = standingTarget?.versionLabel ?? null;
+
+  // Read during render, not in an effect: an effect would paint the call once
+  // before hiding it, so a reader who dismissed it last week sees it flash on
+  // every visit.
+  const dismissedBefore = useMemo(
+    () => (targetLabel === null ? false : isWhatsNewDismissed(targetLabel)),
+    [targetLabel],
+  );
+  const whatsNewDismissed = dismissedBefore || dismissedLabel === targetLabel;
 
   const handleReadWhatsNew = useCallback(() => {
     if (standingTarget) handleSelect(standingTarget.slug);
   }, [standingTarget, handleSelect]);
 
   const handleDismissWhatsNew = useCallback(() => {
-    if (!installedLabel) return;
-    dismissWhatsNew(installedLabel);
-    setDismissedLabel(installedLabel);
-  }, [installedLabel]);
+    if (!targetLabel) return;
+    dismissWhatsNew(targetLabel);
+    setDismissedLabel(targetLabel);
+  }, [targetLabel]);
 
   return (
     <div className="guard-releases space-y-6 pb-10">
       <ReleaseStatusBand
         standing={standing}
         onRead={standingTarget ? handleReadWhatsNew : undefined}
-        onDismiss={installedLabel ? handleDismissWhatsNew : undefined}
+        onDismiss={targetLabel ? handleDismissWhatsNew : undefined}
         ctaDismissed={whatsNewDismissed}
       />
 

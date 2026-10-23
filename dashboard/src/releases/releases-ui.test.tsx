@@ -110,6 +110,37 @@ const detail: ReleaseDetail = {
   assert.match(layout, /props\.view === "releases"/);
 }
 
+// Dismissal belongs to the release the call names, not to the one this device
+// runs. Keyed on the installed version, a reader who dismissed the call for
+// one release would never be offered the next while they stayed put.
+{
+  const workspace = readFileSync(new URL("../releases/releases-workspace.tsx", import.meta.url), "utf8");
+  assert.match(workspace, /const targetLabel = standingTarget\?\.versionLabel \?\? null;/);
+  assert.match(workspace, /isWhatsNewDismissed\(targetLabel\)/);
+  assert.match(workspace, /dismissWhatsNew\(targetLabel\);/);
+  assert.ok(
+    !workspace.includes("isWhatsNewDismissed(installedLabel)"),
+    "dismissal is not keyed on the installed version",
+  );
+}
+
+// The rail's arrow keys belong to the rail. On the <nav> they also caught the
+// pager below it, so paging with the keyboard threw the reader back into the
+// list and changed the release under them.
+{
+  const rail = readFileSync(
+    new URL("../releases/components/release-archive-list.tsx", import.meta.url),
+    "utf8",
+  );
+  const nav = rail.slice(rail.indexOf("<nav "), rail.indexOf(">", rail.indexOf("<nav ")));
+  assert.ok(!nav.includes("onKeyDown"), "the landmark does not take the rail's keys");
+  assert.match(rail, /overflow-y-auto[^"]*" onKeyDown=\{onKeyDown\}/);
+  // Movement starts at the row the reader is on, not at a selection that can
+  // move under them when the installed version arrives after the archive.
+  assert.match(rail, /let origin = selectedSlug;/);
+  assert.match(rail, /if \(node === event\.target\)/);
+}
+
 // The band answers the question the archive exists for — am I current, and
 // if not by how much — and it is the page's own heading while it does.
 {

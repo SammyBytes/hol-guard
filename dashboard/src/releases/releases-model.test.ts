@@ -177,13 +177,72 @@ function change(kind: ReleaseChange["kind"], id: string): ReleaseChange {
   assert.match(standingCopy(installedStanding(page1, "3.0.57")).body, /not on this page/);
   assert.match(standingCopy(current).body, /newest published release/);
   assert.match(standingCopy(behind).body, /2 newer releases have been published since\./);
-  assert.match(standingCopy(behind).body, /The newest is 3\.53\.0\./);
+  assert.match(standingCopy(behind).body, /The newest stable release is 3\.53\.0\./);
   assert.match(
     standingCopy(installedStanding(page1, "3.52.0")).body,
     /One newer release has been published since\./,
     "one is not said as 1",
   );
-  assert.equal(standingCopy(deep).body.includes("The newest is"), false);
+  assert.equal(standingCopy(deep).body.includes("The newest"), false);
+}
+
+// The call to read the notes names a release this device is offered. A stable
+// install is not sent to a preview's notes; a device already on previews takes
+// whichever channel published next.
+{
+  const mixed: ReleaseIndex = {
+    kind: "index",
+    page: 1,
+    pageSize: 20,
+    total: 3,
+    totalPages: 1,
+    generatedAt: "2026-10-21T00:00:00Z",
+    releases: [
+      summary({ slug: "v3-54-0rc1", versionLabel: "3.54.0rc1", channel: "preview" }),
+      summary({ slug: "v3-53-0", versionLabel: "3.53.0" }),
+      summary({ slug: "v3-52-0", versionLabel: "3.52.0" }),
+    ],
+  };
+
+  const stable = installedStanding(mixed, "3.52.0");
+  assert.equal(
+    stable.kind === "behind" ? stable.newest?.versionLabel : null,
+    "3.53.0",
+    "a stable install skips the preview above it",
+  );
+  assert.equal(
+    stable.kind === "behind" ? stable.behind : -1,
+    2,
+    "the count still covers every release published since",
+  );
+  assert.match(standingCopy(stable).body, /The newest stable release is 3\.53\.0\./);
+
+  const onPreviews: ReleaseIndex = {
+    ...mixed,
+    releases: [
+      summary({ slug: "v3-54-0", versionLabel: "3.54.0" }),
+      summary({ slug: "v3-53-0rc1", versionLabel: "3.53.0rc1", channel: "preview" }),
+    ],
+  };
+  const preview = installedStanding(onPreviews, "3.53.0rc1");
+  assert.equal(
+    preview.kind === "behind" ? preview.newest?.versionLabel : null,
+    "3.54.0",
+    "a device on previews is offered the stable release above it",
+  );
+
+  // Nothing above a stable install but previews: the band states the gap and
+  // offers no release to open.
+  const previewsOnly: ReleaseIndex = {
+    ...mixed,
+    releases: [
+      summary({ slug: "v3-54-0rc1", versionLabel: "3.54.0rc1", channel: "preview" }),
+      summary({ slug: "v3-53-0", versionLabel: "3.53.0" }),
+    ],
+  };
+  const stranded = installedStanding(previewsOnly, "3.53.0");
+  assert.equal(stranded.kind === "behind" ? stranded.newest : "unset", null);
+  assert.match(standingCopy(stranded).body, /One newer release has been published since\.$/);
 }
 
 // The tally names what is in a release before a word of it is read, in the

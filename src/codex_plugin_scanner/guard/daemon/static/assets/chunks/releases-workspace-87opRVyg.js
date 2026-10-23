@@ -124,7 +124,9 @@ function installedStanding(index, installedVersion) {
   const release = index.releases[position];
   const behind = (index.page - 1) * index.pageSize + position;
   if (behind === 0) return { kind: "current", release };
-  return { kind: "behind", release, behind, newest: index.page === 1 ? index.releases[0] : null };
+  const onOffer = (candidate) => release.channel === "preview" || candidate.channel === "stable";
+  const newest = index.page === 1 ? index.releases.slice(0, position).find(onOffer) ?? null : null;
+  return { kind: "behind", release, behind, newest };
 }
 function standingCopy(standing) {
   if (standing.kind === "unknown") {
@@ -146,7 +148,7 @@ function standingCopy(standing) {
     };
   }
   const count = standing.behind === 1 ? "One newer release has" : `${standing.behind} newer releases have`;
-  const newest = standing.newest ? ` The newest is ${normalizeVersionLabel(standing.newest.versionLabel)}.` : "";
+  const newest = standing.newest ? ` The newest ${channelLabel(standing.newest.channel).toLowerCase()} release is ${normalizeVersionLabel(standing.newest.versionLabel)}.` : "";
   return {
     title: normalizeVersionLabel(standing.release.versionLabel),
     body: `Running here. ${count} been published since.${newest}`
@@ -402,7 +404,14 @@ function ReleaseArchiveList(props) {
     (event) => {
       const order = index.releases;
       if (order.length === 0) return;
-      const current = order.findIndex((release) => release.slug === selectedSlug);
+      let origin = selectedSlug;
+      for (const [slug2, node] of rows.current) {
+        if (node === event.target) {
+          origin = slug2;
+          break;
+        }
+      }
+      const current = order.findIndex((release) => release.slug === origin);
       let next = -1;
       if (event.key === "ArrowDown") next = Math.min(order.length - 1, current + 1);
       else if (event.key === "ArrowUp") next = Math.max(0, current <= 0 ? 0 : current - 1);
@@ -416,63 +425,55 @@ function ReleaseArchiveList(props) {
     },
     [index.releases, selectedSlug, onSelect]
   );
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-    "nav",
-    {
-      "aria-label": "Published Guard releases",
-      className: "flex min-h-0 flex-1 flex-col",
-      onKeyDown,
-      children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "min-h-0 flex-1 overflow-y-auto px-1.5 pb-2", children: groups.map((group, position) => /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { "aria-label": `${group.train} series`, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "sticky top-0 z-10 bg-white/90 px-1.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-dark/75 backdrop-blur", children: group.train }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("ul", { className: "relative space-y-0.5 pb-2", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "span",
-              {
-                "aria-hidden": "true",
-                className: "absolute inset-y-0 left-4 w-px -translate-x-1/2 bg-brand-dark/10"
-              }
-            ),
-            group.releases.map((release) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-              ReleaseRow,
-              {
-                release,
-                selected: release.slug === props.selectedSlug,
-                installed: release.slug === props.installedSlug,
-                tabbable: release.slug === tabbableSlug,
-                onSelect: props.onSelect,
-                registerRef
-              },
-              release.slug
-            ))
-          ] })
-        ] }, `${group.train}-${position}`)) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2 border-t border-brand-dark/10 px-3 py-2.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs tabular-nums text-brand-dark/75", children: pageRangeLabel(props.index) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              ActionButton,
-              {
-                variant: "outline",
-                disabled: !hasPreviousPage(props.index),
-                onClick: () => props.onPage(props.index.page - 1),
-                children: "Newer"
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              ActionButton,
-              {
-                variant: "outline",
-                disabled: !hasNextPage(props.index),
-                onClick: () => props.onPage(props.index.page + 1),
-                children: "Older"
-              }
-            )
-          ] })
-        ] })
-      ]
-    }
-  );
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { "aria-label": "Published Guard releases", className: "flex min-h-0 flex-1 flex-col", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "min-h-0 flex-1 overflow-y-auto px-1.5 pb-2", onKeyDown, children: groups.map((group, position) => /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { "aria-label": `${group.train} series`, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "sticky top-0 z-10 bg-white/90 px-1.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-dark/75 backdrop-blur", children: group.train }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("ul", { className: "relative space-y-0.5 pb-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "span",
+          {
+            "aria-hidden": "true",
+            className: "absolute inset-y-0 left-4 w-px -translate-x-1/2 bg-brand-dark/10"
+          }
+        ),
+        group.releases.map((release) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+          ReleaseRow,
+          {
+            release,
+            selected: release.slug === props.selectedSlug,
+            installed: release.slug === props.installedSlug,
+            tabbable: release.slug === tabbableSlug,
+            onSelect: props.onSelect,
+            registerRef
+          },
+          release.slug
+        ))
+      ] })
+    ] }, `${group.train}-${position}`)) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2 border-t border-brand-dark/10 px-3 py-2.5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs tabular-nums text-brand-dark/75", children: pageRangeLabel(props.index) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          ActionButton,
+          {
+            variant: "outline",
+            disabled: !hasPreviousPage(props.index),
+            onClick: () => props.onPage(props.index.page - 1),
+            children: "Newer"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          ActionButton,
+          {
+            variant: "outline",
+            disabled: !hasNextPage(props.index),
+            onClick: () => props.onPage(props.index.page + 1),
+            children: "Older"
+          }
+        )
+      ] })
+    ] })
+  ] });
 }
 const MAX_SOURCE_CHARS = 64e3;
 const MAX_BLOCKS = 1e3;
@@ -1355,17 +1356,11 @@ function ReleasesWorkspace({ installedVersion }) {
     });
     return () => controller.abort();
   }, [selectedSlug, detailToken]);
-  const installed = indexState.kind === "ready" ? installedRelease(indexState.index.releases, installedVersion) : null;
-  const installedLabel = installed?.versionLabel ?? null;
-  const dismissedBefore = reactExports.useMemo(
-    () => installedLabel === null ? false : isWhatsNewDismissed(installedLabel),
-    [installedLabel]
-  );
-  const whatsNewDismissed = dismissedBefore || dismissedLabel === installedLabel;
   const standing = reactExports.useMemo(
     () => indexState.kind === "ready" ? installedStanding(indexState.index, installedVersion) : { kind: "unknown" },
     [indexState, installedVersion]
   );
+  const installed = standing.kind === "current" || standing.kind === "behind" ? standing.release : null;
   const handleSelect = reactExports.useCallback((slug, options) => {
     readerChose.current = true;
     setSelectedSlug(slug);
@@ -1373,21 +1368,27 @@ function ReleasesWorkspace({ installedVersion }) {
     detailHeadingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
   const standingTarget = standing.kind === "behind" ? standing.newest ?? standing.release : standing.kind === "current" ? standing.release : null;
+  const targetLabel = standingTarget?.versionLabel ?? null;
+  const dismissedBefore = reactExports.useMemo(
+    () => targetLabel === null ? false : isWhatsNewDismissed(targetLabel),
+    [targetLabel]
+  );
+  const whatsNewDismissed = dismissedBefore || dismissedLabel === targetLabel;
   const handleReadWhatsNew = reactExports.useCallback(() => {
     if (standingTarget) handleSelect(standingTarget.slug);
   }, [standingTarget, handleSelect]);
   const handleDismissWhatsNew = reactExports.useCallback(() => {
-    if (!installedLabel) return;
-    dismissWhatsNew(installedLabel);
-    setDismissedLabel(installedLabel);
-  }, [installedLabel]);
+    if (!targetLabel) return;
+    dismissWhatsNew(targetLabel);
+    setDismissedLabel(targetLabel);
+  }, [targetLabel]);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "guard-releases space-y-6 pb-10", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       ReleaseStatusBand,
       {
         standing,
         onRead: standingTarget ? handleReadWhatsNew : void 0,
-        onDismiss: installedLabel ? handleDismissWhatsNew : void 0,
+        onDismiss: targetLabel ? handleDismissWhatsNew : void 0,
         ctaDismissed: whatsNewDismissed
       }
     ),

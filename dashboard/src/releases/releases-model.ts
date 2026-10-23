@@ -226,7 +226,16 @@ export function installedStanding(
   // published releases rather than the page size the screen asked for.
   const behind = (index.page - 1) * index.pageSize + position;
   if (behind === 0) return { kind: "current", release };
-  return { kind: "behind", release, behind, newest: index.page === 1 ? index.releases[0] : null };
+  // The screen offers to open this release, so it has to be one this device
+  // can actually move to. A device on previews takes either channel; a stable
+  // install is not sent to read a preview's notes. Only page 1 holds the top
+  // of the history, so only page 1 can name the newest release there is; when
+  // nothing above this row is on offer, there is none to name.
+  const onOffer = (candidate: ReleaseSummary): boolean =>
+    release.channel === "preview" || candidate.channel === "stable";
+  const newest =
+    index.page === 1 ? (index.releases.slice(0, position).find(onOffer) ?? null) : null;
+  return { kind: "behind", release, behind, newest };
 }
 
 export type StandingCopy = { title: string; body: string };
@@ -254,8 +263,10 @@ export function standingCopy(standing: InstalledStanding): StandingCopy {
   }
   const count =
     standing.behind === 1 ? "One newer release has" : `${standing.behind} newer releases have`;
+  // The count covers every channel, because every one of them was published;
+  // the release named is the newest one this device is actually offered.
   const newest = standing.newest
-    ? ` The newest is ${normalizeVersionLabel(standing.newest.versionLabel)}.`
+    ? ` The newest ${channelLabel(standing.newest.channel).toLowerCase()} release is ${normalizeVersionLabel(standing.newest.versionLabel)}.`
     : "";
   return {
     title: normalizeVersionLabel(standing.release.versionLabel),
