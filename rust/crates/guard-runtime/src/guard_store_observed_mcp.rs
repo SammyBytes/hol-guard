@@ -57,6 +57,42 @@ fn token(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(&byte))
 }
 
+/// `_FLATTENED_NAME_HARNESSES`: harnesses that present an MCP tool under a
+/// single flattened name.
+const FLATTENED_NAME_HARNESSES: [&str; 1] = ["omp"];
+
+/// `_flattened_tool`: Oh My Pi presents `mcp__<server>__<tool>` as
+/// `mcp__<server>_<tool>`, with the server's dashes turned into underscores.
+/// Nothing in the name says where the server ends, so the connector the tool
+/// was catalogued under supplies the boundary.
+fn flattened_tool(harness: &str, tool_name: &str, namespace: &str) -> Option<ObservedTool> {
+    if !FLATTENED_NAME_HARNESSES.contains(&harness)
+        || tool_name.chars().count() > MAX_TOOL_NAME_CHARS
+    {
+        return None;
+    }
+    let rest = tool_name.strip_prefix("mcp__")?;
+    if rest.contains("__") {
+        return None;
+    }
+    let server = namespace.strip_prefix("mcp__")?.strip_suffix("__")?;
+    let flat = server.replace('-', "_");
+    // A server whose flattened form already ends in `_` cannot be told apart
+    // from the same server joined to a `_`-led tool name.
+    if flat.ends_with('_') {
+        return None;
+    }
+    let name = rest.strip_prefix(&flat)?.strip_prefix('_')?;
+    if name.starts_with('_') || !token(name) {
+        return None;
+    }
+    Some(ObservedTool {
+        namespace: namespace.to_owned(),
+        qualified_name: tool_name.to_owned(),
+        harness: harness.to_owned(),
+    })
+}
+
 /// `observed_mcp_tool`: parse a fully qualified MCP name and keep the
 /// connector boundary.
 fn observed_mcp_tool(harness: &str, tool_name: &str) -> Option<ObservedTool> {
@@ -341,6 +377,14 @@ fn compile_item(
     let namespace_block = format!("{harness}:{namespace}*");
     if state.as_deref() == Some("blocked") {
         actions.insert(namespace_block, Value::from("block"));
+        block_catalogued_flattened_tools(
+            connection,
+            &grant_cli_id,
+            &example,
+            namespace,
+            harness,
+            actions,
+        )?;
         return Ok(());
     }
     let states = local_cli_grants::command_states(connection, &grant_cli_id)?;
@@ -351,7 +395,9 @@ fn compile_item(
         if command_id == OTHER_COMMAND_ID {
             continue;
         }
-        let Some(tool) = observed_mcp_tool(harness, &usage) else {
+        let Some(tool) = observed_mcp_tool(harness, &usage)
+            .or_else(|| flattened_tool(&example.harness, &usage, namespace))
+        else {
             continue;
         };
         if tool.namespace != namespace || tool.command_id() != command_id {
@@ -365,6 +411,38 @@ fn compile_item(
                 Value::from(state),
             );
         }
+    }
+    Ok(())
+}
+
+/// A flattened name carries no connector boundary, so the connector's own
+/// `<namespace>*` selector never matches one. Name each tool the operator saw
+/// when they blocked the connector, so the block reaches them too.
+fn block_catalogued_flattened_tools(
+    connection: &Connection,
+    grant_cli_id: &str,
+    example: &ObservedTool,
+    namespace: &str,
+    harness: &str,
+    actions: &mut Map<String, Value>,
+) -> StoreResult<()> {
+    if !FLATTENED_NAME_HARNESSES.contains(&example.harness.as_str()) {
+        return Ok(());
+    }
+    for (command_id, usage) in command_catalog(connection, grant_cli_id)? {
+        if command_id == OTHER_COMMAND_ID {
+            continue;
+        }
+        let Some(tool) = flattened_tool(&example.harness, &usage, namespace) else {
+            continue;
+        };
+        if tool.command_id() != command_id {
+            continue;
+        }
+        actions.insert(
+            format!("{harness}:{}", tool.qualified_name),
+            Value::from("block"),
+        );
     }
     Ok(())
 }
@@ -424,3 +502,7 @@ mod vectors_tests;
 #[cfg(test)]
 #[path = "guard_store_observed_mcp_history_tests.rs"]
 mod history_tests;
+
+#[cfg(test)]
+#[path = "guard_store_observed_mcp_flattened_tests.rs"]
+mod flattened_tests;
