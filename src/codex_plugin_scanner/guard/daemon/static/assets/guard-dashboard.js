@@ -29256,7 +29256,9 @@ function QueueBulkStickyBar(props) {
     if (previousStep.current === "confirming" && props.blockStep === "idle") blockButton.current?.focus();
     previousStep.current = props.blockStep;
   }, [props.blockStep]);
-  if (!props.visible) return null;
+  if (!props.visible) {
+    return props.blockError ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { role: "alert", className: "mb-4 text-xs text-brand-attention", children: props.blockError }) : null;
+  }
   const total = props.selectedRequestCount;
   const unit = total === 1 ? "request" : "requests";
   const approvableNote = props.selectedActionCount === total ? "approve once" : `${props.selectedActionCount} can be approved at once`;
@@ -29678,14 +29680,10 @@ class BulkBlockError extends Error {
 }
 const MAX_REASONS$1 = 3;
 async function blockRequestsOnce(groups, lookup, resolve) {
-  const outcome = { blocked: 0, failed: 0, reasons: [], failedIds: [] };
+  let blocked = 0;
+  const failures = /* @__PURE__ */ new Map();
   const fail = (requestId, error) => {
-    outcome.failed += 1;
-    outcome.failedIds.push(requestId);
-    const reason = error instanceof Error ? error.message : String(error);
-    if (outcome.reasons.length < MAX_REASONS$1 && !outcome.reasons.includes(reason)) {
-      outcome.reasons.push(reason);
-    }
+    failures.set(requestId, error instanceof Error ? error.message : String(error));
   };
   const blockOnce = async (item) => {
     const payload = buildDecisionPayload({ item, action: "block", scope: "artifact", reason: "blocked in bulk review" });
@@ -29699,13 +29697,13 @@ async function blockRequestsOnce(groups, lookup, resolve) {
     try {
       const result = await blockOnce(group.primary);
       for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
-      outcome.blocked += 1;
+      blocked += 1;
     } catch (error) {
       fail(group.primary.request_id, error);
     }
     for (const duplicateId of group.duplicateIds) {
       if (settled.has(duplicateId)) {
-        outcome.blocked += 1;
+        blocked += 1;
         continue;
       }
       const duplicate = lookup(duplicateId);
@@ -29713,13 +29711,20 @@ async function blockRequestsOnce(groups, lookup, resolve) {
         if (duplicate === void 0) throw new Error("A selected request is no longer in the queue.");
         const result = await blockOnce(duplicate);
         for (const id2 of result.resolved_duplicate_ids) settled.add(id2);
-        outcome.blocked += 1;
+        blocked += 1;
       } catch (error) {
         fail(duplicateId, error);
       }
     }
+    for (const id2 of settled) {
+      if (failures.delete(id2)) blocked += 1;
+    }
   }
-  return outcome;
+  const reasons2 = [];
+  for (const reason of failures.values()) {
+    if (reasons2.length < MAX_REASONS$1 && !reasons2.includes(reason)) reasons2.push(reason);
+  }
+  return { blocked, failed: failures.size, reasons: reasons2, failedIds: [...failures.keys()] };
 }
 function bulkBlockSummary(outcome) {
   const unit = outcome.blocked === 1 ? "request" : "requests";

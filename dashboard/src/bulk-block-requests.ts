@@ -33,14 +33,11 @@ export async function blockRequestsOnce(
   lookup: (requestId: string) => GuardApprovalRequest | undefined,
   resolve: (input: GuardApprovalResolutionInput) => Promise<GuardQueueResolutionResult>,
 ): Promise<BulkBlockOutcome> {
-  const outcome: BulkBlockOutcome = { blocked: 0, failed: 0, reasons: [], failedIds: [] };
+  let blocked = 0;
+  // Request id to why it could not be blocked, in the order each failed.
+  const failures = new Map<string, string>();
   const fail = (requestId: string, error: unknown) => {
-    outcome.failed += 1;
-    outcome.failedIds.push(requestId);
-    const reason = error instanceof Error ? error.message : String(error);
-    if (outcome.reasons.length < MAX_REASONS && !outcome.reasons.includes(reason)) {
-      outcome.reasons.push(reason);
-    }
+    failures.set(requestId, error instanceof Error ? error.message : String(error));
   };
   const blockOnce = async (item: GuardApprovalRequest) => {
     const payload = buildDecisionPayload({ item, action: "block", scope: "artifact", reason: "blocked in bulk review" });
@@ -55,14 +52,14 @@ export async function blockRequestsOnce(
     try {
       const result = await blockOnce(group.primary);
       for (const id of result.resolved_duplicate_ids) settled.add(id);
-      outcome.blocked += 1;
+      blocked += 1;
     } catch (error) {
       // A request resolved elsewhere can leave its duplicates pending.
       fail(group.primary.request_id, error);
     }
     for (const duplicateId of group.duplicateIds) {
       if (settled.has(duplicateId)) {
-        outcome.blocked += 1;
+        blocked += 1;
         continue;
       }
       const duplicate = lookup(duplicateId);
@@ -70,13 +67,22 @@ export async function blockRequestsOnce(
         if (duplicate === undefined) throw new Error("A selected request is no longer in the queue.");
         const result = await blockOnce(duplicate);
         for (const id of result.resolved_duplicate_ids) settled.add(id);
-        outcome.blocked += 1;
+        blocked += 1;
       } catch (error) {
         fail(duplicateId, error);
       }
     }
+    // A later block can settle a request that failed earlier in the group,
+    // such as a primary the server still held pending. It is blocked, not failed.
+    for (const id of settled) {
+      if (failures.delete(id)) blocked += 1;
+    }
   }
-  return outcome;
+  const reasons: string[] = [];
+  for (const reason of failures.values()) {
+    if (reasons.length < MAX_REASONS && !reasons.includes(reason)) reasons.push(reason);
+  }
+  return { blocked, failed: failures.size, reasons, failedIds: [...failures.keys()] };
 }
 
 export function bulkBlockSummary(outcome: BulkBlockOutcome): string {

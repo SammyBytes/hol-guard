@@ -147,6 +147,41 @@ assert.equal(wider.length, 0);
 assert.equal(refused.failed, 1);
 assert.match(refused.reasons[0] ?? "", /could not be blocked just this once/);
 
+// A block that settles a request which failed earlier in its group does not
+// leave that request reported as failed, and its reason is no longer shown.
+const lateSent: string[] = [];
+const lateOutcome = await blockRequestsOnce(
+  [group(pending, ["req-loose"])],
+  (id) => looseQueue.get(id),
+  async (input) => {
+    lateSent.push(input.requestId);
+    if (input.requestId === "req-stale") throw new Error("Guard could not be reached.");
+    return settled("req-stale");
+  },
+);
+assert.deepEqual(lateOutcome, { blocked: 2, failed: 0, reasons: [], failedIds: [] });
+assert.deepEqual(lateSent, ["req-stale", "req-loose"]);
+
+// A failed duplicate settled by a later duplicate is reconciled too, while a
+// request that stays failed keeps its own reason and stays selected.
+const lateDuplicate = { ...pending, request_id: "req-late-dup" };
+const stayQueue = new Map([looseDuplicate, lateDuplicate].map((item) => [item.request_id, item]));
+const stayOutcome = await blockRequestsOnce(
+  [group(pending, ["req-loose", "req-late-dup"])],
+  (id) => stayQueue.get(id),
+  async (input) => {
+    if (input.requestId === "req-stale") throw new Error("This request was already resolved.");
+    if (input.requestId === "req-loose") throw new Error("Guard could not be reached.");
+    return settled("req-loose");
+  },
+);
+assert.deepEqual(stayOutcome, {
+  blocked: 2,
+  failed: 1,
+  reasons: ["This request was already resolved."],
+  failedIds: ["req-stale"],
+});
+
 assert.equal(bulkBlockSummary({ blocked: 2, failed: 0, reasons: [], failedIds: [] }), "2 requests blocked.");
 assert.equal(
   bulkBlockFailureMessage({ blocked: 1, failed: 1, reasons: ["This request was already resolved."], failedIds: ["req-second"] }),
@@ -205,5 +240,16 @@ assert.match(mixed, /Block selected/);
 
 const failed = renderToStaticMarkup(createElement(QueueBulkStickyBar, { ...bar, blockError: "1 blocked, 1 failed." }));
 assert.match(failed, /role="alert"[^>]*>1 blocked, 1 failed\.</);
+
+// With nothing left selected the bar is hidden, but a partial block's outcome
+// is still shown; without one, nothing is rendered.
+const hiddenFailure = renderToStaticMarkup(createElement(QueueBulkStickyBar, {
+  ...bar,
+  visible: false,
+  blockError: "1 blocked, 1 failed.",
+}));
+assert.match(hiddenFailure, /role="alert"[^>]*>1 blocked, 1 failed\.</);
+assert.doesNotMatch(hiddenFailure, /Block selected/);
+assert.equal(renderToStaticMarkup(createElement(QueueBulkStickyBar, { ...bar, visible: false })), "");
 
 console.log("bulk-block-selected.test.tsx: all tests passed");

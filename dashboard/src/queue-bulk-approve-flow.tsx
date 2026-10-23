@@ -47,7 +47,13 @@ export function QueueBulkStickyBar(props: QueueBulkStickyBarProps) {
     if (previousStep.current === "confirming" && props.blockStep === "idle") blockButton.current?.focus();
     previousStep.current = props.blockStep;
   }, [props.blockStep]);
-  if (!props.visible) return null;
+  if (!props.visible) {
+    // A partial block can leave nothing selected, such as when the one request
+    // that failed was settled elsewhere. Its outcome still has to be shown.
+    return props.blockError ? (
+      <p role="alert" className="mb-4 text-xs text-brand-attention">{props.blockError}</p>
+    ) : null;
+  }
   const total = props.selectedRequestCount;
   const unit = total === 1 ? "request" : "requests";
   const approvableNote = props.selectedActionCount === total
