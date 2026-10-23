@@ -59,6 +59,8 @@ CRITICAL_COMMAND_FLOORS: tuple[tuple[str, GuardAction], ...] = (
     ("rm -rf ./BUILD", "review"),
     ("rm --recurs --for workspace/target", "review"),
     ("xargs rm -rf BUILD", "block"),
+    ("parallel rm -rf BUILD", "block"),
+    ("echo / | parallel rm -rf BUILD", "block"),
     ("timeout 5 bash -lc 'rm -rf workspace/target'", "block"),
     ("timeout 5 /bin/bash -lc 'rm -rf workspace/target'", "block"),
     ("timeout 5 /bin/sh -c 'rm -rf workspace/target'", "block"),
