@@ -238,6 +238,43 @@ container IO that surrounds a download. The dead source-ancestry fetch is
 removed; the same descendant rule runs in `transition` and is covered by its
 tests.
 
+An installed command pack upgrade is judged against the managed policy its
+candidate was prepared against, and the resident decides whether that policy
+moved (`migrate_plan`, `extension_control_authority_op/installed_upgrade.rs`).
+It re-reads the authenticated head, refuses anything but a protected view,
+composes the managed layers from the same snapshot and `sync_state` rows the
+authority serves, and compares that revision and those signed-cloud layers with
+the evidence the migration carries. Python sends the anchor and the manifest the
+head is bound to, and carries the revision and layers the candidate recorded as
+evidence; it no longer recomputes the view or compares verdicts. A head the
+resident cannot read, or one whose managed policy has moved, refuses the
+migration with no Python fallback.
+
+Reading a stored or replayed package evaluation back into the view a harness
+shows is decided in the resident (`package-evaluation-view-v1`, in
+`package_evaluation_view_op.rs`, over the grammar in
+`supply_chain_package_eval/result_models.rs` and `package_copy.rs`). It owns
+every default a written row omits, which policy actions are recognised and what
+an unrecognised one costs, how the user copy reads once the local route has no
+cloud inbox to send anyone to, which evidence and archive hashes survive, and
+the ecosystem support a package row carries. Python sends the payload exactly as
+it holds it together with the four identity fields the stored row does not
+carry, and reads the answer; absent identity travels as an explicit null,
+because the reply is bound by the canonical digest of the request and a key one
+side omits would unbind it. Every outcome other than a well-formed,
+request-bound `ok` reply raises, and both callers already fail closed on that,
+so no view is composed in Python beside the one the resident decided.
+
+Shell execution-context modeling is the resident's
+(`guard-command/src/shell_execution_context_support.rs`): which segment runs a
+`cd`, `pushd` or `popd`, what its operand is once assignments, wrappers and
+redirects are set aside, when an operand is too dynamic to model, and which
+`shell_cwd_*` reason code explains a directory it will not follow. Python kept a
+second copy of that grammar after the port and no longer calls it; the copy is
+removed and the retirement ledger names its symbols so they cannot return. What
+stays on this side is the vocabulary the answer is read with and the filesystem
+identity this process captures for it, which needs the descriptors it holds.
+
 ## Harness route inventory
 
 The v2 contract maps all harnesses in `HARNESS_CONTRACTS`, including harnesses
