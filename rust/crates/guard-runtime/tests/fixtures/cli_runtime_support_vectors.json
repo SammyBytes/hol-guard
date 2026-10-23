@@ -3041,6 +3041,22 @@
         "home_dir": "/nonexistent-guard-home-7f3a",
         "value": "~"
       }
+    },
+    {
+      "expected": false,
+      "operation": "skill_doc_path",
+      "params": {
+        "home_dir": "/nonexistent-guard-home-7f3a",
+        "value": "~\\.claude/skills/demo/SKILL.md"
+      }
+    },
+    {
+      "expected": false,
+      "operation": "skill_doc_path",
+      "params": {
+        "home_dir": "/nonexistent-guard-home-7f3a",
+        "value": "~nosuchaccount7f3a/.claude/skills/demo/SKILL.md"
+      }
     }
   ],
   "schema": "guard-cli-runtime-support-parity.v1",
