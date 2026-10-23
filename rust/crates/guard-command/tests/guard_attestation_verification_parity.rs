@@ -5,7 +5,7 @@
 //! identity an accepted case carries is the one Python returned and a refusal
 //! is Python's own wording.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use guard_command::attestation_envelope::validated_trust_attestation_envelope;
 use guard_command::attestation_verification::{
