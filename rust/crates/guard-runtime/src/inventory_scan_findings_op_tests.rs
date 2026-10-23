@@ -319,7 +319,11 @@ fn the_response_binds_itself_to_its_request() {
     assert_eq!(result.request_id, "inventory-scan-findings-test");
     assert_eq!(result.status, "ok");
     assert_eq!(result.code, "ok");
-    assert_eq!(result.request_sha256.len(), 64);
+    // The caller binds the reply by comparing this against its own
+    // "sha256:" + hex of the request it sent, so the prefix is part of the
+    // contract, not decoration.
+    assert!(result.request_sha256.starts_with("sha256:"));
+    assert_eq!(result.request_sha256.len(), "sha256:".len() + 64);
     assert!(result.payload.is_some());
 }
 

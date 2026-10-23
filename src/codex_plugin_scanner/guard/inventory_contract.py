@@ -265,8 +265,8 @@ def _scan_records(
     )
     try:
         return (
-            tuple(GuardAgentInventoryFinding(**finding) for finding in findings),  # type: ignore[arg-type]
-            tuple(GuardInventorySource(**source) for source in sources),  # type: ignore[arg-type]
+            tuple(GuardAgentInventoryFinding(**finding) for finding in findings),  # pyright: ignore[reportArgumentType]
+            tuple(GuardInventorySource(**source) for source in sources),  # pyright: ignore[reportArgumentType]
         )
     except TypeError:
         raise InventoryScanFindingsUnavailableError from None
