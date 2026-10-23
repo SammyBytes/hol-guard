@@ -74,20 +74,24 @@ fn regex_whitespace_matches_python_separators() {
     }
 }
 
+/// One recorded `ntpath.expanduser` case: the path, then `USERPROFILE`,
+/// `HOMEDRIVE`, `HOMEPATH` and `USERNAME`, then the expansion ntpath returns.
+type NtExpanduserVector = (
+    &'static str,
+    Option<&'static str>,
+    Option<&'static str>,
+    Option<&'static str>,
+    Option<&'static str>,
+    &'static str,
+);
+
 /// Recorded from `ntpath.expanduser`; runs on every host because the Windows
 /// expansion is plain text logic over four environment variables.
 #[test]
 fn expanduser_nt_matches_recorded_ntpath_vectors() {
     const PROFILE: Option<&str> = Some(r"C:\Users\Me");
     const ME: Option<&str> = Some("Me");
-    let vectors: &[(
-        &str,
-        Option<&str>,
-        Option<&str>,
-        Option<&str>,
-        Option<&str>,
-        &str,
-    )] = &[
+    let vectors: &[NtExpanduserVector] = &[
         (
             r"~\.claude\skills\demo\SKILL.md",
             PROFILE,
