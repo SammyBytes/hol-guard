@@ -25,7 +25,12 @@ pub const INVENTORY_SNAPSHOT_DIGEST_RESULT_SCHEMA: &str =
 /// Capability advertised by the runtime when this operation is available.
 pub const INVENTORY_SNAPSHOT_DIGEST_FEATURE: &str = "inventory-snapshot-digest-v1";
 /// Largest canonical request serialization the op will accept.
-pub const INVENTORY_SNAPSHOT_DIGEST_MAX_BYTES: usize = 8 * 1024 * 1024;
+///
+/// Held under [`MAX_NATIVE_REQUEST_BYTES`](crate::MAX_NATIVE_REQUEST_BYTES),
+/// which the transport enforces on the frame before this op ever sees it. A
+/// bound above that would be unreachable: a snapshot between the two would be
+/// refused as a malformed frame instead of being told its own size is why.
+pub const INVENTORY_SNAPSHOT_DIGEST_MAX_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]

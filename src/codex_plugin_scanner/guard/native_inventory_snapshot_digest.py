@@ -40,8 +40,11 @@ _RESULT_SCHEMA = "guard-inventory-snapshot-digest-result.v1"
 _TIMEOUT_FLOOR_SECONDS = 5.0
 _TIMEOUT_PER_ROW_SECONDS = 0.002
 _TIMEOUT_CEILING_SECONDS = 30.0
-# Mirrors ``INVENTORY_SNAPSHOT_DIGEST_MAX_BYTES``.
-_MAX_REQUEST_BYTES = 8 * 1024 * 1024
+# Mirrors ``INVENTORY_SNAPSHOT_DIGEST_MAX_BYTES``, which is itself held under
+# the transport's own frame limit so an oversized snapshot is refused for its
+# size rather than as a malformed frame.
+_MAX_REQUEST_BYTES = 4 * 1024 * 1024
+_HEX_DIGITS = frozenset("0123456789abcdef")
 
 
 class InventorySnapshotDigestUnavailableError(RuntimeError):
@@ -99,6 +102,12 @@ def native_inventory_snapshot_digest(
         raise InventorySnapshotDigestUnavailableError
     digest = payload.get("digest")
     if not isinstance(digest, str) or len(digest) != 64:
+        raise InventorySnapshotDigestUnavailableError
+    # The digest becomes the snapshot's identity, and sixty-four characters of
+    # anything would satisfy a length check alone. A reply that is bound to
+    # this request but is not a hash is a runtime that no longer agrees with
+    # this contract, which is the same unavailability as no reply.
+    if any(character not in _HEX_DIGITS for character in digest):
         raise InventorySnapshotDigestUnavailableError
     return digest
 

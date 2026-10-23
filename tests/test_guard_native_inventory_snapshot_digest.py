@@ -158,10 +158,21 @@ def test_a_transport_failure_fails_closed(monkeypatch: pytest.MonkeyPatch) -> No
         _ask()
 
 
-@pytest.mark.parametrize("payload", [{}, {"digest": "short"}, {"digest": 7}, "not-a-mapping"])
-def test_an_answer_that_is_not_a_digest_fails_closed(
-    monkeypatch: pytest.MonkeyPatch, payload: object
-) -> None:
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"digest": "short"},
+        {"digest": 7},
+        "not-a-mapping",
+        # Sixty-four characters that are not a hash. The digest becomes the
+        # snapshot's identity, so a length check alone would let a runtime that
+        # no longer agrees with this contract name the snapshot.
+        {"digest": "z" * 64},
+        {"digest": "A" * 64},
+    ],
+)
+def test_an_answer_that_is_not_a_digest_fails_closed(monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
     _resident(monkeypatch, lambda _request: payload)
     with pytest.raises(bridge.InventorySnapshotDigestUnavailableError):
         _ask()
