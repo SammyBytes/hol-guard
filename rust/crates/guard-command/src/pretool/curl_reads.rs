@@ -311,6 +311,11 @@ const OTHER_PROTOCOL_PREFIXES: [&str; 6] = ["ftp.", "dict.", "ldap.", "imap.", "
 /// the ordinary way to name a local server, `localhost:3000/health`, and curl
 /// fetches it over HTTP; only that guess is taken here, so a name whose prefix
 /// picks another protocol stays unread rather than passing as a web request.
+///
+/// The same spelling names a public host too, and `curl example.com` issues
+/// the request `curl http://example.com` issues, so both forms reach the same
+/// checks. Proving one and reviewing the other would turn the scheme into
+/// authority it does not carry.
 fn as_curl_reads_it(raw: &str) -> Option<std::borrow::Cow<'_, str>> {
     if raw.contains("://") {
         return Some(std::borrow::Cow::Borrowed(raw));

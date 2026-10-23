@@ -39,6 +39,7 @@ fn plain_public_reads_are_proven() {
         "curl -sS -D - https://example.com/api/health -o /dev/null",
         "curl -sS --dump-header=- https://example.com/",
         "curl -sSD /dev/null https://example.com/",
+        "curl -s example.com",
     ] {
         assert!(proven(command), "{command}");
     }
@@ -83,7 +84,6 @@ fn bodies_files_credentials_and_routing_stay_reviewed() {
         "curl -s https://example.com/$PATH_PART",
         "curl -H \"Accept: $TYPE\" https://example.com/",
         "curl -s",
-        "curl -s example.com",
     ] {
         assert!(!proven(command), "{command}");
     }
@@ -106,7 +106,8 @@ fn local_dev_server_reads_are_proven() {
 #[test]
 fn a_dev_server_read_written_without_a_scheme_is_proven() {
     // curl fetches a URL written without `://` over HTTP, which is how a local
-    // server is usually named, so the same host and port decide it here.
+    // server is usually named, so the same host and port decide it here. A
+    // public host written the same way is the same request too.
     for command in [
         "curl localhost:3000/",
         "curl -s localhost:3000/health",
