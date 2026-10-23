@@ -192,24 +192,33 @@ def test_normalization_shell_uses_available_python_and_propagates_failure(tmp_pa
         executable = commands / name
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$SELECTED_INTERPRETER"\nexec "$TEST_PYTHON" "$@"\n')
         executable.chmod(0o755)
-    rustup = commands / "rustup"
     active = WINDOWS_PINNED if valid else PINNED
     unused = f"1.99.1-{WINDOWS_HOST}"
-    rustup.write_text(
-        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$RUSTUP_CALLS"\n'
-        'case "$*" in\n'
-        f'  "toolchain list") printf "%s\\n" "{active} (default)" "{unused}" ;;\n'
-        f'  "show active-toolchain") printf "%s\\n" "{active} (default)" ;;\n'
-        f'  "toolchain uninstall {unused}") ;;\n'
-        "  *) exit 91 ;;\nesac\n"
+    # Hook only the child's rustup boundary: native Windows CreateProcess cannot
+    # execute an extensionless Bash stub. The selected Python still runs the CLI.
+    (commands / "sitecustomize.py").write_text(
+        "import os, subprocess\nfrom pathlib import Path\n"
+        "def rustup(arguments, **kwargs):\n"
+        "    assert arguments[0] == 'rustup' and kwargs['check'] is True\n"
+        "    with Path(os.environ['RUSTUP_CALLS']).open('a') as output:\n"
+        "        output.write(' '.join(arguments[1:]) + '\\n')\n"
+        "    if arguments == ['rustup', 'toolchain', 'list']:\n"
+        f"        result = '{active} (default)\\n{unused}\\n'\n"
+        "    elif arguments == ['rustup', 'show', 'active-toolchain']:\n"
+        f"        result = '{active} (default)\\n'\n"
+        f"    elif arguments == ['rustup', 'toolchain', 'uninstall', '{unused}']:\n"
+        "        result = ''\n"
+        "    else:\n        raise AssertionError(arguments)\n"
+        "    return subprocess.CompletedProcess(arguments, 0, stdout=result)\n"
+        "subprocess.run = rustup\n"
     )
-    rustup.chmod(0o755)
     completed = subprocess.run(
         [shutil.which("bash"), "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
         cwd=ROOT,
         env={
             **os.environ,
             "PATH": str(commands),
+            "PYTHONPATH": str(commands),
             "TEST_PYTHON": sys.executable,
             "SELECTED_INTERPRETER": str(selected),
             "RUSTUP_CALLS": str(calls),
