@@ -432,7 +432,10 @@ def retry_assessment(case: dict[str, Any], decisions: list[dict[str, Any]] | Non
 
 
 def pinned_retry_outcome(
-    commands: tuple[str, ...], decisions: list[dict[str, Any]], path: str | None = None
+    commands: tuple[str, ...],
+    decisions: list[dict[str, Any]],
+    path: str | None = None,
+    tool: str | None = None,
 ) -> tuple[str, str] | None:
     """For a case that pins its action, did an allowed retry carry exactly that action?
 
@@ -440,7 +443,8 @@ def pinned_retry_outcome(
     file tool by tool and path, so it alone would pass a retry that changed an environment
     setting or an argument. A pinned case claims the identical action runs, so it also
     needs an allowed attempt that matches what the case pinned: a command byte for byte,
-    or the exact file the case named.
+    or the exact file the case named, read by the tool the case named. Without the tool,
+    an edit of the pinned file would pass a case whose point is that a read of it runs.
     """
     if commands:
         if any(d.get("decision") == "allow" and d.get("command") in commands for d in decisions):
@@ -449,7 +453,13 @@ def pinned_retry_outcome(
     if not path:
         return None
     wanted = relative_path(path)
-    allowed = (d for d in decisions if d.get("decision") == "allow" and isinstance(d.get("path"), str))
-    if any(relative_path(d["path"]) == wanted for d in allowed):
+    named = tool.strip().lower() if tool else None
+    for row in decisions:
+        if row.get("decision") != "allow" or not isinstance(row.get("path"), str):
+            continue
+        if relative_path(row["path"]) != wanted:
+            continue
+        if named and str(row.get("tool") or "").strip().lower() != named:
+            continue
         return None
     return "not-exercised", "no allowed retry named the file the case pinned"

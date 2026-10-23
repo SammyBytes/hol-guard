@@ -14,7 +14,9 @@ import shlex
 from typing import Any
 
 from .approval_retry import pinned_retry_outcome, retry_assessment
+from .approval_retry_action import PATH_KEYS as _PATH_KEYS
 from .approval_retry_action import WORKSPACE_ROOTS as _WINDOWS_ROOTS
+from .approval_retry_action import pinned_file_tool
 from .approval_retry_action import relative_path as _relative
 from .approval_retry_bash import BASH_LIFECYCLE_ORACLE
 from .approval_retry_bash import assessment as bash_lifecycle_assessment
@@ -48,7 +50,6 @@ _LIFECYCLE_EVENTS = frozenset(
 _EXTENSION_REASON = "native_command_permission_disabled"
 # Normalized transcript tools whose calls every supported harness routes through a Guard pre-tool hook.
 _HOOKED_TOOLS = frozenset({"bash", "read", "write", "edit"})
-_PATH_KEYS = ("file_path", "path", "filePath")
 
 
 def effective_decision(response: Any) -> str:
@@ -241,7 +242,11 @@ def _outcome(scenario: Scenario, case: dict[str, Any]) -> tuple[str, str]:
         if not calls:
             return "not-exercised", "the model made no tool call"
         outcome = retry_assessment(case, decisions)
-        if outcome[0] == "pass" and (pinned := pinned_retry_outcome(scenario.commands, decisions, scenario.path)):
+        if outcome[0] == "pass" and (
+            pinned := pinned_retry_outcome(
+                scenario.commands, decisions, scenario.path, pinned_file_tool(scenario.required_tools)
+            )
+        ):
             return pinned
         return outcome
     if scenario.oracle == "mixed-read-batch":

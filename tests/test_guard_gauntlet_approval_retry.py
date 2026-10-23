@@ -20,6 +20,7 @@ from ci.gauntlet.approval_retry import (
     pinned_retry_outcome,
     retry_assessment,
 )
+from ci.gauntlet.approval_retry_action import input_path, pinned_file_tool
 from ci.gauntlet.approval_retry_bash import (
     BASH_LIFECYCLE_CASES,
     BASH_LIFECYCLE_ORACLE,
@@ -593,3 +594,35 @@ def test_a_pinned_file_case_needs_an_allowed_call_on_the_file_it_named():
     outcome, reason = pinned_retry_outcome((), elsewhere, "README.md")
     assert outcome == "not-exercised"
     assert "the file the case pinned" in reason
+
+
+def test_a_pinned_file_case_needs_the_tool_it_named_not_another_one():
+    """An edit of the pinned file does not stand in for the read the case pins.
+
+    Both calls name the same path and both ride the same approval, so the path alone
+    would pass a run in which the read this case exists to drive never happened.
+    """
+    edited = [_file_decision("Edit", "README.md", "allow")]
+    outcome, reason = pinned_retry_outcome((), edited, "README.md", "read")
+    assert outcome == "not-exercised"
+    assert "the file the case pinned" in reason
+    assert pinned_retry_outcome((), [_file_decision("Read", "README.md", "allow")], "README.md", "read") is None
+    # A case that names no single file tool keeps the path-only pin it had before.
+    assert pinned_retry_outcome((), edited, "README.md") is None
+
+
+def test_a_pinned_tool_comes_from_a_case_whose_tools_are_all_file_tools():
+    assert pinned_file_tool(("read",)) == "read"
+    assert pinned_file_tool(("Read",)) == "read"
+    assert pinned_file_tool(("read", "bash")) is None
+    assert pinned_file_tool(("read", "write")) is None
+    assert pinned_file_tool(()) is None
+
+
+def test_a_file_tool_call_names_its_path_in_whichever_key_the_harness_used():
+    assert input_path({"file_path": "{{workspace}}/README.md"}) == "{{workspace}}/README.md"
+    assert input_path({"filePath": "README.md"}) == "README.md"
+    assert input_path({"path": "README.md"}) == "README.md"
+    assert input_path({"command": "cat README.md"}) is None
+    assert input_path({"file_path": "   "}) is None
+    assert input_path(None) is None

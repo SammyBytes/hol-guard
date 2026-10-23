@@ -18,6 +18,10 @@ from typing import Any
 # command text the request never carried.
 FILE_TOOLS = frozenset({"read", "write", "edit"})
 
+# The keys a harness spells the file a tool call names with. One list, so every lane
+# reads the same field whether it holds a whole hook payload or a bare tool input.
+PATH_KEYS = ("file_path", "path", "filePath")
+
 # The fixture roots a Windows host spells with backslashes.
 WORKSPACE_ROOTS = ("{{workspace}}\\", "{{home}}\\", ".\\")
 
@@ -39,6 +43,24 @@ def relative_path(value: str) -> str:
     for prefix in ("{{workspace}}/", "./"):
         value = value.removeprefix(prefix)
     return value
+
+
+def input_path(fields: Any) -> str | None:
+    """The file a tool call's own input names, in any harness's spelling."""
+    if not isinstance(fields, dict):
+        return None
+    return next((value for key in PATH_KEYS if isinstance(value := fields.get(key), str) and value.strip()), None)
+
+
+def pinned_file_tool(required_tools: tuple[str, ...]) -> str | None:
+    """The one file tool a case requires, when its pinned action is a file-tool call.
+
+    A pinned case claims a named tool runs on a named file. Without the tool, an allowed
+    call any other file tool made on the same path would satisfy the pin, although the
+    call the case pinned never happened.
+    """
+    tools = {str(tool).strip().lower() for tool in required_tools}
+    return tools.pop() if len(tools) == 1 and tools <= FILE_TOOLS else None
 
 
 def _names_a_path(word: str) -> bool:
