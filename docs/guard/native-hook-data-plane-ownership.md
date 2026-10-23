@@ -264,6 +264,19 @@ the text the plan selected. A refusal names the rule it broke for the
 diagnostics record; the read ends either way. Without a plan there is no read
 and no Python grammar to fall back on: the command returns to ordinary review.
 
+The AIBOM report summaries now come from the resident.
+`aibom_report_summaries_op` counts an inventory report's layers, its trust
+coverage and its drift through `aibom_reporting::summarize_aibom_layers`, the
+grammar Rust already owned: which item kind lands in which layer, when a
+source link counts and when a source of truth counts in its place, which kinds
+are eligible for trust coverage and what makes a score low, and which drift
+states a report totals. Python sent a second copy of all of it. It now sends
+the projection the grammar reads — each item's kind, risk level, drift state
+and the three metadata keys, plus the number of findings and sources and the
+snapshot drift states — and returns the three summaries the reply carries. A
+report whose rows exceed the request budget, or a resident that cannot answer,
+fails the summary closed; there is no Python recount.
+
 Reading a stored or replayed package evaluation back into the view a harness
 shows is decided in the resident (`package-evaluation-view-v1`, in
 `package_evaluation_view_op.rs`, over the grammar in

@@ -312,6 +312,7 @@ pub(crate) enum ResidentOperationV1 {
     RuntimeArtifactIdentity(guard_contracts::RuntimeArtifactIdentityRequestV1),
     VerifiedReadDecision(guard_contracts::VerifiedReadDecisionRequestV1),
     VerifiedReadPlan(guard_contracts::VerifiedReadPlanRequestV1),
+    AibomReportSummaries(guard_contracts::AibomReportSummariesRequestV1),
     Health(Value),
     Shutdown(Value),
 }
