@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from . import native_inventory_url_redaction as _native_url
@@ -44,15 +43,14 @@ def classify_endpoint_host(value: str | None) -> str:
     return _native_url.classify_endpoint_host(value)
 
 
-_COMMAND_URL_RE = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[^\s]+")
-
-
 def _prefetch_artifact_urls(artifacts: tuple[object, ...]) -> None:
     """Answer every URL an export of these artifacts redacts in batched requests.
 
     The per-value redaction below then reads the pass's answers instead of
     asking the resident once per string. A value this walk misses is still
-    redacted; it only costs its own request.
+    redacted; it only costs its own request. A command string is one such
+    value: the resident redacts the whole command in a single task, so the
+    pass caches it by the command rather than by the URLs inside it.
     """
     urls: list[str] = []
     hosts: list[str] = []
@@ -61,9 +59,6 @@ def _prefetch_artifact_urls(artifacts: tuple[object, ...]) -> None:
         if isinstance(url, str) and url:
             urls.append(url)
             hosts.append(url)
-        command = getattr(artifact, "command", None)
-        if isinstance(command, str) and command:
-            urls.extend(match.group(0) for match in _COMMAND_URL_RE.finditer(command))
         _collect_metadata_urls(getattr(artifact, "metadata", None), urls)
     _native_url.prefetch(urls, hosts)
 
@@ -157,45 +152,12 @@ def _sanitize_paths(value: object, home_dir: Path, workspace_dir: Path | None) -
 
 def _redact_known_path(value: str, home_dir: Path, workspace_dir: Path | None) -> str:
     """Redact one known local path using the operator home boundary."""
-    path = Path(value)
-    if path.is_absolute():
-        home_redacted = redact_local_path(path, home_dir=home_dir)
-        if home_redacted.startswith("{home}/"):
-            return home_redacted
-        if workspace_dir is not None:
-            try:
-                relative = path.resolve().relative_to(workspace_dir.resolve())
-                return f"{{workspace}}/{relative.as_posix()}"
-            except (OSError, RuntimeError, ValueError):
-                return path.name
-        return path.name
-    return value
+    return _native_url.redact_known_path(value, home_dir, workspace_dir)
 
 
 def _redact_command_value(value: str, home_dir: Path, workspace_dir: Path | None) -> str:
     """Redact path and credential values from an exported command string."""
-    redacted = _COMMAND_URL_RE.sub(lambda match: redact_url(match.group(0)), value)
-    redacted = re.sub(
-        r"(^|\s)(/[^\s]+)",
-        lambda match: f"{match.group(1)}{_redact_known_path(match.group(2), home_dir, workspace_dir)}",
-        redacted,
-    )
-    redacted = re.sub(
-        r"(?i)(authorization:\s*bearer\s+)\S+",
-        r"\1redacted",
-        redacted,
-    )
-    redacted = re.sub(
-        r"(?i)((?:api[_-]?key|auth|password|secret|token)=)\S+",
-        r"\1redacted",
-        redacted,
-    )
-    redacted = re.sub(
-        r"(?i)((?:--)?(?:api[_-]?key|auth|password|secret|token)\s+)\S+",
-        r"\1redacted",
-        redacted,
-    )
-    return redacted
+    return _native_url.redact_command_value(value, home_dir, workspace_dir)
 
 
 def _sanitize_serializer_string(

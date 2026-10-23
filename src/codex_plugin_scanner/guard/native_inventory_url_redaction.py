@@ -1,7 +1,8 @@
-"""Typed client for the native inventory URL redaction; no Python composition."""
+"""Typed client for the native inventory redaction; no Python composition."""
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -29,6 +30,11 @@ _MAX_WIRE_BYTES = 2 * _MAX_REQUEST_BYTES + 4096
 # character of a value needs a JSON escape.
 _MAX_CHUNK_TEXT_BYTES = _MAX_REQUEST_BYTES // 8
 _HOST_CLASSES = frozenset({"none", "local_loopback", "local_private", "remote_public"})
+# Tasks whose answer is the one redacted string under the ``value`` field.
+_VALUE_KINDS = frozenset({"redact_url", "redact_command_value", "redact_known_path"})
+# Tasks whose answer depends on the caller's home, workspace and working
+# directories as well as on the value.
+_ROOTED_KINDS = frozenset({"redact_command_value", "redact_known_path"})
 
 _TaskKey = tuple[str, object]
 # Answers already read in the current export pass, keyed by task. ``None``
@@ -101,11 +107,56 @@ def classify_endpoint_host(value: str | None, *, guard_home: Path | None = None)
     return _answer_for({"kind": "classify_endpoint_host", "value": value}, guard_home=guard_home)
 
 
+def redact_command_value(
+    value: str,
+    home_dir: Path,
+    workspace_dir: Path | None,
+    *,
+    guard_home: Path | None = None,
+) -> str:
+    """Return the exported form of one command string."""
+
+    return _answer_for(_rooted("redact_command_value", value, home_dir, workspace_dir), guard_home=guard_home)
+
+
+def redact_known_path(
+    value: str,
+    home_dir: Path,
+    workspace_dir: Path | None,
+    *,
+    guard_home: Path | None = None,
+) -> str:
+    """Return the exported form of one path."""
+
+    return _answer_for(_rooted("redact_known_path", value, home_dir, workspace_dir), guard_home=guard_home)
+
+
+def _rooted(kind: str, value: str, home_dir: Path, workspace_dir: Path | None) -> dict[str, object]:
+    """Describe a task whose answer depends on the caller's directories.
+
+    The resident resolves a relative path against its own process directory,
+    which is not this one, so the working directory travels with the task
+    rather than being left to whichever process answers it.
+    """
+
+    return {
+        "kind": kind,
+        "value": value,
+        "home_dir": str(home_dir),
+        "workspace_dir": None if workspace_dir is None else str(workspace_dir),
+        "cwd": os.getcwd(),
+    }
+
+
 def _task_key(task: dict[str, object]) -> _TaskKey:
     kind = str(task["kind"])
     if kind == "redact_headers":
         names = task["header_names"]
         return kind, tuple(names) if isinstance(names, list) else names
+    if kind in _ROOTED_KINDS:
+        # Two identical strings redact differently under different roots, so
+        # the roots are part of what the cached answer belongs to.
+        return kind, (task["value"], task["home_dir"], task["workspace_dir"], task["cwd"])
     return kind, task["value"]
 
 
@@ -179,7 +230,7 @@ def _answer(answer: object, task: dict[str, object]) -> Any:
         raise _unusable()
     if kind == "redact_headers":
         return _headers(answer)
-    if kind == "redact_url":
+    if kind in _VALUE_KINDS:
         return _text(answer, "value")
     host_class = _text(answer, "host_class")
     # A class outside the contract would read as a safe endpoint downstream.
