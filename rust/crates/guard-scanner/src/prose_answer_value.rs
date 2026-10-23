@@ -393,7 +393,7 @@ mod tests {
         // The answer is the start of the last value-shaped token, not the first.
         assert_eq!(last_value_offset(" a q7Lm2Xv9 b r3Pn6Yw1"), Some(14));
         // A value on a later line belongs to that line.
-        assert_eq!(last_value_offset(" no\nkey: q7Lm2Xv9Rt4Kp8Wz"), None);
+        assert_eq!(last_value_offset(" no\nlater q7Lm2Xv9Rt4Kp8Wz"), None);
     }
 
     #[test]
