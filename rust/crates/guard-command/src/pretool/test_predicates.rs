@@ -43,8 +43,18 @@ pub(super) fn answers_from_operands(arguments: &[String]) -> bool {
 /// A word the shell has already expanded to a plain string. A leading `-`
 /// would be read as a predicate rather than as an operand, and a command
 /// substitution runs a command this proof does not stand for.
+///
+/// A glob is refused too. The words reach this proof with their quoting
+/// removed, so `*`, `?` and `[` cannot be told apart from the literal
+/// characters a quoted pattern would carry; the shell expands an unquoted
+/// one by listing the directory it names, and the exit status then reports
+/// what that directory holds. A pattern can also change how many words
+/// `test` receives, and so which form it reads.
 fn plain_operand(word: &str) -> bool {
-    !word.starts_with('-') && !word.contains('`') && !word.contains("$(")
+    !word.starts_with('-')
+        && !word.contains('`')
+        && !word.contains("$(")
+        && !word.contains(['*', '?', '['])
 }
 
 #[cfg(test)]
@@ -78,6 +88,9 @@ mod tests {
             vec!["-z", "`cat /etc/shadow`"],
             vec!["-z", "$DEBUG", "-a", "-f", ".env"],
             vec!["$NODE_ENV", "-a", "production"],
+            vec!["~/.ssh/id_*", "=", "x"],
+            vec!["/root/?", "=", "x"],
+            vec!["-z", "/etc/[a-z]*"],
             vec![],
         ] {
             assert!(!answers_from_operands(&arguments(&words)), "{words:?}");
