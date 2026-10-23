@@ -22769,7 +22769,7 @@
       "expect": "allow_or_review"
     },
     {
-      "id": "dot-version-manager-then-node-version",
+      "id": "dot-version-manager-then-use",
       "fix_area": "shell",
       "harnesses": [
         "codex",
@@ -22779,7 +22779,7 @@
       ],
       "tool": "shell",
       "tool_input": {
-        "command": ". ~/.nvm/nvm.sh && node -v"
+        "command": ". ~/.nvm/nvm.sh && nvm use 20"
       },
       "cwd": "worktree",
       "expect": "allow_or_review"

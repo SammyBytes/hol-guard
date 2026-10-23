@@ -39,6 +39,7 @@ const ACTIVATE: &str = concat!(
 );
 
 const FAILED: &str = "native_command_extension_evaluation_failed";
+const REVIEWED: &str = "native_command_review_required";
 
 fn outcome(root: &Path, command: &str) -> (String, String) {
     let cwd = root.join("project");
@@ -487,13 +488,15 @@ fn a_sourced_file_this_scan_cannot_bound_is_reviewed_not_refused() {
 fn a_hidden_directory_without_the_marker_is_not_a_virtualenv() {
     // The read is admitted by the environment's own `pyvenv.cfg`, not by the
     // name `.venv`. Without the marker the hidden-path screen still refuses
-    // the read, so the command keeps no owners and keeps its failure.
+    // the read, so nothing in that file is ever projected and the command
+    // keeps no owners from it. What it does keep is the review card `bash` on
+    // the same unreadable file has always had: the shape is still only
+    // sourcing, and the file is still named in the text.
     let root = project("unmarked", BOUNDED);
     std::fs::remove_file(root.join("project").join(".venv").join("pyvenv.cfg")).unwrap();
-    assert_eq!(
-        reviewed(&root, "source .venv/bin/activate && pytest -q").1,
-        FAILED
-    );
+    let (action, code) = reviewed(&root, "source .venv/bin/activate && pytest -q");
+    assert_eq!(code, REVIEWED);
+    assert_ne!(action, "allow");
     let _ = std::fs::remove_dir_all(&root);
 }
 
@@ -754,7 +757,9 @@ fn a_quoted_span_still_shows_the_program_a_substitution_runs() {
 /// card. `~/.nvm/nvm.sh` is the line every Node project's instructions open
 /// with: a hidden home path with no marker of its own the way a virtualenv has
 /// `pyvenv.cfg`, so this scan may not read it. It reviews rather than being
-/// refused outright with no approval left to give it.
+/// refused outright with no approval left to give it. Both spellings of the
+/// sourcing word carry the same reading, and the controls are compiled so the
+/// sourced floor this covers is really the one a harness reaches.
 #[test]
 fn sourcing_a_file_this_scan_may_not_read_still_reaches_a_review() {
     let root = project("toolchain", ACTIVATE);
@@ -763,9 +768,9 @@ fn sourcing_a_file_this_scan_may_not_read_still_reaches_a_review() {
     for command in [
         "source ~/.nvm/nvm.sh",
         "source ~/.nvm/nvm.sh && nvm use 20",
-        ". ~/.nvm/nvm.sh && node -v",
+        ". ~/.nvm/nvm.sh && nvm use 20",
     ] {
-        let (action, code) = outcome(&root, command);
+        let (action, code) = reviewed(&root, command);
         assert_ne!(code, FAILED, "{command}");
         assert_ne!(action, "allow", "{command}: {code}");
     }
@@ -779,11 +784,19 @@ fn sourcing_a_file_this_scan_may_not_read_still_reaches_a_review() {
 #[test]
 fn nesting_beside_the_sourcing_keeps_its_evaluation_failure() {
     let root = project("nested", ACTIVATE);
-    let (_, code) = outcome(
+    let (action, code) = outcome(&root, "eval \"$CMD\" && source .venv/bin/activate");
+    assert_eq!(code, FAILED);
+    assert_ne!(action, "allow");
+    // A substitution that names the program it runs is read as the words it
+    // prints, so this one reaches the same review card every other bounded
+    // substitution gets rather than an evaluation failure. It is still not an
+    // allow, and the sourcing beside it buys it nothing.
+    let (action, code) = outcome(
         &root,
         "eval \"$(pyenv init -)\" && source .venv/bin/activate",
     );
-    assert_eq!(code, FAILED);
+    assert_eq!(code, REVIEWED);
+    assert_ne!(action, "allow");
     let (action, code) = outcome(&root, "source $INIT && pytest -q");
     assert_ne!(action, "allow", "{code}");
     let _ = std::fs::remove_dir_all(&root);
