@@ -687,7 +687,7 @@ fn sourcing_names_its_files(
     command: &CanonicalCommandV1,
     context: crate::pretool::PathContext<'_>,
 ) -> bool {
-    crate::pretool::sourcing_shape_is_reviewable(command, context)
+    crate::pretool::sourcing_bounded_sources(command, context).is_some()
 }
 
 /// A command with its heredocs removed that moves no data, or only to

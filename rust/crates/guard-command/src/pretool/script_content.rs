@@ -250,6 +250,19 @@ pub(crate) fn sourced_program_sources(
 /// a block floor it carries still stands. The file has to be named here as
 /// well: `source $INIT` runs a path the text does not hold at all, and
 /// `eval evil && source ok.sh` runs words from nowhere.
+///
+/// A path the filesystem does not hold is the third kind, and it holds no
+/// words to miss: a shell sourcing it only reports that it could not read it.
+/// Giving up the whole command over that left an ordinary
+/// `source venv/bin/activate && pytest -q`, run in a checkout whose virtualenv
+/// has not been created yet, a block with no approval to give it, while the
+/// same command one `python -m venv venv` later reviewed behind a card. A file
+/// that exists and could not be read is not that case: padding one past the
+/// read bound or writing a byte that is not UTF-8 hides its words, and a
+/// checkout this agent did not write controls both. Neither is a file an
+/// earlier segment of this same command names - `printf '...' > run.sh &&
+/// . ./run.sh` sources words written after the scan looked, so both keep the
+/// evaluation failure they have today.
 pub(crate) fn sourcing_bounded_sources(
     model: &CanonicalCommandV1,
     context: PathContext<'_>,
@@ -270,66 +283,14 @@ pub(crate) fn sourcing_bounded_sources(
         }
         match resolve(target, context).as_deref().and_then(read_text) {
             Some(text) => sources.push(text),
-            // A file this scan may not read bounds nothing, but it does not
-            // take the owners of its neighbours with it.
-            None if outside_the_workspace(target, context) => {}
+            // A file this scan does not hold the words of bounds nothing, but
+            // it does not take the owners of its neighbours with it either.
+            None if reviewable_unread(target, context, &segments[..index]) => {}
             None => return None,
         }
         sourcing = true;
     }
     sourcing.then_some(sources)
-}
-
-/// Whether a sourcing-only command's shape is one this scan can put behind an
-/// approval card.
-///
-/// [`sourcing_bounded_sources`] answers the stronger question - which programs
-/// the sourced files name, so that they join the owners - and a file that is
-/// not there answers none of it. That is the right answer for the owners and
-/// the wrong one for the card: a path the filesystem does not hold holds no
-/// words to miss either, and a shell sourcing it only reports that it could
-/// not read it. Refusing the shape over that left an ordinary
-/// `source venv/bin/activate && pytest -q`, run in a checkout whose virtualenv
-/// has not been created yet, a block with no approval to give it, while the
-/// same command one `python -m venv venv` later reviewed behind a card. The
-/// floor this opens starts at review and only rises, so an absent file never
-/// turns a command into an allow.
-///
-/// A file that exists and could not be read is not that case: padding one past
-/// the read bound or writing a byte that is not UTF-8 hides its words, and a
-/// checkout this agent did not write controls both. Neither is a file an
-/// earlier segment of this same command names. `printf '...' > run.sh &&
-/// . ./run.sh` sources words written after the scan looked, so both keep the
-/// evaluation failure they have today.
-pub(crate) fn sourcing_shape_is_reviewable(
-    model: &CanonicalCommandV1,
-    context: PathContext<'_>,
-) -> bool {
-    let Some((_, segments)) = structure(model, context) else {
-        return false;
-    };
-    if !sourcing_is_the_only_nesting(&segments) {
-        return false;
-    }
-    let mut sourcing = false;
-    for (index, segment) in segments.iter().enumerate() {
-        if !sources_a_file(segment) {
-            continue;
-        }
-        let Some(target) = sourced_file(segment) else {
-            return false;
-        };
-        let prior = &segments[..index];
-        if moved_out_of_reach(prior, target) {
-            return false;
-        }
-        let read = resolve(target, context).as_deref().and_then(read_text);
-        if read.is_none() && !reviewable_unread(target, context, prior) {
-            return false;
-        }
-        sourcing = true;
-    }
-    sourcing
 }
 
 /// Whether a sourced file whose words this scan does not have may still stand
