@@ -29,7 +29,12 @@ pub const INVENTORY_ITEM_CLASSIFICATION_RESULT_SCHEMA: &str =
 /// Capability advertised by the runtime when this operation is available.
 pub const INVENTORY_ITEM_CLASSIFICATION_FEATURE: &str = "inventory-item-classification-v1";
 /// Largest canonical request serialization the op will accept.
-pub const INVENTORY_ITEM_CLASSIFICATION_MAX_BYTES: usize = 8 * 1024 * 1024;
+///
+/// Held under [`MAX_NATIVE_REQUEST_BYTES`](crate::MAX_NATIVE_REQUEST_BYTES),
+/// which the transport enforces on the frame before this op ever sees it. A
+/// bound above that would be unreachable: a batch between the two would be
+/// refused as a malformed frame instead of being told its own size is why.
+pub const INVENTORY_ITEM_CLASSIFICATION_MAX_BYTES: usize = 4 * 1024 * 1024;
 /// Most entries one request may carry. A scan covering more than this asks
 /// again with the next batch rather than growing the request unbounded.
 pub const INVENTORY_ITEM_CLASSIFICATION_MAX_ENTRIES: usize = 512;

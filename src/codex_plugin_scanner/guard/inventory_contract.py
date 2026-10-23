@@ -285,10 +285,7 @@ def inventory_snapshot_from_detection(
         )
         for artifact, evidence in zip(artifact_tuple, source_evidence, strict=True)
     ]
-    classifications = native_inventory_item_classification(
-        classification_entries,
-        guard_home=home_dir,
-    )
+    classifications = native_inventory_item_classification(classification_entries)
     items: list[GuardAgentInventoryItem] = []
     for artifact, entry, classification in zip(artifact_tuple, classification_entries, classifications, strict=True):
         item = _item_from_artifact(

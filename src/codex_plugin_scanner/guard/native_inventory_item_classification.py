@@ -20,7 +20,8 @@ snapshot's exported keys do not churn.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import json
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import cast
 from uuid import uuid4
@@ -43,7 +44,15 @@ _TIMEOUT_CEILING_SECONDS = 30.0
 # Mirrors ``INVENTORY_ITEM_CLASSIFICATION_MAX_ENTRIES``: the resident refuses a
 # request carrying more entries than this.
 _MAX_ENTRIES = 512
-_MAX_REQUEST_BYTES = 8 * 1024 * 1024
+# Mirrors ``INVENTORY_ITEM_CLASSIFICATION_MAX_BYTES``, which is itself held
+# under the transport's own frame limit so an oversized batch is refused for
+# its size rather than as a malformed frame.
+_MAX_REQUEST_BYTES = 4 * 1024 * 1024
+# What one batch's entries may serialize to. The envelope around them -- the
+# schema, the request id, and JSON's own punctuation -- is small and bounded,
+# and leaving a share of the limit for it keeps a batch this side accepted
+# from arriving as one the resident refuses on size.
+_MAX_BATCH_ENTRY_BYTES = _MAX_REQUEST_BYTES - (_MAX_REQUEST_BYTES // 8)
 _ANSWER_KEYS = (
     "item_kind",
     "metadata_removals",
@@ -87,13 +96,56 @@ def native_inventory_item_classification(
     if not ensure_resident_prerequisite(home):
         raise InventoryItemClassificationUnavailableError
     answers: list[dict[str, object]] = []
-    for start in range(0, len(entries), _MAX_ENTRIES):
-        answers.extend(_classification_for_batch(entries[start : start + _MAX_ENTRIES], home))
+    for batch in _batches(entries):
+        answers.extend(_classification_for_batch(batch, home))
     return answers
 
 
+def _batches(entries: Sequence[Mapping[str, object]]) -> Iterator[list[dict[str, object]]]:
+    """Split the artifacts into requests the resident will accept.
+
+    An entry carries the artifact's whole sanitized metadata, which for an MCP
+    server is every tool definition it declares, so a few hundred artifacts can
+    outgrow the request limit long before they outgrow ``_MAX_ENTRIES``.
+    Counting entries alone left those snapshots failing closed on a limit the
+    caller could have split under, so the serialized size is counted too.
+
+    One entry larger than a whole batch still travels alone and is refused by
+    the resident for its size. Trimming it here would make this module decide
+    which metadata an item's classification reads, which is the second
+    implementation the op exists to remove.
+    """
+
+    batch: list[dict[str, object]] = []
+    size = 0
+    for entry in entries:
+        wire = _entry_wire(entry)
+        cost = _wire_bytes(wire)
+        if batch and (len(batch) >= _MAX_ENTRIES or size + cost > _MAX_BATCH_ENTRY_BYTES):
+            yield batch
+            batch, size = [], 0
+        batch.append(wire)
+        size += cost
+    if batch:
+        yield batch
+
+
+def _wire_bytes(wire: Mapping[str, object]) -> int:
+    """What one entry costs in a request, as the transport will measure it.
+
+    An entry that cannot be serialized is counted as a whole batch so it
+    travels alone, and the request it travels in raises the same unavailability
+    the resident would answer with.
+    """
+
+    try:
+        return len(json.dumps(wire, separators=(",", ":")).encode("utf-8"))
+    except (TypeError, ValueError):
+        return _MAX_BATCH_ENTRY_BYTES
+
+
 def _classification_for_batch(
-    entries: Sequence[Mapping[str, object]],
+    entries: Sequence[dict[str, object]],
     home: Path,
 ) -> list[dict[str, object]]:
     """Ask the resident about one batch the contract is willing to accept."""
@@ -101,7 +153,7 @@ def _classification_for_batch(
     wire: dict[str, object] = {
         "schema": _REQUEST_SCHEMA,
         "request_id": f"inventory-item-classification-{uuid4().hex}",
-        "entries": [_entry_wire(entry) for entry in entries],
+        "entries": list(entries),
     }
     try:
         response = _resident_request(
