@@ -8,7 +8,9 @@
 //! config, carries credentials, routes through a proxy or socket, or writes a
 //! file other than a scratch file keeps the normal review path.
 //!
-//! A read of a dev server on `127.0.0.1` or `localhost` is proven too, on a
+//! A read of a dev server on `127.0.0.1` or `localhost` is proven too, written
+//! with a scheme or without one, since curl reads `localhost:3000/health` as
+//! the HTTP request a developer means by it, on a
 //! conventional dev-server port ([`super::loopback_ports`]) that neither
 //! Guard's daemon nor a local service answering a plain GET with
 //! credentials, cluster state or a debugger ([`LOCAL_ADMIN_PORTS`]) may
@@ -295,7 +297,31 @@ fn safe_header(value: &str) -> bool {
 }
 
 fn readable_url(raw: &str, context: super::PathContext<'_>) -> bool {
-    public_url(raw) || loopback_url(raw, context.home_dir)
+    let Some(raw) = as_curl_reads_it(raw) else {
+        return false;
+    };
+    public_url(&raw) || loopback_url(&raw, context.home_dir)
+}
+
+/// Names whose prefix picks curl a protocol other than HTTP when the URL is
+/// written without one. curl matches them case-insensitively.
+const OTHER_PROTOCOL_PREFIXES: [&str; 6] = ["ftp.", "dict.", "ldap.", "imap.", "smtp.", "pop3."];
+
+/// The URL with the scheme curl reads it under. A URL written without `://` is
+/// the ordinary way to name a local server, `localhost:3000/health`, and curl
+/// fetches it over HTTP; only that guess is taken here, so a name whose prefix
+/// picks another protocol stays unread rather than passing as a web request.
+fn as_curl_reads_it(raw: &str) -> Option<std::borrow::Cow<'_, str>> {
+    if raw.contains("://") {
+        return Some(std::borrow::Cow::Borrowed(raw));
+    }
+    let host = raw.split(['/', '?', '#']).next().unwrap_or(raw);
+    if OTHER_PROTOCOL_PREFIXES.iter().any(|prefix| {
+        host.len() >= prefix.len() && host[..prefix.len()].eq_ignore_ascii_case(prefix)
+    }) {
+        return None;
+    }
+    Some(std::borrow::Cow::Owned(format!("http://{raw}")))
 }
 
 /// An `http(s)` URL naming `127.0.0.1` or `localhost` itself, on a dev-server

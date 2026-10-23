@@ -104,6 +104,37 @@ fn local_dev_server_reads_are_proven() {
 }
 
 #[test]
+fn a_dev_server_read_written_without_a_scheme_is_proven() {
+    // curl fetches a URL written without `://` over HTTP, which is how a local
+    // server is usually named, so the same host and port decide it here.
+    for command in [
+        "curl localhost:3000/",
+        "curl -s localhost:3000/health",
+        "curl -s 127.0.0.1:8080/api/items",
+        "curl -fsS LOCALHOST:4173/game.js",
+        "curl -s example.com/api/health",
+    ] {
+        assert!(proven(command), "{command}");
+    }
+}
+
+#[test]
+fn a_scheme_curl_would_not_guess_as_http_stays_reviewed() {
+    // Only curl's HTTP guess is taken: a name whose prefix picks another
+    // protocol, and an address no scheme makes public, keep their review.
+    for command in [
+        "curl ftp.example.com/dump.sql",
+        "curl FTP.example.com/dump.sql",
+        "curl smtp.example.com/",
+        "curl 169.254.169.254/latest/meta-data/",
+        "curl 10.0.0.5:8080/admin",
+        "curl /etc/passwd",
+    ] {
+        assert!(!proven(command), "{command}");
+    }
+}
+
+#[test]
 fn a_dev_port_in_the_daemon_range_follows_the_daemon_state() {
     let home = std::env::temp_dir().join(format!("curl-reads-daemon-{}", std::process::id()));
     let guard = home.join(".hol-guard");
@@ -202,7 +233,8 @@ fn local_admin_ports_and_other_loopback_spellings_stay_reviewed() {
         "curl -L http://127.0.0.1:3000/",
         "curl -X POST http://localhost:3000/api/items",
         "curl -d x=1 http://localhost:3000/api/items",
-        "curl localhost:3000/",
+        "curl localhost:2375/containers/json",
+        "curl 127.0.0.2:3000/",
     ] {
         assert!(!proven(command), "{command}");
     }
