@@ -14,7 +14,7 @@
 
 use serde_json::{Map, Value};
 
-use crate::attestation_timestamp::parse_attestation_timestamp;
+use crate::attestation_timestamp::{parse_attestation_timestamp, python_strip};
 
 /// `GUARD_TRUST_ATTESTATION_PAYLOAD_VERSION_V3`.
 pub const GUARD_TRUST_ATTESTATION_PAYLOAD_VERSION_V3: &str = "guard-aibom-trust-attestation.v3";
@@ -88,6 +88,33 @@ pub struct AttestationPayloadRules {
     pub require_subject_bindings: bool,
 }
 
+impl AttestationPayloadRules {
+    /// `_validate_attestation_payload(payload, require_signed_at=False)`.
+    ///
+    /// The one call Python makes while a payload is still being assembled: no
+    /// signing time yet, and the nonce and subject bindings are not demanded
+    /// until the payload is handed to a key.
+    pub const BUILDER: Self = Self {
+        require_signed_at: false,
+        require_nonce: false,
+        require_subject_bindings: false,
+    };
+
+    /// The rules both `sign_trust_attestation` and `verify_trust_attestation`
+    /// use: `require_signed_at=True, require_nonce=True,
+    /// require_subject_bindings=True`.
+    ///
+    /// A verifier has no say in these. `TrustAttestationVerificationPolicy`
+    /// carries its own `require_nonce`, which is the separate, later check
+    /// Python makes against the verifier's policy and which defaults to false
+    /// there; it does not loosen the nonce a signed payload must already name.
+    pub const SIGNED: Self = Self {
+        require_signed_at: true,
+        require_nonce: true,
+        require_subject_bindings: true,
+    };
+}
+
 /// The payload was refused, with the message Python raises.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttestationPayloadError(String);
@@ -131,7 +158,13 @@ fn is_non_negative_integer(value: &Value) -> bool {
         return false;
     };
     let text = number.to_string();
-    !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit())
+    // `json.loads` reads `-0` as the `int` `0`, which is not negative, so the
+    // sign is only a refusal when some digit under it is not a zero.
+    let digits = text.strip_prefix('-').unwrap_or(&text);
+    if !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return digits.len() == text.len() || digits.bytes().all(|byte| byte == b'0');
+    }
+    false
 }
 
 /// A readable timestamp, by the same reading `_parse_attestation_timestamp` does.
@@ -193,7 +226,7 @@ pub fn validate_attestation_payload(
         };
         let stripped = value
             .as_str()
-            .map(str::trim)
+            .map(python_strip)
             .filter(|text| !text.is_empty())
             .ok_or_else(|| {
                 AttestationPayloadError(format!(

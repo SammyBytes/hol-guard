@@ -4,6 +4,9 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use super::attestation_envelope::{public_key_fingerprint, TrustAttestationEnvelope};
+use super::attestation_payload::{
+    GUARD_TRUST_ATTESTATION_DOMAIN, GUARD_TRUST_ATTESTATION_PAYLOAD_VERSION_V3,
+};
 use super::attestation_verification::{
     trust_attestation_under_signature, TrustAttestationVerificationKey,
     TrustAttestationVerificationPolicy,
@@ -12,12 +15,33 @@ use super::evidence_hash::canonical_guard_evidence_payload;
 
 const PEM: &str = "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----";
 
+/// A payload a verifier would accept: every required field, every subject
+/// binding, a nonce and a signing time, because `trust_attestation_under_signature`
+/// validates under `AttestationPayloadRules::SIGNED` before it checks anything,
+/// exactly as `verify_trust_attestation` does.
+///
+/// The scope is `trust_resolution`, which is the one that carries no layer
+/// identity, so a test can change a single field without also having to keep
+/// `layerId` and `layerType` in step.
 fn payload() -> Map<String, Value> {
     json!({
+        "adapterId": "adapter-1",
+        "adapterVersion": "4.2.0",
+        "agentId": "agent-1",
         "capturedAt": "2026-07-16T12:00:00Z",
         "claimHash": "sha256:claim",
+        "configPathHash": "sha256:config-path",
+        "contentHash": "sha256:content",
+        "domainSeparator": GUARD_TRUST_ATTESTATION_DOMAIN,
+        "evidenceHash": "sha256:evidence",
         "expiresAt": "2026-07-16T12:05:00Z",
+        "itemId": "item-1",
+        "itemKind": "skill",
         "nonce": "nonce-1",
+        "payloadVersion": GUARD_TRUST_ATTESTATION_PAYLOAD_VERSION_V3,
+        "policyVersion": "policy-1",
+        "repositoryId": "repository-1",
+        "scope": "trust_resolution",
         "sequence": 8,
         "signedAt": "2026-07-16T12:00:00Z",
     })
@@ -41,6 +65,7 @@ fn envelope(payload: &Map<String, Value>) -> TrustAttestationEnvelope {
         fingerprint_sha256: public_key_fingerprint(PEM),
         public_jwk_thumbprint: None,
         signature: "c2lnbmF0dXJl".to_owned(),
+        signed_at: None,
     }
 }
 
@@ -259,7 +284,14 @@ fn an_attestation_signed_before_its_evidence_was_captured_is_refused() {
 
 #[test]
 fn a_signing_or_capture_time_the_verifier_cannot_read_is_refused() {
-    for field in ["signedAt", "capturedAt"] {
+    // The payload rules read both times before any of the checks here do, so
+    // an unreadable one is named rather than reported as bad ordering. Python
+    // reaches its own ordering check the same way, which is why that check
+    // only ever sees two times it could read.
+    for (field, message) in [
+        ("signedAt", "Trust attestation signedAt is invalid"),
+        ("capturedAt", "Trust attestation capturedAt is invalid"),
+    ] {
         let mut payload = payload();
         payload.insert(field.to_owned(), json!("whenever"));
         let envelope = envelope(&payload);
@@ -270,7 +302,7 @@ fn a_signing_or_capture_time_the_verifier_cannot_read_is_refused() {
                 &envelope,
                 &TrustAttestationVerificationPolicy::default()
             ),
-            "Trust attestation timestamp ordering is invalid",
+            message,
             "{field}"
         );
     }
@@ -390,17 +422,29 @@ fn a_sequence_too_wide_to_hold_still_outruns_the_one_already_seen() {
 }
 
 #[test]
-fn a_sequence_that_is_absent_or_not_a_whole_count_cannot_advance_one() {
-    for sequence in [None, Some(json!("8")), Some(json!(8.5)), Some(json!(-1))] {
+fn a_sequence_that_is_absent_cannot_advance_one() {
+    let mut payload = payload();
+    payload.remove("sequence");
+    let envelope = envelope(&payload);
+    let policy = TrustAttestationVerificationPolicy {
+        minimum_sequence: Some(0),
+        ..TrustAttestationVerificationPolicy::default()
+    };
+
+    assert_eq!(
+        refusal(&payload, &envelope, &policy),
+        "Trust attestation sequence is not monotonic"
+    );
+}
+
+#[test]
+fn a_sequence_that_is_not_a_whole_count_is_refused_by_the_payload_rules() {
+    // A text, a fraction and a negative count never reach the monotonic check:
+    // the payload rules refuse them first, so by the time a minimum is compared
+    // the sequence is a run of digits.
+    for sequence in [json!("8"), json!(8.5), json!(-1)] {
         let mut payload = payload();
-        match sequence.clone() {
-            None => {
-                payload.remove("sequence");
-            }
-            Some(value) => {
-                payload.insert("sequence".to_owned(), value);
-            }
-        }
+        payload.insert("sequence".to_owned(), sequence.clone());
         let envelope = envelope(&payload);
         let policy = TrustAttestationVerificationPolicy {
             minimum_sequence: Some(0),
@@ -409,26 +453,33 @@ fn a_sequence_that_is_absent_or_not_a_whole_count_cannot_advance_one() {
 
         assert_eq!(
             refusal(&payload, &envelope, &policy),
-            "Trust attestation sequence is not monotonic",
+            "Trust attestation sequence must be a non-negative integer",
             "{sequence:?}"
         );
     }
 }
 
 #[test]
-fn a_verifier_that_requires_a_nonce_refuses_an_attestation_without_one() {
+fn a_signed_payload_without_a_nonce_is_refused_whatever_the_verifier_asks_for() {
+    // `AttestationPayloadRules::SIGNED` already demands the nonce, so the
+    // verifier's own `require_nonce` can only ever see a payload that carries
+    // one. Python's policy flag is unreachable in the same way; both refusals
+    // are worded identically, so neither side can tell which one fired.
     let mut payload = payload();
     payload.remove("nonce");
     let envelope = envelope(&payload);
-    let policy = TrustAttestationVerificationPolicy {
-        require_nonce: true,
-        ..TrustAttestationVerificationPolicy::default()
-    };
 
-    assert_eq!(
-        refusal(&payload, &envelope, &policy),
-        "Trust attestation nonce is required"
-    );
+    for require_nonce in [false, true] {
+        let policy = TrustAttestationVerificationPolicy {
+            require_nonce,
+            ..TrustAttestationVerificationPolicy::default()
+        };
+        assert_eq!(
+            refusal(&payload, &envelope, &policy),
+            "Trust attestation nonce is required",
+            "{require_nonce}"
+        );
+    }
 }
 
 #[test]
@@ -477,5 +528,64 @@ fn a_claim_is_hashed_before_the_payload_is() {
         .expect_err("refused")
         .message(),
         "Trust claim is not locally derived or has invalid evidence"
+    );
+}
+
+#[test]
+fn the_envelope_decides_the_signing_time_the_payload_is_checked_under() {
+    // Python hashes `_payload_with_signed_at(payload, envelope["signedAt"])`,
+    // so a payload that arrives claiming some other signing time is checked —
+    // and hashed — under the envelope's. A verifier that read the payload's own
+    // copy would accept an attestation whose signature covers a different time
+    // than the one it just compared against the clock.
+    let signed = payload();
+    let mut envelope = envelope(&signed);
+    envelope.signed_at = Some("2026-07-16T12:00:00Z".to_owned());
+
+    let mut claimed = signed.clone();
+    claimed.insert("signedAt".to_owned(), json!("2026-07-16T12:04:00Z"));
+
+    let verified = trust_attestation_under_signature(
+        &claimed,
+        &envelope,
+        None,
+        None,
+        &TrustAttestationVerificationPolicy::default(),
+    )
+    .expect("the envelope's signing time is the one that counts");
+    assert_eq!(
+        verified.canonical_payload,
+        canonical_guard_evidence_payload(&signed)
+    );
+
+    // And the envelope's time is what the clock sees: the payload's later copy
+    // would have made this verification time the future.
+    let policy = TrustAttestationVerificationPolicy {
+        now: Some("2026-07-16T12:02:00Z".to_owned()),
+        ..TrustAttestationVerificationPolicy::default()
+    };
+    assert!(
+        trust_attestation_under_signature(&claimed, &envelope, None, None, &policy).is_ok(),
+        "the payload's own signedAt must not reach the clock"
+    );
+}
+
+#[test]
+fn a_payload_the_rules_refuse_never_reaches_the_hash_checks() {
+    // The validation message, not a hash mismatch: Python validates before it
+    // canonicalises, so a payload missing a required field is named for what it
+    // is even when its envelope hash could not have matched either.
+    let mut payload = payload();
+    payload.remove("agentId");
+    let mut envelope = envelope(&payload);
+    envelope.payload_hash = "00".repeat(32);
+
+    assert_eq!(
+        refusal(
+            &payload,
+            &envelope,
+            &TrustAttestationVerificationPolicy::default()
+        ),
+        "Missing trust attestation payload fields: agentId"
     );
 }

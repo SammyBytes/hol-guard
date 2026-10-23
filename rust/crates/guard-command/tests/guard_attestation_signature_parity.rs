@@ -66,3 +66,38 @@ fn recorded_signature_decisions_replay() {
         "the fixture must keep recording signatures that verify"
     );
 }
+
+/// Python signs with the longest salt the modulus allows, but
+/// `padding.PSS.MAX_LENGTH` reads as "whatever the encoding says" on the
+/// verifying side, so it accepts a PSS-SHA-256 signature made under any salt
+/// length. A verifier that only knew the longest salt would refuse the
+/// salt-equals-digest signatures other signers produce by default, so the
+/// fixture has to keep carrying them.
+#[test]
+fn the_fixture_keeps_salt_lengths_other_than_the_longest() {
+    let document: Value = serde_json::from_str(FIXTURE).expect("fixture parses");
+    let cases = document["cases"].as_array().expect("cases");
+    let outcome = |wanted: &str| -> Option<&str> {
+        cases
+            .iter()
+            .find(|case| text(case, "name") == wanted)
+            .map(|case| text(case, "expected"))
+    };
+    for name in [
+        "rsa-2048-salt-equals-digest",
+        "rsa-2048-salt-zero",
+        "rsa-2048-salt-sixteen",
+        "rsa-3072-salt-equals-digest",
+    ] {
+        assert_eq!(
+            outcome(name),
+            Some("ok"),
+            "the fixture must keep accepting {name}"
+        );
+    }
+    assert_eq!(
+        outcome("rsa-2048-salt-equals-digest-wrong-payload"),
+        Some("Trust attestation signature verification failed"),
+        "a recovered salt length must not let other bytes through"
+    );
+}

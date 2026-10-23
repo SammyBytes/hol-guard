@@ -12,8 +12,7 @@ const TRUNCATED_SPKI_PEM: &str = concat!(
 
 fn refusal(pem: &str) -> String {
     load_attestation_public_key(pem)
-        .err()
-        .expect("the key should be refused")
+        .expect_err("the key should be refused")
         .message()
         .to_owned()
 }
@@ -63,8 +62,7 @@ fn a_label_other_than_a_public_key_is_refused() {
 fn an_unsupported_algorithm_keeps_pythons_wording() {
     let key = AttestationPublicKey::EcOtherCurve;
     let error = verify_attestation_signature(&key, b"payload", b"signature", "ed25519")
-        .err()
-        .expect("an unknown algorithm is refused");
+        .expect_err("an unknown algorithm is refused");
     assert_eq!(
         error.message(),
         "Unsupported trust attestation signature algorithm"
@@ -75,13 +73,11 @@ fn an_unsupported_algorithm_keeps_pythons_wording() {
 fn a_key_that_does_not_match_the_declared_algorithm_is_refused_before_verifying() {
     let other_curve = AttestationPublicKey::EcOtherCurve;
     let error = verify_attestation_signature(&other_curve, b"payload", b"", "rsa-pss-sha256")
-        .err()
-        .expect("an EC key cannot answer for RSA");
+        .expect_err("an EC key cannot answer for RSA");
     assert_eq!(error.message(), "Trust attestation public key must be RSA");
 
     let error = verify_attestation_signature(&other_curve, b"payload", b"", "ecdsa-p256-sha256")
-        .err()
-        .expect("P-384 cannot answer for P-256");
+        .expect_err("P-384 cannot answer for P-256");
     assert_eq!(
         error.message(),
         "Trust attestation EC public key must use P-256"
@@ -96,8 +92,7 @@ fn a_malformed_ecdsa_signature_fails_verification() {
     let key = AttestationPublicKey::EcP256(point);
     let error =
         verify_attestation_signature(&key, b"payload", b"not a signature", "ecdsa-p256-sha256")
-            .err()
-            .expect("garbage cannot verify");
+            .expect_err("garbage cannot verify");
     assert_eq!(
         error.message(),
         "Trust attestation signature verification failed"

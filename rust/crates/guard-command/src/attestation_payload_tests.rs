@@ -7,11 +7,7 @@ use super::attestation_payload::{
     GUARD_TRUST_ATTESTATION_PAYLOAD_VERSION_V3,
 };
 
-const BUILDER: AttestationPayloadRules = AttestationPayloadRules {
-    require_signed_at: false,
-    require_nonce: false,
-    require_subject_bindings: false,
-};
+const BUILDER: AttestationPayloadRules = AttestationPayloadRules::BUILDER;
 
 /// A payload the gate accepts, before a case spoils one field of it.
 fn payload() -> Map<String, Value> {
@@ -190,7 +186,12 @@ fn a_sequence_has_to_be_a_whole_number_that_is_not_negative() {
             "{refused} should not pass as a sequence"
         );
     }
-    for accepted in [json!(0), json!(5)] {
+    // `json.loads` reads `-0` as the `int` `0`, and `0 < 0` is false, so the
+    // sign alone is not a refusal. Only a literal read back out of JSON keeps
+    // it: `json!(-0)` is the `i64` `0` before serde_json ever sees it.
+    let negative_zero: Value = serde_json::from_str("-0").expect("a number");
+    let huge: Value = serde_json::from_str("123456789012345678901234567890").expect("a number");
+    for accepted in [json!(0), json!(5), negative_zero, huge] {
         let mut fields = payload();
         fields.insert("sequence".to_owned(), accepted.clone());
         assert!(
@@ -198,6 +199,27 @@ fn a_sequence_has_to_be_a_whole_number_that_is_not_negative() {
             "{accepted} should pass as a sequence"
         );
     }
+}
+
+#[test]
+fn a_field_is_stripped_the_way_python_strips_it() {
+    let mut fields = payload();
+    // U+001C to U+001F are whitespace to `str.strip` and not to `str::trim`,
+    // so a field padded with one has to come out the same length on both
+    // sides: the canonical bytes the signature covers are built from it.
+    fields.insert("agentId".to_owned(), json!("\u{1c}\u{1f} agent-1 \u{1e}"));
+    let validated = validate_attestation_payload(&fields, BUILDER).expect("accepted");
+    assert_eq!(
+        validated.get("agentId").and_then(Value::as_str),
+        Some("agent-1")
+    );
+
+    let mut blank = payload();
+    blank.insert("agentId".to_owned(), json!("\u{1c}\u{1d}\u{1e}\u{1f}"));
+    assert_eq!(
+        refusal(blank, BUILDER),
+        "Trust attestation payload field agentId must be a non-empty string"
+    );
 }
 
 #[test]

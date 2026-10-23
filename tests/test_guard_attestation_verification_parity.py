@@ -77,6 +77,19 @@ def test_the_fixture_still_covers_both_outcomes() -> None:
     assert len({case["name"] for case in cases}) == len(cases)
 
 
+def test_the_fixture_keeps_an_envelope_that_overrides_the_payloads_signing_time() -> None:
+    """A verifier reads the envelope's ``signedAt``, never the payload's own.
+
+    Both runtimes hash the payload the override produced, so a fixture that
+    only ever recorded the two times agreeing would let either side read the
+    wrong one without a case noticing.
+    """
+
+    overridden = [case for case in _cases() if case["envelope"].get("signedAt") != case["payload"].get("signedAt")]
+    assert overridden, "no case records an envelope that moves the signing time"
+    assert any("replay_key" in case for case in overridden)
+
+
 @pytest.mark.parametrize("case", _cases(), ids=lambda case: case["name"])
 def test_a_recorded_attestation_is_verified_the_way_the_fixture_records(case: dict[str, Any]) -> None:
     if "replay_key" in case:

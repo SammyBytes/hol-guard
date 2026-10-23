@@ -2,24 +2,35 @@
 //!
 //! A trust claim is rejected when its `capturedAt` is not a timezone-aware
 //! instant, so the gate is only as good as the agreement between the two
-//! runtimes about which strings are instants at all. Python asks
-//! `datetime.fromisoformat` after folding a trailing `Z` into `+00:00`, and
-//! that accepts far more than RFC 3339: week dates, the basic formats without
-//! separators, an arbitrary single character where the `T` belongs, an hour on
-//! its own, `24:00:00` as the next midnight, and offsets carrying seconds.
+//! runtimes about which strings are instants at all.
 //!
-//! This module is a port of that parser rather than a stricter reading of it.
-//! A stricter one would fail closed on claims Python admits, which reads as a
-//! claim nobody made rather than as a parser disagreement. The vectors in
+//! Python used to ask `datetime.fromisoformat` alone, and that answer moves
+//! with the interpreter: 3.10 refuses the week dates and basic formats 3.11
+//! accepts, 3.10 reads a few doubled-offset spellings no later release does,
+//! and only 3.14 reads `24:00` as the next midnight. No port could agree with
+//! all of them, so both runtimes now hold one shape first,
+//! `_ATTESTATION_TIMESTAMP_SHAPE`:
+//!
+//! ```text
+//! YYYY-MM-DD(T|t| )HH:MM[:SS[.fff|.ffffff]](+|-)HH:MM[:SS]
+//! ```
+//!
+//! after a trailing `Z` becomes `+00:00`, with the hour below 24. Every
+//! timestamp Guard writes has that shape. Inside it every supported
+//! interpreter reads the same instant, and `from_isoformat` computes it.
+//!
+//! An offset carries no fraction for the same reason. The reader behind
+//! `fromisoformat` used to ask only whether the offset's whole seconds were
+//! zero, so `+00:00:00.999999` was UTC itself; newer interpreters read it as a
+//! microsecond east. Neither RFC 3339 nor ISO 8601 admits the spelling, so the
+//! shape refuses it and both runtimes call it no instant at all, rather than a
+//! different instant per interpreter.
+//!
+//! Python strips the input with `str.strip`, which also removes the four
+//! ASCII separators U+001C..U+001F that `char::is_whitespace` keeps;
+//! [`python_strip`] removes them too. The vectors in
 //! `tests/fixtures/guard-trust-claim.v1.json` are recorded from CPython and
 //! replayed on both sides.
-//!
-//! One input is refused differently on the two sides. Python shifts the parsed
-//! value to UTC with `astimezone`, which raises `OverflowError` rather than
-//! returning `None` when the shift leaves `datetime`'s own year range — a
-//! `0001-01-01T00:00:00+01:00`, say. Nothing catches that, so Python answers
-//! with an exception where this returns `None`. Both refuse to name a claim,
-//! and the fixture marks those inputs so each side can assert its own refusal.
 
 /// A `capturedAt` that parsed: microseconds from the Unix epoch, in UTC.
 pub type AttestationInstant = i64;
@@ -38,7 +49,7 @@ const MAX_ORDINAL: i64 = 3_652_059;
 /// `_parse_attestation_timestamp(value)` for a string that is already a string.
 #[must_use]
 pub fn parse_attestation_timestamp(value: &str) -> Option<AttestationInstant> {
-    let trimmed = value.trim();
+    let trimmed = python_strip(value);
     if trimmed.is_empty() {
         return None;
     }
@@ -46,6 +57,9 @@ pub fn parse_attestation_timestamp(value: &str) -> Option<AttestationInstant> {
         Some(b'Z' | b'z') => format!("{}+00:00", &trimmed[..trimmed.len() - 1]),
         _ => trimmed.to_owned(),
     };
+    if !has_attestation_shape(&normalized) {
+        return None;
+    }
     let parsed = from_isoformat(&normalized)?;
     // A naive datetime has no instant to compare, and Python rejects it.
     let offset_micros = parsed.offset_micros?;
@@ -61,6 +75,84 @@ pub fn parse_attestation_timestamp(value: &str) -> Option<AttestationInstant> {
         return None;
     }
     Some(micros)
+}
+
+/// Python's `str.strip()`: Unicode white space, plus the four ASCII
+/// separators U+001C..U+001F that `str.isspace` counts and
+/// `char::is_whitespace` does not.
+#[must_use]
+pub fn python_strip(text: &str) -> &str {
+    text.trim_matches(|c: char| c.is_whitespace() || ('\u{1c}'..='\u{1f}').contains(&c))
+}
+
+fn take_digits(bytes: &[u8], at: &mut usize, count: usize) -> bool {
+    let end = *at + count;
+    match bytes.get(*at..end) {
+        Some(run) if run.iter().all(u8::is_ascii_digit) => {
+            *at = end;
+            true
+        }
+        _ => false,
+    }
+}
+
+fn take_byte(bytes: &[u8], at: &mut usize, allowed: &[u8]) -> bool {
+    match bytes.get(*at) {
+        Some(byte) if allowed.contains(byte) => {
+            *at += 1;
+            true
+        }
+        _ => false,
+    }
+}
+
+/// `_ATTESTATION_TIMESTAMP_SHAPE.fullmatch(value)`, after the `Z` fold.
+fn has_attestation_shape(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let mut at = 0;
+    let date = take_digits(bytes, &mut at, 4)
+        && take_byte(bytes, &mut at, b"-")
+        && take_digits(bytes, &mut at, 2)
+        && take_byte(bytes, &mut at, b"-")
+        && take_digits(bytes, &mut at, 2)
+        && take_byte(bytes, &mut at, b"Tt ");
+    if !date {
+        return false;
+    }
+    let hour_at = at;
+    if !(take_digits(bytes, &mut at, 2) && &bytes[hour_at..at] <= b"23".as_slice()) {
+        return false;
+    }
+    if !(take_byte(bytes, &mut at, b":") && take_digits(bytes, &mut at, 2)) {
+        return false;
+    }
+    if take_byte(bytes, &mut at, b":") {
+        if !take_digits(bytes, &mut at, 2) {
+            return false;
+        }
+        if take_byte(bytes, &mut at, b".") {
+            let fraction = bytes[at..]
+                .iter()
+                .take_while(|byte| byte.is_ascii_digit())
+                .count();
+            if fraction != 3 && fraction != 6 {
+                return false;
+            }
+            at += fraction;
+        }
+    }
+    let offset = take_byte(bytes, &mut at, b"+-")
+        && take_digits(bytes, &mut at, 2)
+        && take_byte(bytes, &mut at, b":")
+        && take_digits(bytes, &mut at, 2);
+    if !offset {
+        return false;
+    }
+    // An offset carries no fraction: see the note on the module.
+    if take_byte(bytes, &mut at, b":") && !take_digits(bytes, &mut at, 2) {
+        return false;
+    }
+    at == bytes.len()
 }
 
 struct IsoDateTime {
@@ -257,7 +349,11 @@ fn parse_isoformat_time(tstr: &[u8]) -> Option<IsoTime> {
             return None;
         }
         let tz_comps = parse_hh_mm_ss_ff(tzstr)?;
-        if tz_comps.iter().all(|part| *part == 0) {
+        // `tzinfo_from_isoformat_results` asks only whether the whole seconds
+        // are zero and drops the fraction, which is the reading interpreters
+        // have since changed. The shape admits no fraction to drop, so this
+        // agrees with every one of them.
+        if tz_comps[..3].iter().all(|part| *part == 0) {
             offset_micros = Some(0);
         } else {
             let magnitude = i64::from(tz_comps[0]) * 3_600 * MICROS_PER_SECOND
@@ -292,11 +388,11 @@ fn parse_hh_mm_ss_ff(tstr: &[u8]) -> Option<[u32; 4]> {
     let mut comps = [0u32; 4];
     let mut pos = 0usize;
     let mut has_sep = false;
-    for comp in 0..3 {
+    for (comp, slot) in comps.iter_mut().enumerate().take(3) {
         if len.checked_sub(pos)? < 2 {
             return None;
         }
-        comps[comp] = digits(tstr, pos, 2)?;
+        *slot = digits(tstr, pos, 2)?;
         pos += 2;
         let next = tstr.get(pos).copied();
         if comp == 0 {

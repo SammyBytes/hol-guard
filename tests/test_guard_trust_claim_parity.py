@@ -15,6 +15,7 @@ to either runtime has to move both copies or fail.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -47,12 +48,6 @@ def _epoch_microseconds(moment: datetime) -> int:
 
 @pytest.mark.parametrize("case", _section("timestamps"), ids=lambda case: case["input"])
 def test_recorded_timestamps_parse_to_their_recorded_instant(case: dict[str, object]) -> None:
-    if case.get("pythonRaisesOverflow"):
-        # Shifting this to UTC leaves ``datetime``'s own range. Python raises
-        # where the Rust port returns nothing; neither names a claim.
-        with pytest.raises(OverflowError):
-            _parse_attestation_timestamp(case["input"])
-        return
     parsed = _parse_attestation_timestamp(case["input"])
     if case["epochMicroseconds"] is None:
         assert parsed is None
@@ -100,3 +95,24 @@ def test_an_absent_replay_field_hashes_as_null() -> None:
         "repositoryId": None,
     }
     assert trust_attestation_replay_key(present) == trust_attestation_replay_key(explicit)
+
+
+def test_the_fixture_keeps_the_offsets_the_interpreters_read_differently() -> None:
+    """A UTC offset carrying a fraction is no instant, on every interpreter.
+
+    The reader behind ``fromisoformat`` used to ask only whether an offset's
+    whole seconds were zero and drop the fraction, so ``+00:00:00.999999`` was
+    UTC itself; newer interpreters read it as a microsecond east. The shape
+    refuses the spelling before ``fromisoformat`` sees it, so the answer no
+    longer depends on which interpreter runs the check.
+    """
+
+    fractional = [
+        case for case in _section("timestamps") if re.search(r"[+-]\d{2}:\d{2}:\d{2}\.\d+$", str(case["input"]))
+    ]
+    assert len(fractional) >= 15, len(fractional)
+    for case in fractional:
+        assert case["epochMicroseconds"] is None, case["input"]
+    recorded = {str(case["input"]) for case in _section("timestamps")}
+    assert "2026-10-23T12:00:00-00:00:00.000001" in recorded
+    assert "2026-10-23T12:00:00+00:00:00.999999" in recorded
