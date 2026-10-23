@@ -188,6 +188,18 @@ fn split_execution_segments_inner(
             }
             '|' => {
                 let logical_or = chars.get(index + 1) == Some(&'|');
+                // `a |& b` sends a's standard error down the pipe with its
+                // standard output: the `&` belongs to the pipe, not to a job
+                // behind it. Reading it as a background `&` left `make |& tee
+                // build.log` unmodelled, while the `make 2>&1 | tee build.log`
+                // it spells modelled as the two commands it names. A trailing
+                // `|&` with nothing behind it is ksh's coprocess rather than a
+                // pipe, so the `&` is left where it is.
+                let merges_stderr = !logical_or
+                    && chars.get(index + 1) == Some(&'&')
+                    && chars[index + 2..]
+                        .iter()
+                        .any(|value| !value.is_whitespace());
                 push_segment(
                     &chars,
                     segment_start,
@@ -201,6 +213,9 @@ fn split_execution_segments_inner(
                     group_index += 1;
                     pipeline_index = 0;
                 } else {
+                    if merges_stderr {
+                        index += 1;
+                    }
                     pipeline_index += 1;
                 }
                 segment_start = index + 1;
@@ -480,6 +495,10 @@ mod ansi_c_tests;
 #[cfg(test)]
 #[path = "parser_segments_arithmetic_tests.rs"]
 mod arithmetic_tests;
+
+#[cfg(test)]
+#[path = "parser_segments_pipe_tests.rs"]
+mod pipe_tests;
 
 #[cfg(test)]
 #[path = "parser_segments_windows_escape_tests.rs"]
