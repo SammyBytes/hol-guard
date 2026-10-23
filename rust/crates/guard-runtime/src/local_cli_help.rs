@@ -101,7 +101,9 @@ fn is_skipped(name: &str) -> bool {
 
 /// `str.split()` with no separator: fields between runs of whitespace.
 fn py_split(text: &str) -> Vec<&str> {
-    text.split(py_isspace).filter(|part| !part.is_empty()).collect()
+    text.split(py_isspace)
+        .filter(|part| !part.is_empty())
+        .collect()
 }
 
 /// `str.split(maxsplit=n)` with no separator. The last field keeps whatever
@@ -156,10 +158,7 @@ pub(crate) fn parse_cli_help_text(
             }
             continue;
         }
-        if !invocation.is_empty()
-            && raw_line == stripped
-            && YARGS_GROUP_HEADER.is_match(stripped)
-        {
+        if !invocation.is_empty() && raw_line == stripped && YARGS_GROUP_HEADER.is_match(stripped) {
             in_section = !NON_COMMAND_GROUP.is_match(stripped);
             prefixed_only = true;
             continue;
@@ -324,7 +323,10 @@ mod tests {
 
     #[test]
     fn a_choice_set_is_read_even_without_a_section() {
-        assert_eq!(names("usage: tool {add,remove} ...\n"), vec!["add", "remove"]);
+        assert_eq!(
+            names("usage: tool {add,remove} ...\n"),
+            vec!["add", "remove"]
+        );
     }
 
     #[test]

@@ -260,5 +260,3 @@ def _safe_probe_path(path_text: str) -> bool:
         return False
     parts = [part.lower() for part in resolved.parts]
     return not (len(parts) > 1 and parts[0] == "/" and parts[1] in {"proc", "dev", "sys"})
-
-
