@@ -30,7 +30,8 @@ def _install(monkeypatch: pytest.MonkeyPatch, mutate) -> list[tuple[str, object]
         result: dict[str, Any] = {
             "schema": response_schema,
             "request_id": request["request_id"],
-            "request_sha256": _canonical_request_sha256(request),
+            # The resident answers with the prefixed token.
+            "request_sha256": "sha256:" + _canonical_request_sha256(request),
             "status": "ok",
             "code": "ok",
             "answers": [dict(_ANSWERS[task["kind"]]) for task in request["tasks"]],
@@ -102,7 +103,12 @@ def test_more_tasks_than_the_bound_allows_never_reach_the_resident(monkeypatch, 
 @pytest.mark.parametrize(
     "mutate",
     [
-        pytest.param(lambda result: result.update(request_sha256="0" * 64), id="foreign-digest"),
+        pytest.param(lambda result: result.update(request_sha256="sha256:" + "0" * 64), id="foreign-digest"),
+        pytest.param(
+            # The bare hex of the right request is still the wrong token.
+            lambda result: result.update(request_sha256=result["request_sha256"].removeprefix("sha256:")),
+            id="unprefixed-digest",
+        ),
         pytest.param(lambda result: result.update(request_id="other"), id="foreign-request-id"),
         pytest.param(lambda result: result.update(code="other"), id="not-ok-code"),
         pytest.param(lambda result: result.update(status="error"), id="not-ok-status"),

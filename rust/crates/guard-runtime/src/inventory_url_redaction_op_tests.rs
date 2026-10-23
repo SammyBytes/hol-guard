@@ -158,10 +158,9 @@ fn the_reply_binds_the_digest_of_the_request_it_answered() {
     assert_eq!(decoded["status"], json!("ok"));
     assert_eq!(decoded["code"], json!("ok"));
     assert_ne!(decoded["request_sha256"], reply(&other)["request_sha256"]);
-    assert_eq!(
-        decoded["request_sha256"].as_str().map(str::len),
-        Some(64usize)
-    );
+    let digest = decoded["request_sha256"].as_str().unwrap_or_default();
+    assert!(digest.starts_with("sha256:"), "{digest}");
+    assert_eq!(digest.len(), "sha256:".len() + 64);
 }
 
 #[test]

@@ -124,7 +124,8 @@ def _answers(
         home = _resolve_digest_home(guard_home)
         if not ensure_resident_prerequisite(home):
             raise NativeInventoryUrlRedactionError("native_inventory_url_redaction_unavailable")
-        request_sha256 = _canonical_request_sha256(wire)
+        # The resident answers with the prefixed token, so bind against the same form.
+        request_sha256 = "sha256:" + _canonical_request_sha256(wire)
         # Resolved once: the transport and the health record below must name
         # the same binary, and the lookup walks the runtime on disk.
         status = native_runtime_status()
