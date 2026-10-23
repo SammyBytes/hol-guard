@@ -154,7 +154,10 @@ def test_any_other_spelling_keeps_the_strict_request_binding(command: str) -> No
     assert _canonical_command_from_native(command, _script_model("gh pr view 12")) is None
 
 
-def _simple_model(command: str, executable: str | None, environment_names: list[str]) -> dict:
+def _simple_model(
+    command: str, executable: str | None, environment_names: list[str], wrappers: list[str] | None = None
+) -> dict:
+    wrappers = wrappers or []
     tokens = command.split()
     arguments = tokens[tokens.index(executable) + 1 :] if executable in tokens else []
     path_overridden = "PATH" in environment_names
@@ -163,7 +166,7 @@ def _simple_model(command: str, executable: str | None, environment_names: list[
         "dialect": "posix",
         "transport": "shell_string",
         "extraction_provenance": "guard-shell",
-        "wrapper_chain": [],
+        "wrapper_chain": wrappers,
         "segments": [
             {
                 "text": command,
@@ -171,7 +174,7 @@ def _simple_model(command: str, executable: str | None, environment_names: list[
                 "executable": executable,
                 "arguments": arguments,
                 "environment_names": environment_names,
-                "wrapper_chain": [],
+                "wrapper_chain": wrappers,
                 "path_overridden": path_overridden,
                 "execution_context": "top:0",
                 "pipeline_index": 0,
@@ -181,7 +184,7 @@ def _simple_model(command: str, executable: str | None, environment_names: list[
         "confidence": "exact",
         "uncertainty_reason": None,
         "path_overridden": path_overridden,
-        "parser_profile": "posix-simple-v1",
+        "parser_profile": "posix-bounded-wrappers-v2" if wrappers else "posix-simple-v1",
     }
 
 
@@ -218,3 +221,44 @@ def test_an_env_spelling_the_parser_does_not_step_past_is_not_rebound(
     command: str, executable: str, names: list[str]
 ) -> None:
     assert _canonical_command_from_native(command, _simple_model(command, executable, names)) is None
+
+
+@pytest.mark.parametrize(
+    ("command", "executable", "names", "wrappers"),
+    [
+        ("env FOO=1 sudo ls", "ls", ["FOO"], ["sudo"]),
+        ("sudo env FOO=1 ls", "ls", ["FOO"], ["sudo"]),
+        ("sudo command ls", "ls", [], ["sudo"]),
+        ("command sudo -n ls", "ls", [], ["sudo"]),
+        ("time env FOO=1 npm test", "npm", ["FOO"], []),
+        ("command ls -la", "ls", [], []),
+        ("time cargo build", "cargo", [], []),
+    ],
+)
+def test_prefixes_bind_in_the_order_the_text_writes_them(
+    command: str, executable: str, names: list[str], wrappers: list[str]
+) -> None:
+    canonical = _canonical_command_from_native(command, _simple_model(command, executable, names, wrappers))
+    assert canonical is not None
+    assert canonical.segments[0].executable == executable
+    assert canonical.segments[0].environment_names == tuple(names)
+    assert canonical.wrapper_chain == tuple(wrappers)
+
+
+@pytest.mark.parametrize(
+    ("command", "executable", "wrappers"),
+    [
+        # An option keeps `command` and `time` as the executable.
+        ("command -v ls", "ls", []),
+        ("time -p ls", "ls", []),
+        # A prefix with no program behind it is the prefix itself.
+        ("command", None, []),
+        # A wrapper the text writes must be in the chain the parser reports.
+        ("env FOO=1 sudo ls", "ls", []),
+    ],
+)
+def test_a_prefix_the_parser_does_not_step_past_is_not_rebound(
+    command: str, executable: str | None, wrappers: list[str]
+) -> None:
+    names = ["FOO"] if "FOO=1" in command else []
+    assert _canonical_command_from_native(command, _simple_model(command, executable, names, wrappers)) is None
