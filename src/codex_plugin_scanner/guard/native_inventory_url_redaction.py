@@ -232,7 +232,10 @@ def _answers(
             record_success=False,
             status=status,
         )
-    except (OSError, TypeError, ValueError) as error:
+    except NativeInventoryUrlRedactionError:
+        raise
+    except (OSError, TypeError, ValueError, RuntimeError) as error:
+        # A home that cannot be resolved raises a plain RuntimeError.
         raise NativeInventoryUrlRedactionError("native_inventory_url_redaction_unavailable") from error
     if decoded is None:
         raise NativeInventoryUrlRedactionError("native_inventory_url_redaction_unavailable")
