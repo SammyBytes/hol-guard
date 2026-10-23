@@ -375,6 +375,20 @@ contract names the symbols so they cannot return, and
 `scripts/ci/inventory_item_metadata_reference.py` keeps the retired CPython only
 to regenerate the parity corpus the port is pinned to.
 
+Choosing what an inventory pass is allowed to open is the resident's as well
+(`inventory-scan-targets-v1`, in `inventory_scan_targets_op.rs`). One call per
+pass carries the detected artifacts along with the harness, the working
+directory, the home directory and the workspace, and answers with the MCP
+configurations worth scanning, the root each one is scanned under, the label a
+finding reports it as, and the skill collections to walk. Resolving a `~`-rooted
+or relative configuration path, deciding which directory a server's declared
+roots make the scan root, collapsing a tree of skill directories to the
+collection that contains them, and ordering the answer are all settled there, so
+a path that leaves the home or workspace it was named against never becomes a
+target. Python no longer picks targets at all: when the resident cannot answer,
+the pass reports each enabled scanner as unavailable rather than reporting a
+clean scan of configurations nothing opened.
+
 ## Harness route inventory
 
 The v2 contract maps all harnesses in `HARNESS_CONTRACTS`, including harnesses
