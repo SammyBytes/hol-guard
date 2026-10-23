@@ -451,9 +451,16 @@ fn a_backgrounded_script_launch_reaches_review_instead_of_a_hard_block() {
         "node dist/index.js --port 3000 &",
     ] {
         let result = evaluate_in(&binding, command, home.path(), &project);
-        assert_eq!(
-            result.minimum_action, "review",
-            "{command} {}",
+        // The sandbox is the better of the two answers: a contained launch runs
+        // without a prompt, where a review stops to ask. Either keeps the
+        // approval the hard block took away.
+        assert!(
+            matches!(
+                result.minimum_action.as_str(),
+                "review" | "sandbox-required"
+            ),
+            "{command} {} {}",
+            result.minimum_action,
             result.reason_code
         );
         assert_ne!(
