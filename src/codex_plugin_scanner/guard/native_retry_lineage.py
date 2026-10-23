@@ -9,14 +9,13 @@ the digests are; this module only moves the inputs and reads the record back.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from . import native_execution
-from .native_context import _resolve_digest_home, ensure_resident_prerequisite
+from .native_context import _canonical_request_sha256, _resolve_digest_home, ensure_resident_prerequisite
 from .native_runtime import native_runtime_status
 from .native_runtime_resilience import native_record_resident_failure, native_record_resident_success
 
@@ -69,17 +68,15 @@ def capture_retry_lineage(
         # with surrogateescape) survives the ASCII-escaped transport but not
         # the resident's decoder; refuse it here instead of as a resident failure.
         json.dumps(wire, ensure_ascii=False).encode("utf-8")
-        # The same canonical bytes the resident digests and bounds.
-        canonical = json.dumps(wire, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode(
-            "utf-8"
-        )
+        # The same canonical bytes the resident bounds.
+        canonical = json.dumps(wire, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
         if len(canonical) > _MAX_REQUEST_BYTES:
             return None
         home = _resolve_digest_home(guard_home)
         if not ensure_resident_prerequisite(home):
             return None
         # The resident answers with the prefixed token, so bind against the same form.
-        request_sha256 = "sha256:" + hashlib.sha256(canonical).hexdigest()
+        request_sha256 = "sha256:" + _canonical_request_sha256(wire)
         # Resolved once: the transport and the health record below must name
         # the same binary, and the lookup walks the runtime on disk.
         status = native_runtime_status()
