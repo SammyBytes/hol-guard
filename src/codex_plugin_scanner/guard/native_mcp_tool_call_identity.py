@@ -26,7 +26,10 @@ _RESULT_SCHEMA = "guard-mcp-tool-call-identity-result.v1"
 _OPERATION = "mcp_tool_call_identity"
 _UNAVAILABLE = "native_mcp_tool_approval_hash_unavailable"
 _PROVIDER_HASH_CODE = "native_mcp_tool_call_identity_provider_hash_invalid"
-_MAX_REQUEST_BYTES = 8 * 1024 * 1024
+# Mirrors ``MCP_TOOL_CALL_IDENTITY_MAX_BYTES``, which is itself held under the
+# transport's own frame limit so an oversized request is refused for its size
+# rather than as a malformed frame.
+_MAX_REQUEST_BYTES = 4 * 1024 * 1024
 _TIMEOUT_SECONDS = 5.0
 _TOKEN_PREFIX = "guard-approval-context:v1:"
 _ARTIFACT_KEYS = frozenset(

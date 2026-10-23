@@ -44,7 +44,10 @@ EXTENSION_CONTROL_AUTHORITY_FEATURE = "extension-control-authority-v1"
 _REQUEST_SCHEMA = "guard-extension-control-authority-request.v1"
 _RESULT_SCHEMA = "guard-extension-control-authority-result.v1"
 _TIMEOUT_SECONDS = 10.0
-_MAX_REQUEST_BYTES = 16 * 1024 * 1024
+# Mirrors ``EXTENSION_CONTROL_AUTHORITY_MAX_BYTES``, which is itself held under the
+# transport's own frame limit so an oversized request is refused for its size
+# rather than as a malformed frame.
+_MAX_REQUEST_BYTES = 6 * 1024 * 1024 - 64 * 1024
 _FLAGS = ("migration", "allow_migration", "restore_attempted", "resume_attempted", "rollback_attempted")
 
 
