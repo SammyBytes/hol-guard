@@ -266,6 +266,19 @@ Python fallback redaction. The retired bodies live on only as
 parity corpus the port is pinned against — asking the runtime for that corpus
 would pin it against itself.
 
+The same op now also redacts an exported command string and an exported path.
+`redact_command_value` and `redact_known_path` in
+`guard_command::inventory_path_redaction` already carried both, pinned by
+`inventory_path_parity.json`: the four substitutions that take a command's
+URLs, absolute paths, bearer header, `key=value` secrets and `--flag value`
+secrets out of an export, and the home-then-workspace-then-file-name labelling
+a path gets. A task carries the home, workspace and working directories its
+answer depends on, because the resident resolves a relative path against its
+own process directory and not the caller's. One consequence worth stating: a
+command string is now one task rather than one task per URL inside it, so the
+export's prefetch walk no longer pulls URLs out of commands — the pass caches
+the whole command instead.
+
 The contributed MCP grammar now settles in the resident. A configured
 `direct-command` launcher is reduced to its portable executable basename there,
 and a `remote-http` endpoint is normalized, bounded and checked against the
@@ -306,6 +319,21 @@ snapshot drift states — and returns the three summaries the reply carries. A
 report whose rows exceed the request budget, or a resident that cannot answer,
 fails the summary closed; there is no Python recount.
 
+An inventory snapshot's content identity is computed in the resident
+(`inventory-snapshot-digest-v1`, in `inventory_snapshot_digest_op.rs`, over
+`inventory_fingerprints::inventory_snapshot_content_hash`). That identity is
+what decides whether an inventory changed, and reaching it is a grammar rather
+than a hash: observation stamps such as `observedAt` and `scanDurationMs` are
+dropped, nested lists are ordered, items, findings and sources are each sorted
+by their own key, and the result is serialized exactly one way before it is
+digested. Python sends only the fields the grammar reads, with an absent
+description travelling as an explicit null so it stays distinct from an empty
+one. The snapshot travels whole: a digest over part of an inventory is not a
+digest of it, so one too large for the request bound fails rather than being
+hashed in Python. A resident that cannot answer leaves the snapshot without an
+identity. The per-item content hashes that feed it are still assembled in
+Python; only the snapshot's own identity moved.
+
 Reading a stored or replayed package evaluation back into the view a harness
 shows is decided in the resident (`package-evaluation-view-v1`, in
 `package_evaluation_view_op.rs`, over the grammar in
@@ -341,6 +369,26 @@ frozensets other modules import for their own vocabulary, but the two decisions
 are gone from this side and the retirement ledger names the locals they used so
 a second reading cannot grow back. The home directory is resolved here and sent
 as text, so the answer never depends on the resident's own environment.
+
+Classifying one inventory artifact is the resident's too
+(`inventory-item-classification-v1`, in `inventory_item_classification_op.rs`
+over `guard-command/src/inventory_item_metadata.rs`). One call carries the whole
+artifact set and answers, per entry, the item kind its type maps onto, the
+content hash it settles on, the capability set and risk level its metadata
+earns, and the edits that bind a skill's document evidence or drop a directory
+hash nothing proved. The answer is edits — the keys to remove and the pairs to
+write — rather than a rebuilt map, so the caller keeps its own insertion order
+and an exported snapshot does not churn. The kind rides back from
+`inventory-source-evidence-v2`, the first question asked about an artifact,
+because the caller needs it to enrich metadata before it can ask anything else.
+The version marks the entry shape: a v2 client sends no kind of its own, and a
+v1 resident refuses an entry that leaves the field out, so the client asks for
+v2 and treats a resident that only advertises v1 as unavailable. The runtime
+keeps advertising v1 as well, because a client built before the change still
+sends its own kind and the resident ignores it. Python computed all of this; the copies are gone, the ownership
+contract names the symbols so they cannot return, and
+`scripts/ci/inventory_item_metadata_reference.py` keeps the retired CPython only
+to regenerate the parity corpus the port is pinned to.
 
 ## Harness route inventory
 
