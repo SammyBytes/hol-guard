@@ -247,6 +247,38 @@ fn a_trailing_help_flag_keeps_the_command_local() {
     }
 }
 
+/// The trailing `--help` is only gh's own help when gh is the one reading it.
+/// After `--` the flag is a positional, and aliases, installed extensions and
+/// `gh extension exec` are registered with flag parsing disabled, so gh hands
+/// the flag to the command it runs.
+#[test]
+fn a_help_gh_itself_does_not_print_still_classifies_the_command() {
+    use crate::github_capability_contract::GitHubCommandCapability as C;
+    for command in [
+        // Uploads a file named `--help` and publishes the release.
+        "release create v1.0.0 -- notes.txt --help",
+        // An alias set with `--shell` runs its shell command.
+        "nuke --help",
+        // An installed extension runs its binary.
+        "my-ext purge --help",
+        "extension exec my-ext delete target --help",
+    ] {
+        let argv: Vec<String> = command.split(' ').map(String::from).collect();
+        let got = classify_github_cli(&argv);
+        assert_ne!(got.capability, C::ReadLocal, "{command}");
+        assert_ne!(got.reason_code, "github.command.local-help", "{command}");
+    }
+    // An unrecognised top-level name keeps the unknown-command floor.
+    for command in ["nuke --help", "my-ext purge --help"] {
+        let argv: Vec<String> = command.split(' ').map(String::from).collect();
+        assert_eq!(
+            classify_github_cli(&argv).capability,
+            C::Unknown,
+            "{command}"
+        );
+    }
+}
+
 /// The two readings a trailing `--help` does not have: an option's value, and
 /// the `--hostname` that `gh` reads `-h` as past the first token.
 #[test]

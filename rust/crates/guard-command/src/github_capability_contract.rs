@@ -495,7 +495,8 @@ pub fn github_assessment(
 /// help when the token before it is a plain word: after a written option the
 /// `--help` is that option's value, and `gh issue create --title --help` opens
 /// an issue. `-h` carries no such reading past the first token, where the CLI
-/// reads it as `--hostname`.
+/// reads it as `--hostname`. It is also only help when gh is the one reading
+/// the flag: see `trailing_help_prints_gh_help`.
 pub fn github_cli_invocation_is_help(normalized: &[String]) -> bool {
     if matches!(
         normalized.first().map(String::as_str),
@@ -506,9 +507,72 @@ pub fn github_cli_invocation_is_help(normalized: &[String]) -> bool {
     match normalized.split_last() {
         Some((last, before)) if last == "--help" => {
             before.last().is_some_and(|token| !token.starts_with('-'))
+                && trailing_help_prints_gh_help(before)
         }
         _ => false,
     }
+}
+
+/// The top-level commands the GitHub CLI itself owns.
+///
+/// gh registers aliases, installed extensions and `gh extension exec` with
+/// flag parsing disabled, and forwards every argument — `--help` included — to
+/// the alias's shell command or to the extension binary, which runs instead of
+/// printing help. A name gh does not own is one of those, so the trailing
+/// `--help` reading is only safe for the names listed here. A built-in missing
+/// from the list reads as it did before the trailing-help reading existed.
+const GITHUB_BUILTIN_TOP_LEVEL: &[&str] = &[
+    "accessibility",
+    "alias",
+    "api",
+    "attestation",
+    "auth",
+    "browse",
+    "cache",
+    "codespace",
+    "completion",
+    "config",
+    "extension",
+    "gist",
+    "gpg-key",
+    "help",
+    "issue",
+    "label",
+    "org",
+    "pr",
+    "project",
+    "release",
+    "repo",
+    "ruleset",
+    "run",
+    "search",
+    "secret",
+    "ssh-key",
+    "status",
+    "variable",
+    "version",
+    "workflow",
+];
+
+/// Whether a trailing `--help` is read by gh rather than by something gh runs.
+fn trailing_help_prints_gh_help(before: &[String]) -> bool {
+    // After `--`, gh stops parsing flags, so `gh release create v1 -- notes.md
+    // --help` uploads a file named `--help` and publishes the release.
+    if before.iter().any(|token| token == "--") {
+        return false;
+    }
+    let Some(top) = before.first().map(|token| token.to_ascii_lowercase()) else {
+        return false;
+    };
+    if !GITHUB_BUILTIN_TOP_LEVEL.contains(&top.as_str()) {
+        return false;
+    }
+    // `gh extension exec <name> …` forwards everything after the name to the
+    // extension binary.
+    !(top == "extension"
+        && before
+            .get(1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("exec")))
 }
 
 /// `combine_github_assessments` (:387).

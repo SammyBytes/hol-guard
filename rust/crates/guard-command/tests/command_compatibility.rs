@@ -160,6 +160,20 @@ fn a_help_that_is_an_options_value_still_runs_the_subcommand() {
             "command.github.delete",
         ),
         ("gh repo --help extra", "command.github.unknown"),
+        // After `--` the flag is a positional: this uploads a file named
+        // `--help` and publishes the release.
+        (
+            "gh release create v1.0.0 -- notes.txt --help",
+            "command.github.publish",
+        ),
+        // An alias or an installed extension runs with flag parsing disabled,
+        // so gh forwards `--help` to what it runs.
+        ("gh nuke --help", "command.github.unknown"),
+        ("gh my-ext purge --help", "command.github.unknown"),
+        (
+            "gh extension exec my-ext delete target --help",
+            "command.github.unknown",
+        ),
     ] {
         let observed = compatibility_observations(&model(command), None).unwrap();
         assert_eq!(observed.rule_matches.len(), 1, "{command}");
