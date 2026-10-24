@@ -884,6 +884,16 @@
       },
       {
         "home": "C:\\Users\\u",
+        "value": "~\\é:x",
+        "expected": "é:x"
+      },
+      {
+        "home": "C:\\Users\\u",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
+      },
+      {
+        "home": "C:\\Users\\u",
         "value": "~\\c:y",
         "expected": "c:\\Users\\u\\y"
       },
@@ -986,6 +996,16 @@
         "home": "C:/Users/u",
         "value": "~\\C:y",
         "expected": "C:\\Users\\u\\y"
+      },
+      {
+        "home": "C:/Users/u",
+        "value": "~\\é:x",
+        "expected": "é:x"
+      },
+      {
+        "home": "C:/Users/u",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
       },
       {
         "home": "C:/Users/u",
@@ -1094,6 +1114,16 @@
       },
       {
         "home": "\\\\srv\\sh",
+        "value": "~\\é:x",
+        "expected": "é:x"
+      },
+      {
+        "home": "\\\\srv\\sh",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
+      },
+      {
+        "home": "\\\\srv\\sh",
         "value": "~\\c:y",
         "expected": "c:y"
       },
@@ -1196,6 +1226,16 @@
         "home": "C:",
         "value": "~\\C:y",
         "expected": "C:y"
+      },
+      {
+        "home": "C:",
+        "value": "~\\é:x",
+        "expected": "é:x"
+      },
+      {
+        "home": "C:",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
       },
       {
         "home": "C:",
@@ -1304,6 +1344,16 @@
       },
       {
         "home": "C:\\",
+        "value": "~\\é:x",
+        "expected": "é:x"
+      },
+      {
+        "home": "C:\\",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
+      },
+      {
+        "home": "C:\\",
         "value": "~\\c:y",
         "expected": "c:\\y"
       },
@@ -1358,6 +1408,121 @@
         "expected": ""
       },
       {
+        "home": "é:\\home",
+        "value": "~",
+        "expected": "é:\\home"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\",
+        "expected": "é:\\home"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\.",
+        "expected": "é:\\home"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\..",
+        "expected": "é:\\home\\.."
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\x",
+        "expected": "é:\\home\\x"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\a\\",
+        "expected": "é:\\home\\a"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\a\\\\b",
+        "expected": "é:\\home\\a\\b"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~/x",
+        "expected": "é:\\home\\x"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~/a/b",
+        "expected": "é:\\home\\a\\b"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\C:y",
+        "expected": "C:y"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\é:x",
+        "expected": "é:\\home\\x"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\c:y",
+        "expected": "c:y"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\D:y",
+        "expected": "D:y"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\C:\\z",
+        "expected": "C:\\z"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\D:\\q",
+        "expected": "D:\\q"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\\\x",
+        "expected": "é:\\x"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\\\\\srv\\sh\\f",
+        "expected": "\\\\srv\\sh\\f"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~\\é\\ü",
+        "expected": "é:\\home\\é\\ü"
+      },
+      {
+        "home": "é:\\home",
+        "value": "plain",
+        "expected": "plain"
+      },
+      {
+        "home": "é:\\home",
+        "value": "~user",
+        "expected": "~user"
+      },
+      {
+        "home": "é:\\home",
+        "value": "C:\\abs",
+        "expected": "C:\\abs"
+      },
+      {
+        "home": "é:\\home",
+        "value": "",
+        "expected": ""
+      },
+      {
         "home": "",
         "value": "~",
         "expected": "."
@@ -1406,6 +1571,16 @@
         "home": "",
         "value": "~\\C:y",
         "expected": "C:y"
+      },
+      {
+        "home": "",
+        "value": "~\\é:x",
+        "expected": "é:x"
+      },
+      {
+        "home": "",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
       },
       {
         "home": "",
@@ -1511,6 +1686,16 @@
         "home": ".",
         "value": "~\\C:y",
         "expected": "C:y"
+      },
+      {
+        "home": ".",
+        "value": "~\\é:x",
+        "expected": "é:x"
+      },
+      {
+        "home": ".",
+        "value": "~\\é:\\x",
+        "expected": "é:\\x"
       },
       {
         "home": ".",

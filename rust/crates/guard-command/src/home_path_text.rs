@@ -217,10 +217,13 @@ pub(crate) fn normpath_nt(path: &str) -> String {
 pub(crate) fn split_root_nt(text: &str) -> (&str, &str, &str) {
     let bytes = text.as_bytes();
     if bytes.first() != Some(&b'\\') {
-        if bytes.get(1) == Some(&b':') {
-            // The drive is the first two characters; they may not be ASCII.
-            let split = text.char_indices().nth(2).map_or(text.len(), |(i, _)| i);
-            let (drive, rest) = text.split_at(split);
+        // `splitroot` reads the drive as the first two characters, and neither
+        // has to be ASCII, so the colon is looked for at the second character
+        // rather than the second byte. In `é:\home` the second byte is the
+        // trailing half of `é`, so a byte index misses the drive entirely and
+        // the text behind a `~` joins as a plain component.
+        if let Some((index, ':')) = text.char_indices().nth(1) {
+            let (drive, rest) = text.split_at(index + 1);
             return match rest.strip_prefix('\\') {
                 Some(tail) => (drive, "\\", tail),
                 None => (drive, "", rest),
@@ -314,17 +317,25 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    /// The expansion runs through the host's own pure path, so on Windows a
+    /// home spelled with forward slashes comes back spelled with backslashes.
+    /// `PathBuf::from` keeps the text it is handed and `join` only adds the
+    /// platform's separator, so neither rebuilds that answer: the home and the
+    /// separator are spelled out per platform instead.
+    #[cfg(unix)]
+    const HOME: &str = "/home/u";
+    #[cfg(unix)]
+    const SEP: &str = "/";
+    #[cfg(windows)]
+    const HOME: &str = "\\home\\u";
+    #[cfg(windows)]
+    const SEP: &str = "\\";
+
     #[test]
     fn expand_home_tilde() {
-        let home = PathBuf::from("/home/u");
-        assert_eq!(
-            expand_home("~", Some(&home)),
-            home.to_string_lossy().into_owned()
-        );
-        assert_eq!(
-            expand_home("~/x", Some(&home)),
-            home.join("x").to_string_lossy().into_owned()
-        );
+        let home = PathBuf::from(HOME);
+        assert_eq!(expand_home("~", Some(&home)), HOME);
+        assert_eq!(expand_home("~/x", Some(&home)), format!("{HOME}{SEP}x"));
         assert_eq!(expand_home("plain", Some(&home)), "plain");
     }
 
@@ -355,19 +366,13 @@ mod tests {
 
     #[test]
     fn matches_python_oracle() {
-        let home = PathBuf::from("/home/u");
-        assert_eq!(
-            expand_home("~", Some(&home)),
-            home.to_string_lossy().into_owned()
-        );
+        let home = PathBuf::from(HOME);
+        assert_eq!(expand_home("~", Some(&home)), HOME);
         assert_eq!(
             expand_home("~/a/b", Some(&home)),
-            home.join("a").join("b").to_string_lossy().into_owned()
+            format!("{HOME}{SEP}a{SEP}b")
         );
-        assert_eq!(
-            expand_home("~\\w", Some(&home)),
-            home.join("w").to_string_lossy().into_owned()
-        );
+        assert_eq!(expand_home("~\\w", Some(&home)), format!("{HOME}{SEP}w"));
         assert_eq!(expand_home("plain", Some(&home)), "plain");
         assert_eq!(expand_home("/abs", Some(&home)), "/abs");
 

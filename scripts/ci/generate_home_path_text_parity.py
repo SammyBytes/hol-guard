@@ -73,7 +73,9 @@ POSIX_VALUES = (
     "~~",
 )
 
-WINDOWS_HOMES = ("C:\\Users\\u", "C:/Users/u", "\\\\srv\\sh", "C:", "C:\\", "", ".")
+# `splitroot` reads the drive as the first two characters, whatever they
+# are, so a drive letter outside ASCII is a drive like any other.
+WINDOWS_HOMES = ("C:\\Users\\u", "C:/Users/u", "\\\\srv\\sh", "C:", "C:\\", "é:\\home", "", ".")
 WINDOWS_VALUES = (
     "~",
     "~\\",
@@ -85,6 +87,8 @@ WINDOWS_VALUES = (
     "~/x",
     "~/a/b",
     "~\\C:y",
+    "~\\é:x",
+    "~\\é:\\x",
     "~\\c:y",
     "~\\D:y",
     "~\\C:\\z",
