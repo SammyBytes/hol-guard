@@ -91,3 +91,36 @@ for (const [name, root, reason] of [
     }
   });
 }
+
+// Hardening Forge for a validate or publish run writes no VEX statement, so a
+// zod assessment that has gone stale must not fail those runs.
+test("harden Forge without the zod assessment when no VEX is written", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "mcpb-forge-only-"));
+  try {
+    const modules = path.join(root, "node_modules");
+    fs.cpSync(path.join(__dirname, "node_modules", "node-forge"), path.join(modules, "node-forge"), {
+      recursive: true,
+    });
+    // A zod the assessment no longer describes.
+    const zod = path.join(modules, "zod");
+    fs.mkdirSync(zod, { recursive: true });
+    fs.writeFileSync(path.join(zod, "package.json"), JSON.stringify({ version: "4.6.6", main: "index.js" }));
+    fs.writeFileSync(path.join(zod, "index.js"), "exports.string = () => ({});\nexports.array = () => ({});\n");
+    for (const name of ["harden-forge.cjs", "verify-forge.cjs"]) {
+      fs.copyFileSync(path.join(__dirname, name), path.join(root, name));
+    }
+    const script = path.join(root, "harden-forge.cjs");
+
+    const hardened = spawnSync(process.execPath, [script], { encoding: "utf8" });
+    assert.equal(hardened.status, 0, hardened.stderr);
+    assert(hardened.stdout.includes("Verified MCPB Forge backport SHA-256: "));
+
+    const vex = path.join(root, "proof.json");
+    const attested = spawnSync(process.execPath, [script, "--vex-output", vex], { encoding: "utf8" });
+    assert.notEqual(attested.status, 0);
+    assert(attested.stderr.includes("Review the zod assessment when the locked version changes."));
+    assert.equal(fs.existsSync(vex), false);
+  } finally {
+    fs.rmSync(root, { recursive: true });
+  }
+});

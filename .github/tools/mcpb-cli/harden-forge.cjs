@@ -70,8 +70,10 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   assert(args.length === 0 || (args.length === 2 && args[0] === "--vex-output"), "Invalid hardening arguments.");
   const patchedSha256 = hardenForge();
-  const verifiedZodVersion = verifyClassicZodEntry();
   if (args.length) {
+    // Only the VEX writer depends on the zod assessment. Hardening Forge for a
+    // validate or publish run must not fail on an attestation it never writes.
+    const verifiedZodVersion = verifyClassicZodEntry();
     const vex = {
       "@context": "https://openvex.dev/ns/v0.2.0",
       "@id": "https://github.com/hashgraph-online/hol-guard/blob/main/.github/tools/mcpb-cli/harden-forge.cjs",
