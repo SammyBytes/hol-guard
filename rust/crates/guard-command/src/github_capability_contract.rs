@@ -527,7 +527,9 @@ pub fn github_cli_invocation_is_help(normalized: &[String]) -> bool {
 /// as its argument. gh refuses to register a name it already owns, so listing
 /// a group's own subcommands is what keeps a nested alias out. A group whose
 /// list is empty owns no subcommands, and gh refuses an alias beneath it too,
-/// so a word there is an argument to the command itself.
+/// so a word there is an argument to the command itself. A few of these
+/// subcommands are groups in their own right, and those are listed in
+/// `GITHUB_BUILTIN_NESTED_GROUPS` so an alias cannot hide one level deeper.
 const GITHUB_BUILTIN_COMMANDS: &[(&str, &[&str])] = &[
     ("accessibility", &[]),
     ("alias", &["delete", "import", "list", "set"]),
@@ -680,6 +682,26 @@ const GITHUB_BUILTIN_COMMANDS: &[(&str, &[&str])] = &[
     ("workflow", &["disable", "enable", "list", "run", "view"]),
 ];
 
+/// The built-in subcommands that own subcommands themselves.
+///
+/// gh registers an alias wherever its parent group is, so a name under one of
+/// these is a name a user can take: `gh alias set --shell "repo deploy-key zap"`
+/// is accepted and `gh repo deploy-key zap --help` then runs it. Reading the
+/// trailing `--help` has to walk down to the group that really owns the last
+/// name, not stop at the first one.
+const GITHUB_BUILTIN_NESTED_GROUPS: &[(&str, &str, &[&str])] = &[
+    ("codespace", "ports", &["forward", "visibility"]),
+    ("repo", "autolink", &["create", "delete", "list", "view"]),
+    ("repo", "deploy-key", &["add", "delete", "list"]),
+    ("repo", "gitignore", &["list", "view"]),
+    ("repo", "license", &["list", "view"]),
+];
+
+/// The options gh reads a value from wherever they are written. Cobra takes
+/// these and their values out of the way before it matches a subcommand, so
+/// they say nothing about where the subcommand ends up.
+const GITHUB_OPTIONS_THAT_TAKE_A_VALUE: &[&str] = &["-R", "--repo", "--hostname"];
+
 /// Whether a trailing `--help` is read by gh rather than by something gh runs.
 fn trailing_help_prints_gh_help(before: &[String]) -> bool {
     // After `--`, gh stops parsing flags, so `gh release create v1 -- notes.md
@@ -705,19 +727,54 @@ fn trailing_help_prints_gh_help(before: &[String]) -> bool {
     {
         return false;
     }
-    if subcommands.is_empty() {
-        return true;
-    }
-    match before.get(1) {
-        // gh expands an alias only when the words at the front of the command
-        // line are its whole name, and it refuses a name containing a flag, so
-        // a written option here leaves gh reading the rest.
-        None => true,
-        Some(second) if second.starts_with('-') => true,
-        Some(second) => subcommands
+    // Cobra matches a subcommand against the words that are left once it has
+    // taken the options out of the way, so a written option in front of a name
+    // does not keep gh from expanding an alias there: `gh issue -R o/r mine`
+    // still runs the `issue mine` alias. Walk the names the way gh does, and
+    // read the trailing `--help` only when gh owns every one of them.
+    let mut parent = top.as_str();
+    let mut owned = subcommands;
+    let mut index = 1;
+    while index < before.len() {
+        let token = &before[index];
+        if token.starts_with('-') {
+            // A value written onto the option carries its own, so the next word
+            // is still a name. A bare option whose arity gh does not publish
+            // here could take the next word or leave it, and the name an alias
+            // would be registered under is exactly that word, so the reading is
+            // given up rather than guessed.
+            if token.contains('=') || (token.starts_with("-R") && token.as_str() != "-R") {
+                index += 1;
+                continue;
+            }
+            if GITHUB_OPTIONS_THAT_TAKE_A_VALUE.contains(&token.as_str()) {
+                index += 2;
+                continue;
+            }
+            return false;
+        }
+        if owned.is_empty() {
+            // The command owns no names, so this word is an argument to it and
+            // gh is still the one reading the flag.
+            return true;
+        }
+        if !owned.iter().any(|known| known.eq_ignore_ascii_case(token)) {
+            return false;
+        }
+        let name = token.to_ascii_lowercase();
+        let Some((_, group_name, deeper)) = GITHUB_BUILTIN_NESTED_GROUPS
             .iter()
-            .any(|known| known.eq_ignore_ascii_case(second)),
+            .find(|(group, sub, _)| *group == parent && *sub == name)
+        else {
+            // A command that owns no further names reads the rest as its own
+            // arguments, `gh repo delete owner/name --help` included.
+            return true;
+        };
+        parent = group_name;
+        owned = deeper;
+        index += 1;
     }
+    true
 }
 
 /// `combine_github_assessments` (:387).

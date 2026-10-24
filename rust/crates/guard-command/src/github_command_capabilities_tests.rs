@@ -233,6 +233,16 @@ fn a_trailing_help_flag_keeps_the_command_local() {
         "workflow run release.yml --help",
         "--help",
         "-h",
+        // The option and its value are gh's, and what is left is a name gh
+        // owns, so gh is still the one reading the flag.
+        "issue -R owner/name --help",
+        "issue -R owner/name list --help",
+        "issue --repo=owner/name view 1 --help",
+        // A subcommand that is a group itself still prints its own help, and
+        // the names underneath it are gh's too.
+        "repo deploy-key --help",
+        "repo deploy-key add key.pub --help",
+        "codespace ports forward 8080:8080 --help",
     ] {
         let argv: Vec<String> = command.split(' ').map(String::from).collect();
         let got = classify_github_cli(&argv);
@@ -267,6 +277,22 @@ fn a_help_gh_itself_does_not_print_still_classifies_the_command() {
         // the alias's shell command with `--help` as an argument.
         "issue mine --help",
         "run teardown --help",
+        // Cobra takes an option and its value out of the way before it matches
+        // a subcommand, so a written option in front of the alias does not stop
+        // gh from expanding it: these all run the `issue mine` alias.
+        "issue -R owner/name mine --help",
+        "issue --repo owner/name mine --help",
+        "issue --repo=owner/name mine --help",
+        "issue -Rowner/name mine --help",
+        // An option gh does not publish an arity for here could take the next
+        // word or leave it as the name of an alias.
+        "issue --json state mine --help",
+        // An alias can sit under a subcommand that is a group itself.
+        "repo deploy-key zap --help",
+        "repo autolink zap --help",
+        "repo gitignore zap --help",
+        "repo license zap --help",
+        "codespace ports zap --help",
     ] {
         let argv: Vec<String> = command.split(' ').map(String::from).collect();
         let got = classify_github_cli(&argv);
