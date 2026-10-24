@@ -241,7 +241,10 @@ pub(crate) fn harness_protected_write_paths(
         let path = root.join(".codex").join(name);
         let spelled = path.to_string_lossy().into_owned();
         let normalized = normalized_candidate_path(&spelled, cwd, home_dir).unwrap_or(spelled);
-        if !protected.iter().any(|(existing, _)| *existing == normalized) {
+        if !protected
+            .iter()
+            .any(|(existing, _)| *existing == normalized)
+        {
             protected.push((normalized, label.to_owned()));
         }
     };
