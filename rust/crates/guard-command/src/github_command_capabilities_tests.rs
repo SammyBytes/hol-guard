@@ -217,3 +217,52 @@ fn api_jq_filters_that_read_the_environment_are_no_static_reads() {
         );
     }
 }
+
+/// A trailing `--help` prints the subcommand's help and runs nothing. Two rows
+/// of the oracle above recorded the opposite, and that is the false positive
+/// this fix removes rather than a behaviour worth keeping.
+#[test]
+fn a_trailing_help_flag_keeps_the_command_local() {
+    for command in [
+        "repo delete owner/name --help",
+        "release delete v1 --help",
+        "secret set FIXTURE --help",
+        "issue view --help",
+        "secret --help",
+        "auth switch --help",
+        "workflow run release.yml --help",
+        "--help",
+        "-h",
+    ] {
+        let argv: Vec<String> = command.split(' ').map(String::from).collect();
+        let got = classify_github_cli(&argv);
+        assert_eq!(
+            (got.capability, got.reason_code.as_str()),
+            (
+                crate::github_capability_contract::GitHubCommandCapability::ReadLocal,
+                "github.command.local-help"
+            ),
+            "{command}"
+        );
+    }
+}
+
+/// The two readings a trailing `--help` does not have: an option's value, and
+/// the `--hostname` that `gh` reads `-h` as past the first token.
+#[test]
+fn a_help_flag_that_is_not_help_still_classifies_the_command() {
+    use crate::github_capability_contract::GitHubCommandCapability as C;
+    for command in [
+        // `gh issue create --title --help` opens an issue titled `--help`.
+        "issue create --title --help",
+        "secret set FIXTURE --body --help",
+        // Past the first token `-h` names an alternate host, not help.
+        "repo delete owner/name -h",
+        "pr list -h ghes.com",
+    ] {
+        let argv: Vec<String> = command.split(' ').map(String::from).collect();
+        let got = classify_github_cli(&argv);
+        assert_ne!(got.capability, C::ReadLocal, "{command}");
+        assert_ne!(got.reason_code, "github.command.local-help", "{command}");
+    }
+}

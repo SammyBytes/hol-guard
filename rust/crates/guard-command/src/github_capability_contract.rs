@@ -489,11 +489,26 @@ pub fn github_assessment(
 }
 
 /// `github_cli_invocation_is_help` (:381).
+///
+/// A trailing `--help` prints the subcommand's help and runs nothing, so
+/// `gh repo delete owner/name --help` is as local as `gh --help`. It is only
+/// help when the token before it is a plain word: after a written option the
+/// `--help` is that option's value, and `gh issue create --title --help` opens
+/// an issue. `-h` carries no such reading past the first token, where the CLI
+/// reads it as `--hostname`.
 pub fn github_cli_invocation_is_help(normalized: &[String]) -> bool {
-    (matches!(
+    if matches!(
         normalized.first().map(String::as_str),
         Some("--help") | Some("-h")
-    )) || normalized == ["auth", "switch", "--help"]
+    ) {
+        return true;
+    }
+    match normalized.split_last() {
+        Some((last, before)) if last == "--help" => {
+            before.last().is_some_and(|token| !token.starts_with('-'))
+        }
+        _ => false,
+    }
 }
 
 /// `combine_github_assessments` (:387).
