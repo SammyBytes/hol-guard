@@ -131,7 +131,10 @@ pub(super) fn unwrap_wrappers(
 /// compatibility layer reads the rest; an `env` that names no program at all,
 /// or whose next operand `env` would take as an assignment of its own, is
 /// still the environment dump, and keeps its own spelling.
-fn transparent_prefix(tokens: &[String], index: usize) -> Option<(usize, Vec<String>)> {
+pub(crate) fn transparent_prefix(
+    tokens: &[String],
+    index: usize,
+) -> Option<(usize, Vec<String>)> {
     let mut next = index + 1;
     let mut names = Vec::new();
     match tokens.get(index)?.as_str() {

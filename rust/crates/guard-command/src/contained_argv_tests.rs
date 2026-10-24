@@ -210,3 +210,38 @@ fn launcher_program_reports_where_the_parser_reads_the_program() {
         assert_eq!(offset(command), json!({"value": null}), "{command:?}");
     }
 }
+
+#[test]
+fn transparent_prefix_reports_where_the_parser_reads_the_program() {
+    let offset =
+        |command: &[&str]| evaluate("transparent_prefix", &json!({ "command": command })).unwrap();
+    assert_eq!(offset(&["command", "pytest", "-q"]), json!({"value": 1}));
+    assert_eq!(offset(&["time", "pytest", "-q"]), json!({"value": 1}));
+    assert_eq!(offset(&["env", "CI=1", "pytest", "-q"]), json!({"value": 2}));
+    // The parser reads the two system paths as the `env` they name, so the
+    // sink peels them too rather than planning `/usr/bin/env` as the program.
+    assert_eq!(
+        offset(&["/usr/bin/env", "CI=1", "pytest", "-q"]),
+        json!({"value": 2})
+    );
+    assert_eq!(offset(&["/bin/env", "CI=1", "pytest"]), json!({"value": 2}));
+    assert_eq!(
+        offset(&["env", "CI=1", "TZ=UTC", "pytest"]),
+        json!({"value": 3})
+    );
+    for command in [
+        // An `env` carrying no assignment only bypasses shell functions, and
+        // extension floors key on that spelling, so it stays the executable.
+        &["env", "pytest", "-q"][..],
+        &["env", "-i", "pytest"],
+        &["env", "CI=1"],
+        // A word that is no assignment and no program leaves the prefix whole.
+        &["env", "FOO=1", "A-B=1", "rm"],
+        &["command", "-v", "pytest"],
+        &["time", "-p", "pytest"],
+        &["nice", "pytest"],
+        &["pytest", "-q"],
+    ] {
+        assert_eq!(offset(command), json!({"value": null}), "{command:?}");
+    }
+}
