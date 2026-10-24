@@ -12,9 +12,10 @@ pub(crate) use tokens::{shell_tokens, shell_tokens_preserving_redirects};
 mod shapes;
 
 use shapes::sole_command_group;
-pub(super) use shapes::{
-    is_stderr_to_null_redirect, is_stderr_to_stdout_redirect, stderr_null_sink_is_inert,
-};
+pub(super) use shapes::{is_stderr_to_null_redirect, is_stderr_to_stdout_redirect};
+// Only the redirect tests in `command_compatibility` read the sink directly.
+#[cfg(test)]
+pub(super) use shapes::stderr_null_sink_is_inert;
 
 pub(super) fn split_execution_segments(
     command: &str,
