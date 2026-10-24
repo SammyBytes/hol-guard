@@ -709,7 +709,11 @@ fn trailing_help_prints_gh_help(before: &[String]) -> bool {
     if before.iter().any(|token| token == "--") {
         return false;
     }
-    let Some(top) = before.first().map(|token| token.to_ascii_lowercase()) else {
+    // Cobra matches a name byte for byte unless `EnableCaseInsensitive` is set,
+    // and gh leaves it alone, so `ISSUE` is not the built-in `issue`: it is a
+    // name gh looks up among the user's aliases, and an alias can run anything.
+    // Reading its `--help` as gh's own would hand that alias a local reading.
+    let Some(top) = before.first().map(String::as_str) else {
         return false;
     };
     let Some((_, subcommands)) = GITHUB_BUILTIN_COMMANDS
@@ -720,11 +724,7 @@ fn trailing_help_prints_gh_help(before: &[String]) -> bool {
     };
     // `gh extension exec <name> …` forwards everything after the name to the
     // extension binary.
-    if top == "extension"
-        && before
-            .get(1)
-            .is_some_and(|t| t.eq_ignore_ascii_case("exec"))
-    {
+    if top == "extension" && before.get(1).is_some_and(|t| t == "exec") {
         return false;
     }
     // Cobra matches a subcommand against the words that are left once it has
@@ -732,7 +732,7 @@ fn trailing_help_prints_gh_help(before: &[String]) -> bool {
     // does not keep gh from expanding an alias there: `gh issue -R o/r mine`
     // still runs the `issue mine` alias. Walk the names the way gh does, and
     // read the trailing `--help` only when gh owns every one of them.
-    let mut parent = top.as_str();
+    let mut parent = top;
     let mut owned = subcommands;
     let mut index = 1;
     while index < before.len() {
@@ -758,13 +758,12 @@ fn trailing_help_prints_gh_help(before: &[String]) -> bool {
             // gh is still the one reading the flag.
             return true;
         }
-        if !owned.iter().any(|known| known.eq_ignore_ascii_case(token)) {
+        if !owned.iter().any(|known| *known == token.as_str()) {
             return false;
         }
-        let name = token.to_ascii_lowercase();
         let Some((_, group_name, deeper)) = GITHUB_BUILTIN_NESTED_GROUPS
             .iter()
-            .find(|(group, sub, _)| *group == parent && *sub == name)
+            .find(|(group, sub, _)| *group == parent && *sub == token.as_str())
         else {
             // A command that owns no further names reads the rest as its own
             // arguments, `gh repo delete owner/name --help` included.

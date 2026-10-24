@@ -293,6 +293,10 @@ fn a_help_gh_itself_does_not_print_still_classifies_the_command() {
         "repo gitignore zap --help",
         "repo license zap --help",
         "codespace ports zap --help",
+        // gh matches a name byte for byte, so a differently cased spelling is
+        // an alias lookup rather than the built-in command it resembles.
+        "ISSUE delete owner/name --help",
+        "issue VIEW 1 --help",
     ] {
         let argv: Vec<String> = command.split(' ').map(String::from).collect();
         let got = classify_github_cli(&argv);
