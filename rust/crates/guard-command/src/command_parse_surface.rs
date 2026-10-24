@@ -244,7 +244,7 @@ pub(crate) fn parse_posix_command(
     let mut segments = Vec::with_capacity(raw_segments.len());
     let mut total_tokens = 0usize;
     for raw_segment in raw_segments {
-        let text: String = chars[raw_segment.start..raw_segment.end].iter().collect();
+        let mut text: String = chars[raw_segment.start..raw_segment.end].iter().collect();
         let tokens = match shell_tokens(&text, preserve_unquoted_backslash) {
             Ok(value) => value,
             Err(reason) => return Ok(uncertain(request, raw, reason)),
@@ -302,7 +302,9 @@ pub(crate) fn parse_posix_command(
         // Only a complete bracket pair is read that way. A `[[` the segment
         // never closes is some other shape, and so is one `&&` or `||` has
         // already split, because the closing `]]` is then in another segment.
-        if executable.as_deref() == Some("[[") && arguments.last().is_some_and(|last| last == "]]")
+        if executable_index == 0
+            && executable.as_deref() == Some("[[")
+            && arguments.last().is_some_and(|last| last == "]]")
         {
             executable = Some("[".to_owned());
             tokens[executable_index] = "[".to_owned();
@@ -310,6 +312,7 @@ pub(crate) fn parse_posix_command(
             tokens[closing] = "]".to_owned();
             let closing = arguments.len() - 1;
             arguments[closing] = "]".to_owned();
+            text = single_bracket_text(&text);
         }
         if executable.as_deref().is_some_and(is_shell_control_keyword) {
             return Ok(uncertain(request, raw, "compound_shell_not_yet_supported"));
@@ -424,4 +427,23 @@ pub(crate) fn uncertain(
         parser_profile: "posix-simple-v1".to_owned(),
         security_identity: String::new(),
     }
+}
+
+/// The same segment text with its bracket pair written the way `[ ... ]`
+/// writes it. Layers that read a segment's own text rather than its words
+/// would otherwise still see the `[[` spelling the words no longer carry.
+fn single_bracket_text(text: &str) -> String {
+    let leading = text.len() - text.trim_start().len();
+    let trailing = text.len() - text.trim_end().len();
+    let Some(inner) = text[leading..text.len() - trailing]
+        .strip_prefix("[[")
+        .and_then(|rest| rest.strip_suffix("]]"))
+    else {
+        return text.to_owned();
+    };
+    format!(
+        "{}[{inner}]{}",
+        &text[..leading],
+        &text[text.len() - trailing..]
+    )
 }

@@ -189,7 +189,9 @@ fn marks_complex_shell_forms_uncertain_without_partial_segments() {
         "sudo -s rm -rf /tmp/example",
         "eval 'rm -rf /tmp/example'",
         "if true; then echo yes; fi",
-        "[[ -f Cargo.toml ]]",
+        // A closed `[[ ... ]]` pair is not here: the parse surface reads it as
+        // the `[` test it asks. An unclosed one is some other shape.
+        "[[ -f Cargo.toml",
         "echo $\"locale translation\"",
         "xargs rm -rf",
         "find . -exec rm {} ;",
