@@ -180,17 +180,37 @@ fn a_transparent_env_behind_a_launcher_reaches_its_owners_floor() {
         assert_ne!(code, FAILED, "{command}");
         assert_eq!(action, "review", "{command}: {code}");
     }
-    // A name the compatibility layer reads as one that loads code or moves
-    // the search path keeps whatever the bare spelling keeps: `NODE_OPTIONS`
-    // can load code whether the prefix writes it or removes it, and reading
-    // the prefix changes none of that. What this scan owes is that the two
-    // spellings read alike, so the launcher cannot be the thing that decides.
+    // A name that loads code or moves the search path is not inert, so the
+    // bare spelling earns its review from the reviewed environment
+    // projection rather than from this scan. That projection reads a simple
+    // command from its first word and stops at anything that is neither an
+    // assignment nor `env` (`env_prefix_projection::strip_prefixes`), so a
+    // launcher in front of the settings leaves the command unprojected and
+    // on its own floor. Closing that is the projection's to do, not this
+    // scan's; what this scan owes meanwhile is that putting a launcher in
+    // front never buys the command something the bare spelling lacks.
     for command in ["env -u NODE_OPTIONS npm test", "env -u PATH npm test"] {
-        assert_eq!(
-            decision(&controls, &format!("exec {command}")),
-            decision(&controls, command),
-            "{command}"
+        let (bare, bare_code) = decision(&controls, command);
+        let (behind, _) = decision(&controls, &format!("exec {command}"));
+        assert_eq!(bare, "review", "{command}: {bare_code}");
+        assert!(
+            strictness(&behind) >= strictness(&bare),
+            "exec {command}: {behind} is weaker than {bare}"
         );
+    }
+}
+
+/// How strict a minimum action is, so a launcher can be shown never to
+/// soften one. An action this ladder does not name is treated as the
+/// strictest rather than as a pass.
+fn strictness(action: &str) -> u8 {
+    match action {
+        "allow" => 0,
+        "warn" => 1,
+        "review" => 2,
+        "require-reapproval" => 3,
+        "sandbox-required" => 4,
+        _ => 5,
     }
 }
 
