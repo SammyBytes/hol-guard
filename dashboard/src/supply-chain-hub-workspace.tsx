@@ -15,7 +15,7 @@ const SupplyChainWorkspace = lazyWorkspace("supply-chain-workspace", () =>
   import("./supply-chain-workspace").then((m) => ({ default: m.SupplyChainWorkspace }))
 );
 const SupplyChainWorkspaceDetails = lazyWorkspace("supply-chain-workspace-details", () =>
-  import("./supply-chain-workspace").then((m) => ({ default: m.SupplyChainWorkspaceDetails }))
+  import("./supply-chain-workspace-details").then((m) => ({ default: m.SupplyChainWorkspaceDetails }))
 );
 const AuditWorkspace = lazyWorkspace("audit-workspace", () =>
   import("./audit-workspace").then((m) => ({ default: m.AuditWorkspace }))

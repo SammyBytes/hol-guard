@@ -37102,7 +37102,7 @@ const AppDetailWorkspace = lazyWorkspace("app-detail-workspace", () => __vitePre
 const HelpModal = lazyWorkspace("help-modal", () => __vitePreload(() => import("./chunks/help-modal-B0TZsHE3.js"), true ? [] : void 0).then((m) => ({ default: m.HelpModal })));
 const SupplyChainHubWorkspace = lazyWorkspace(
   "supply-chain-hub-workspace",
-  () => __vitePreload(() => import("./chunks/supply-chain-hub-workspace-BDxPy2cU.js").then((n) => n.d), true ? [] : void 0).then((m) => ({ default: m.SupplyChainHubWorkspace }))
+  () => __vitePreload(() => import("./chunks/supply-chain-hub-workspace-C3d9J9-5.js").then((n) => n.d), true ? [] : void 0).then((m) => ({ default: m.SupplyChainHubWorkspace }))
 );
 const PolicyWorkspacePage = lazyWorkspace(
   "policy-workspace-page",
@@ -38310,10 +38310,10 @@ export {
   resolveMcpPolicyRequest as e7,
   HiMiniDocumentPlus as e8,
   HiMiniDocumentMagnifyingGlass as e9,
-  fetchSupplyChainBundle as ea,
-  isSupplyChainScannerEvidence as eb,
-  isBlockedGuardAction as ec,
-  HiMiniComputerDesktop as ed,
+  HiMiniComputerDesktop as ea,
+  fetchSupplyChainBundle as eb,
+  isSupplyChainScannerEvidence as ec,
+  isBlockedGuardAction as ed,
   HiMiniChevronLeft as ee,
   HiMiniArrowDown as ef,
   HiMiniArrowUp as eg,

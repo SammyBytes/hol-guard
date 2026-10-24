@@ -12,6 +12,7 @@ function assert(condition: boolean, message: string): void {
 const here = dirname(fileURLToPath(import.meta.url));
 
 const workspaceSource = readFileSync(join(here, "supply-chain-workspace.tsx"), "utf8");
+const workspaceDetailsSource = readFileSync(join(here, "supply-chain-workspace-details.tsx"), "utf8");
 const hubSource = readFileSync(join(here, "supply-chain-hub-workspace.tsx"), "utf8");
 const auditSource = readFileSync(join(here, "audit-workspace.tsx"), "utf8");
 const workbenchSource = readFileSync(join(here, "package-workbench-panel.tsx"), "utf8");
@@ -31,11 +32,11 @@ assert(
   "workspace keeps the healthy-state status hero",
 );
 assert(
-  workspaceSource.includes("SupplyChainAuditTeaser"),
+  workspaceDetailsSource.includes("SupplyChainAuditTeaser"),
   "workspace shows compact audit teaser instead of full workbench",
 );
 assert(
-  !workspaceSource.includes("PackageWorkbenchPanel"),
+  !workspaceSource.includes("PackageWorkbenchPanel") && !workspaceDetailsSource.includes("PackageWorkbenchPanel"),
   "workspace drops full audit findings workbench",
 );
 assert(

@@ -584,8 +584,9 @@ export function ActivationSummary({
     return null;
   }
   const copy = resolvePackageManagerProtectionCopy(protection);
-  // The status line above already says protection is live, so a healthy
-  // PATH only adds where the shims sit and when they last proved themselves.
+  // A healthy PATH gets no headline of its own, whether the status above is
+  // all clear or the recovery panel: the note itself says the shims intercept
+  // installs, and any open issue the recovery panel names is not about PATH.
   if (protection.path_status === "in_path" && activationAssistError === null) {
     return (
       <p className="text-xs leading-5 text-slate-600">
