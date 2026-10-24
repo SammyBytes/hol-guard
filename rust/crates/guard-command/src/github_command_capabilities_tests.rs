@@ -250,7 +250,8 @@ fn a_trailing_help_flag_keeps_the_command_local() {
 /// The trailing `--help` is only gh's own help when gh is the one reading it.
 /// After `--` the flag is a positional, and aliases, installed extensions and
 /// `gh extension exec` are registered with flag parsing disabled, so gh hands
-/// the flag to the command it runs.
+/// the flag to the command it runs. An alias can also sit under a built-in
+/// group, where only the group's own subcommands are safe from it.
 #[test]
 fn a_help_gh_itself_does_not_print_still_classifies_the_command() {
     use crate::github_capability_contract::GitHubCommandCapability as C;
@@ -262,6 +263,10 @@ fn a_help_gh_itself_does_not_print_still_classifies_the_command() {
         // An installed extension runs its binary.
         "my-ext purge --help",
         "extension exec my-ext delete target --help",
+        // `gh alias set --shell "issue mine" …` is accepted, and gh then runs
+        // the alias's shell command with `--help` as an argument.
+        "issue mine --help",
+        "run teardown --help",
     ] {
         let argv: Vec<String> = command.split(' ').map(String::from).collect();
         let got = classify_github_cli(&argv);

@@ -513,7 +513,7 @@ pub fn github_cli_invocation_is_help(normalized: &[String]) -> bool {
     }
 }
 
-/// The top-level commands the GitHub CLI itself owns.
+/// The commands the GitHub CLI itself owns, each with the subcommands it owns.
 ///
 /// gh registers aliases, installed extensions and `gh extension exec` with
 /// flag parsing disabled, and forwards every argument — `--help` included — to
@@ -521,37 +521,163 @@ pub fn github_cli_invocation_is_help(normalized: &[String]) -> bool {
 /// printing help. A name gh does not own is one of those, so the trailing
 /// `--help` reading is only safe for the names listed here. A built-in missing
 /// from the list reads as it did before the trailing-help reading existed.
-const GITHUB_BUILTIN_TOP_LEVEL: &[&str] = &[
-    "accessibility",
-    "alias",
-    "api",
-    "attestation",
-    "auth",
-    "browse",
-    "cache",
-    "codespace",
-    "completion",
-    "config",
-    "extension",
-    "gist",
-    "gpg-key",
-    "help",
-    "issue",
-    "label",
-    "org",
-    "pr",
-    "project",
-    "release",
-    "repo",
-    "ruleset",
-    "run",
-    "search",
-    "secret",
-    "ssh-key",
-    "status",
-    "variable",
-    "version",
-    "workflow",
+///
+/// An alias can also sit under a group: `gh alias set --shell "issue mine" …`
+/// is accepted, and `gh issue mine --help` then runs the alias with `--help`
+/// as its argument. gh refuses to register a name it already owns, so listing
+/// a group's own subcommands is what keeps a nested alias out. A group whose
+/// list is empty owns no subcommands, and gh refuses an alias beneath it too,
+/// so a word there is an argument to the command itself.
+const GITHUB_BUILTIN_COMMANDS: &[(&str, &[&str])] = &[
+    ("accessibility", &[]),
+    ("alias", &["delete", "import", "list", "set"]),
+    ("api", &[]),
+    ("attestation", &["download", "trusted-root", "verify"]),
+    (
+        "auth",
+        &[
+            "login",
+            "logout",
+            "refresh",
+            "setup-git",
+            "status",
+            "switch",
+            "token",
+        ],
+    ),
+    ("browse", &[]),
+    ("cache", &["delete", "list"]),
+    (
+        "codespace",
+        &[
+            "code", "cp", "create", "delete", "edit", "jupyter", "list", "logs", "ports",
+            "rebuild", "ssh", "stop", "view",
+        ],
+    ),
+    ("completion", &[]),
+    ("config", &["clear-cache", "get", "list", "set"]),
+    (
+        "extension",
+        &[
+            "browse", "create", "exec", "install", "list", "remove", "search", "upgrade",
+        ],
+    ),
+    (
+        "gist",
+        &[
+            "clone", "create", "delete", "edit", "list", "rename", "view",
+        ],
+    ),
+    ("gpg-key", &["add", "delete", "list"]),
+    ("help", &[]),
+    (
+        "issue",
+        &[
+            "close", "comment", "create", "delete", "develop", "edit", "list", "lock", "pin",
+            "reopen", "status", "transfer", "unlock", "unpin", "view",
+        ],
+    ),
+    ("label", &["clone", "create", "delete", "edit", "list"]),
+    ("org", &["list"]),
+    (
+        "pr",
+        &[
+            "checkout",
+            "checks",
+            "close",
+            "comment",
+            "create",
+            "diff",
+            "edit",
+            "list",
+            "lock",
+            "merge",
+            "ready",
+            "reopen",
+            "revert",
+            "review",
+            "status",
+            "unlock",
+            "update-branch",
+            "view",
+        ],
+    ),
+    (
+        "project",
+        &[
+            "close",
+            "copy",
+            "create",
+            "delete",
+            "edit",
+            "field-create",
+            "field-delete",
+            "field-list",
+            "item-add",
+            "item-archive",
+            "item-create",
+            "item-delete",
+            "item-edit",
+            "item-list",
+            "link",
+            "list",
+            "mark-template",
+            "unlink",
+            "view",
+        ],
+    ),
+    (
+        "release",
+        &[
+            "create",
+            "delete",
+            "delete-asset",
+            "download",
+            "edit",
+            "list",
+            "upload",
+            "verify",
+            "verify-asset",
+            "view",
+        ],
+    ),
+    (
+        "repo",
+        &[
+            "archive",
+            "autolink",
+            "clone",
+            "create",
+            "delete",
+            "deploy-key",
+            "edit",
+            "fork",
+            "gitignore",
+            "license",
+            "list",
+            "read-dir",
+            "read-file",
+            "rename",
+            "set-default",
+            "sync",
+            "unarchive",
+            "view",
+        ],
+    ),
+    ("ruleset", &["check", "list", "view"]),
+    (
+        "run",
+        &[
+            "cancel", "delete", "download", "list", "rerun", "view", "watch",
+        ],
+    ),
+    ("search", &["code", "commits", "issues", "prs", "repos"]),
+    ("secret", &["delete", "list", "set"]),
+    ("ssh-key", &["add", "delete", "list"]),
+    ("status", &[]),
+    ("variable", &["delete", "get", "list", "set"]),
+    ("version", &[]),
+    ("workflow", &["disable", "enable", "list", "run", "view"]),
 ];
 
 /// Whether a trailing `--help` is read by gh rather than by something gh runs.
@@ -564,15 +690,34 @@ fn trailing_help_prints_gh_help(before: &[String]) -> bool {
     let Some(top) = before.first().map(|token| token.to_ascii_lowercase()) else {
         return false;
     };
-    if !GITHUB_BUILTIN_TOP_LEVEL.contains(&top.as_str()) {
+    let Some((_, subcommands)) = GITHUB_BUILTIN_COMMANDS
+        .iter()
+        .find(|(name, _)| *name == top)
+    else {
         return false;
-    }
+    };
     // `gh extension exec <name> …` forwards everything after the name to the
     // extension binary.
-    !(top == "extension"
+    if top == "extension"
         && before
             .get(1)
-            .is_some_and(|token| token.eq_ignore_ascii_case("exec")))
+            .is_some_and(|t| t.eq_ignore_ascii_case("exec"))
+    {
+        return false;
+    }
+    if subcommands.is_empty() {
+        return true;
+    }
+    match before.get(1) {
+        // gh expands an alias only when the words at the front of the command
+        // line are its whole name, and it refuses a name containing a flag, so
+        // a written option here leaves gh reading the rest.
+        None => true,
+        Some(second) if second.starts_with('-') => true,
+        Some(second) => subcommands
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(second)),
+    }
 }
 
 /// `combine_github_assessments` (:387).

@@ -1,0 +1,311 @@
+# HOL Guard extension directory
+
+HOL Guard 3 groups command protection into inspectable Extensions. Each Extension owns a stable capability boundary,
+its rule metadata, safer alternatives, and the evidence it contributes to Guard's policy decision. Extensions detect
+and explain command facts; they do not grant authority, execute commands, or replace Guard policy.
+
+Use this directory to discover coverage shipped by the current source tree.
+The tables are generated from the catalog compiled by Rust from canonical JSON
+sources. `command explain`, the local dashboard, and catalog APIs read the same
+generated metadata; the native program owns command matching. Directory checks
+verify that the tables match that catalog.
+
+To add or update coverage, start with the [contribution guide](contributing.md)
+and [native source workflow](../extension-contributions.md). Edit
+`contributions/command-sources/command.<name>.json`, add portable fixtures, and
+regenerate the projections. New Python detector modules are not the contribution
+path. The [Extension Builder](../extension-builder/README.md) can create a review
+kit from an exported CLI inventory or MCP tool list.
+
+```bash
+# List every Extension.
+hol-guard command extensions
+
+# Inspect one Extension and its stable rules.
+hol-guard command extensions command.git --json
+
+# Test a command without executing it or creating an approval.
+hol-guard command explain 'git reset --hard HEAD~1'
+```
+
+Protection model meanings:
+
+- **Required core**: an immutable minimum protection floor shipped by HOL Guard.
+- **Built in**: reviewed native coverage in the compiled catalog.
+- **Package Firewall**: package operations delegated to Guard's supply-chain enforcement surface.
+- **External opt-in**: a contributed extension that remains off until enabled through Guard's controls.
+
+<!-- BEGIN GENERATED EXTENSION DIRECTORY -->
+
+### Core safety
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.git` | Reviews everyday Git porcelain plus local and remote operations that can discard work, replace history, refresh a remote Guard cannot verify, or read a staged index Guard cannot bound. | 39 | Required core |
+| `command.data-protection` | Detects shell flows that can send credentials or local file contents to a network destination. | 2 | Built in |
+| `command.encoded-execution` | Reviews decode-and-execute flows whose effective program is hidden from normal command inspection. | 1 | Built in |
+| `command.system` | Reviews storage formatting and operating-system power-state mutations. | 1 | Required core |
+| `command.guard-self-protection` | Prevents commands from authorizing their own Guard approval or weakening protected Guard state. | 1 | Required core |
+| `command.container-runtime` | Reviews container lifecycle, cleanup, execution, network, and persistent-data operations that can expose credentials or mutate host state. | 32 | Built in |
+| `command.filesystem` | Reviews recursive deletion and access-control changes across filesystem trees. | 2 | Required core |
+| `command.windows` | Reviews destructive Windows storage and operating-system commands. | 1 | Required core |
+| `command.kubernetes-secrets` | Reviews Kubernetes CLI operations that can reveal cluster or application secrets. | 1 | Built in |
+| `command.shell-mutations` | Reviews destructive shell, Git, filesystem, redirection, and protected configuration mutations. | 5 | Built in |
+
+### Cloud and infrastructure
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.cloud.aws` | Reviews a validated AWS CLI operation matrix for permanent resource deletion and service termination across identity, compute, data, delivery, and control-plane services. | 1 | Built in |
+| `command.kubernetes-operations` | Reviews cluster mutations, remote execution, file transfer, tunnels, certificate decisions, and Helm lifecycle operations. | 33 | Built in |
+| `command.cdn` | Reviews distribution, VPC origin, key-value-store, profile, and endpoint deletion through supported cloud CLIs. | 1 | Built in |
+| `command.cloud.digitalocean` | Reviews destructive, disruptive, access-changing, credential-exposing and remote-execution doctl operations, while Guard's read proof keeps ordinary doctl list and get reads quiet. | 7 | Built in |
+| `command.dns.aws` | Reviews AWS Route 53 hosted-zone, record, health-check, traffic-policy, DNSSEC, and Resolver deletions. | 6 | Built in |
+| `command.infrastructure-as-code` | Reviews infrastructure teardown through Terraform, OpenTofu, and Pulumi. | 1 | Built in |
+| `command.cloud.azure` | Reviews a validated Azure CLI operation matrix for permanent resource deletion across subscription, identity, network, compute, application, data, messaging, and AI services. | 1 | Built in |
+| `command.dns.azure` | Reviews Azure public DNS, private DNS, virtual-network link, and DNS resolver deletion through Azure CLI. | 6 | Built in |
+| `command.api-gateway` | Reviews API and gateway deletion through supported cloud CLIs. | 1 | Built in |
+| `command.cloud.gcp` | Reviews a validated gcloud operation matrix for permanent resource deletion across stable and supported release tracks. | 1 | Built in |
+| `command.load-balancer` | Reviews load-balancer, target-group, listener, and forwarding-rule deletion through supported cloud CLIs. | 1 | Built in |
+| `command.dns.gcp` | Reviews gcloud Cloud DNS managed-zone, record-set, policy, and response-policy deletions and updates. | 6 | Built in |
+
+### Data and resilience
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.database.postgresql` | Reviews explicit PostgreSQL database removal commands. | 1 | Built in |
+| `command.database.supabase` | Reviews database reset and migration rollback commands. | 1 | Built in |
+| `command.backup.restic` | Reviews restic operations that remove snapshots or repository data. | 1 | Built in |
+| `command.storage.aws-s3` | Reviews AWS CLI high-level S3 commands and S3 API object, bucket, access-control, and configuration operations including copy, list, sync, website, and deletion. | 14 | Built in |
+| `command.backup.velero` | Reviews Velero operations that delete backup data or recovery records. | 1 | Built in |
+| `command.database.mysql` | Reviews mysqladmin database removal operations. | 1 | Built in |
+| `command.storage.minio` | Reviews MinIO Client commands including copy, list, mirror, and deletion. | 7 | Built in |
+| `command.backup.borg` | Reviews Borg operations that delete, prune, or recreate archives. | 1 | Built in |
+| `command.storage.google-cloud` | Reviews Google CLI storage commands including copy, list, sync, and deletion. | 7 | Built in |
+| `command.database.sqlite` | Reviews SQLite restore operations that replace database content. | 1 | Built in |
+| `command.backup.rclone` | Reviews rclone operations that delete, move, purge, or synchronize data. | 1 | Built in |
+| `command.database.redis` | Reviews Redis key deletion and database flush commands. | 1 | Built in |
+| `command.storage.azure-blob` | Reviews Azure CLI storage commands including upload, list, copy, and deletion. | 6 | Built in |
+| `command.database.mongodb` | Reviews restore operations that drop and replace collections. | 1 | Built in |
+
+### Delivery and remote operations
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.cicd.github` | Reviews workflow-run cancellation, deletion, and workflow disabling through GitHub CLI. | 2 | Built in |
+| `command.remote.essh` | Reviews essh invocations that execute commands across a host group or delete cached hosts, keys, and workspaces. | 2 | External opt-in |
+| `command.remote.rsync` | Reviews rsync options that delete destination data or remove synchronized source files. | 2 | Built in |
+| `command.cicd.circleci` | Reviews remote pipeline execution through CircleCI CLI. | 1 | Built in |
+| `command.cicd.gitlab` | Reviews remote pipeline cancellation through GitLab CLI. | 1 | Built in |
+| `command.remote.scp` | Reviews SCP transfers that can overwrite local or remote destination files. | 1 | Built in |
+| `command.platform.netlify` | Reviews site deletion and production deployments. | 2 | Built in |
+| `command.github` | Reviews distinct GitHub maintenance, content, merge, publication, workflow, and control effects. | 15 | Built in |
+| `command.platform.heroku` | Reviews app destruction, pipeline promotion, and release rollback. | 2 | Built in |
+| `command.remote.ssh` | Reviews SSH invocations that explicitly execute a remote command. | 2 | Built in |
+| `command.platform.vercel` | Reviews deployment and project deletion plus production deployment, promotion, and rollback. | 2 | Built in |
+
+### Managed services
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.email` | Reviews email identity, template, configuration-set, and contact-list deletion through AWS CLI. | 1 | Built in |
+| `command.messaging.kafka` | Reviews Kafka topic, group, offset, and record deletion operations. | 1 | Built in |
+| `command.feature-flags` | Reviews permanent feature-flag deletion through LaunchDarkly CLI. | 1 | Built in |
+| `command.messaging.nats` | Reviews NATS stream, consumer, key-value, and object-store removal operations. | 1 | Built in |
+| `command.messaging.rabbitmq` | Reviews RabbitMQ deletion and broker reset operations. | 1 | Built in |
+| `command.monitoring` | Reviews alarm, dashboard, metric-stream, and alert deletion through supported cloud CLIs. | 1 | Built in |
+| `command.payment` | Reviews product, coupon, customer, and webhook endpoint deletion through Stripe CLI. | 1 | Built in |
+| `command.search.elasticsearch` | Reviews explicit DELETE requests to recognizable Elasticsearch API targets. | 1 | Built in |
+
+### Package supply chain
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.package.node` | Routes Node package installs and one-shot execution through Guard's package firewall. | 0 | Package Firewall |
+| `command.package.go` | Routes Go module and tool installation requests through Guard's package firewall. | 0 | Package Firewall |
+| `command.package.jvm` | Routes Maven and Gradle dependency operations through Guard's package firewall. | 0 | Package Firewall |
+| `command.package.system` | Routes operating-system package installation requests through Guard's package firewall. | 0 | Package Firewall |
+| `command.package.python` | Routes Python dependency installs and isolated package execution through Guard's package firewall. | 0 | Package Firewall |
+| `command.package.php` | Routes Composer dependency operations through Guard's package firewall. | 0 | Package Firewall |
+| `command.package.ruby` | Routes RubyGem and Bundler dependency operations through Guard's package firewall. | 0 | Package Firewall |
+| `command.package.rust` | Routes Cargo dependency and binary installation requests through Guard's package firewall. | 0 | Package Firewall |
+
+### Specialized tools
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.mcp-codex-claude-bridge` | Local stdio bridge that lets Claude Code delegate tasks and native image generation to the signed-in Codex CLI. Starting a task or an image job runs a Codex agent (writes inside the given folder; may request more, which the user approves in Claude Code by default) and answering such a request needs review. Status, wait and cancel inherit. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-quidli-connect` | Reviews value-moving, paid, and onchain trust-write tools for the official hosted Quidli Connect MCP server. | 0 | External opt-in |
+| `command.mcp-run` | Reviews and gates task execution tools for the run polyglot task runner and MCP server. | 0 | External opt-in |
+| `command.mcp-agenthub` | Reviews AgentHub tools that run other coding agents (Codex, Claude Code, Antigravity, Aider, Goose), change or discard their work, apply it to the working tree, or send code to those agents' providers. Tools not listed are reviewed. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-enola` | Allows enola's read-only architecture query tools. Snapshot generation, baseline pinning, and snapshot diffing write enola's own .enola state and stay on Guard's usual handling. Matches uvx and pipx launches of the enola-cli package. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-obsidian-kanban` | Task board kept as Markdown files in an Obsidian vault: list boards and cards, add and move cards, add to descriptions, comment and set follow-ups through the local board server. Rewriting a whole description is the one tool that removes text and is gated on review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-setup-doctor` | Read-only audit and usage-summary tools for AI coding agent setups (CLAUDE.md, skills, MCP servers, session logs). Never writes files or sends data over the network. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-architecture-intelligence-platform` | Read-only evidence-qualified distributed architecture queries for coding agents. This contribution describes the currently hosted AIP Pitstop MCP endpoint; unknown future tools require review. | 0 | External opt-in |
+| `command.mcp-authyouragent` | Reviews the tools that drive a signed-in browser vault: navigate, click, type_text, press_key, select_option, go_back, fill_secret (types a saved password or TOTP code the agent never sees) and request_approval. Reads, status checks, take over and sign-out follow your normal Guard policy. The server also holds committing clicks for phone approval. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-ci-guard` | Read-only pre-flight security and configuration auditor for repositories: detects leaked secrets, GitHub Actions workflow hazards, and environment variable drift across .env, Dockerfiles, and Compose files. Never executes project scripts or Git hooks, and redacts secret values. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-fablecut` | Reviews the FableCut video-editor tools that change the user's timeline or write files: replacing or patching the project, importing media, loudness, ducking and noise reduction, motion tracking, reference analysis, export, and frames read from any local media path. Reading the project, the manual, scopes and export presets is allowed. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-krusch-git` | Git DAG indexer, AST symbol search, blast-radius dependency graph, and hybrid BM25 + pgvector semantic code retrieval for coding agents. Local AST and DAG reads inherit Guard policy; semantic search (which embeds queries) and unknown tools require review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-leadline` | Deterministic function-level complexity analysis for Go, Java, JavaScript, C, C++, TypeScript, TSX, Rust, Python, and Zig. Start the server with `leadline mcp` (stdio); Guard matches the `leadline` executable. Twenty read-only analyzer tools; the only subprocess is a fixed-argument git adapter and the server touches no network. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-pr-ui-compare` | Reviews PR UI Compare tools that run project install and start commands, write artifacts outside the repository, and download Chromium or FFmpeg. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-dchub` | DC Hub is the live data layer for data-center site selection. Its Data Center Power Index (DCPI) is a daily score of where data centers can get grid power, across 300+ markets. Read tools keep Guard's usual handling. Tools that create or recover a key, save to an account, send email or webhooks, accept terms, request an introduction or file a report are gated on review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-mac-address-lookup` | A MAC address lookup with no ads, no cookie popups, and no per-request cost. Its one tool, lookup, reads the public IEEE registries and tells you the vendor, country, and registry of a MAC address or OUI prefix, with a link to more information at mac.jasontally.com. No API key, no account, no session. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-nuvui` | The docs, rules, blocks, charts and design tokens of nuvui, an open-source React UI library, for coding agents. Answers can be scoped to the version a project has installed. Every tool only reads public documentation and needs no key or account, so each keeps Guard's usual handling. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-kranz` | Reviews Kranz MCP action execution, runtime and service lifecycle changes, configuration reloads, and retained log or completed-run deletion. Read-only tools inherit Guard policy; unknown tools require review. Off until enabled locally. | 0 | External opt-in |
+| `command.mcp-loomdesk` | Reviews LoomDesk's planning tools, which return unsigned Robinhood Chain transactions (open, add to, change or close a liquidity position, a limit order, a swap, a new pool) for the caller's own wallet to sign. LoomDesk holds no keys and signs nothing. Read tools keep Guard's usual handling. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-openscreenshot` | Reviews OpenScreenShot capture_screenshot calls. Each call loads the URL the agent gives in a fresh headless Chrome that runs with --no-sandbox, and returns the page to the client as a PNG. The URL can carry data to its host, and the image enters the model context. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-authzloom` | Conservative operation knowledge compiled from a contributor inventory. | 0 | External opt-in |
+| `command.mcp-instapods` | Reviews sensitive InstaPods pod, billing, command execution, and file-write tools for the official hosted MCP server. | 0 | External opt-in |
+| `command.mcp-ops-brain` | Self-hosted team bus for AI agents: cross-machine handoffs, check-in, and shared knowledge on your own PostgreSQL. Reads keep Guard's usual handling; writes to the shared bus and both deletes are gated on review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-reaper` | Reviews destructive REAPER project-editing tools: batch track deletion, track template deletion, clearing every tempo marker, and multi-step undo. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-brickproof-adb` | Lets an agent operate your own Android devices over ADB: screen, input, installs and package changes. Reading the device stays automatic; input, installs, package changes, file transfers, shell and connecting new devices are reviewed. The server adds its own guard rails: dry run by default, a protected set read off the device, a network guard and one-call rollback. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-ccm` | Reviews CCM code-graph indexing tools: background and blocking project indexing that writes index data into the project. Read-only navigation tools stay on inherit. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-debuganything` | Reviews Debug Anything tools that attach observation probes to running processes, containers, or pods (strace, py-spy, perf, gdb/lldb, heap snapshots) or capture network traffic. Debug Anything is read-only by design and never elevates: when a probe needs root it fails closed and prints the sudo command for the operator to run themselves, then analyzes the saved output via import_artifact. Listing and reporting tools inherit host policy. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-fetchsandbox` | Reviews the FetchSandbox tools that upload a workspace for remote analysis or publish evidence to a shareable receipt, and leaves catalog and run listing automatic. | 0 | External opt-in |
+| `command.mcp-halflife` | Local, file-backed long-term memory for coding agents. Stores typed memories (preference, procedural, fact, episodic, trace) as Markdown files with a derived SQLite index; recall is keyword + graph, plus optional local vectors. Memories decay by half-life; inferred ones stay provisional until confirmed. It sees only explicit tool calls, never the transcript. Five tools are read-only; remember and reinforce write local files; forget deletes. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-krusch-context-mcp` | Local-first working memory, span-grounded invariant steering, and decision lineage for coding agents (SQLite by default, optional PostgreSQL). Context retrieval and health checks follow your normal Guard policy (may refresh provenance/drift metadata); memory writes, revisions, and feedback updates require review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-kuuhaku` | Read-only architecture map for coding agents: which repository calls which HTTP route, with file:line on both sides, plus queues, gRPC links, shared databases, env key names and the repos that read a model's field. Answers from the graph.json a local kuuhaku scan wrote, or, with a login token, the workspace graph on api.kuuhaku.dev. All eight tools are read-only (readOnlyHint: true): no shell, no file writes. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-raw-browser` | Drives the Chrome or Edge you are already signed into: 16 tools for tabs, navigation, reading, clicking, filling, screenshots and cookies. Read-only tools inherit normal policy; navigation and input are reviewed; raw_screenshot is reviewed because it writes a PNG; raw_visit, raw_cookies, raw_eval and raw_call are blocked. On Windows, install with npm install -g raw-browser, run the bridge installer, and load its unpacked extension with Developer mode before starting raw-mcp. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-seahorse` | Persistent bi-temporal memory for LLM agents (local-first SQLite, Obsidian vault). Mutations are remember, improve, forget, skill_add; every other tool is read-only. Off until you turn it on. | 0 | External opt-in |
+| `command.skill-sunset` | Reviews the canonical Skill Sunset audit surface and its local report and viewer side effects. Experiment execution and npm launcher policy remain outside this extension. | 1 | External opt-in |
+| `command.mcp-cf-mail-mcp` | Reviews a self-deployed Cloudflare Worker that gives one AI agent a mailbox on your domain over streamable HTTP. send_message, reply_to_message, mark_read and delete_message require review; list_messages and read_message treat inbound mail as untrusted. status is read-only. launch.url is a self-deploy template, not a live shared endpoint. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-krusch` | PostgreSQL-backed coding and staged execution harness that stages diffs, runs sandboxed verification, and commits working-tree writes via a two-phase commit (2PC) apply journal. Status, diff, and diagnostic reads inherit Guard policy; task execution, diff apply, rejection, and abort require review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-lattice-talk` | Cross-harness agent message bus over Redis — shared sessions, rooms, direct messages, and memory for AI coding agents. Messaging, session and room membership changes, cursor updates, and memory writes default to review; read-only discovery tools inherit. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-mail-server` | Conservative operation knowledge compiled from a contributor inventory. | 0 | External opt-in |
+| `command.mcp-vome-home-assistant` | Reviews Home Assistant, ESPHome and Node-RED tools that control devices, change configuration, install third-party code, manage users, read cameras, flash firmware or switch a hosted home's failover. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-xahau-mcp` | Reviews Xahau MCP tools that read public Xahau JSON-RPC endpoints or emit unsigned transactions and Hook source a user could sign or deploy. Offline codec, Hook WASM analysis, and local VM tools are allowed. The server never signs, submits, or holds keys. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-xrpl-token-guard` | Read-only XRPL token and wallet checks with issuer-aware explanations | 0 | External opt-in |
+| `command.mcp-xrpl-trading-lab` | Free read-only XRPL meme entries, dated token health, public AMM wallet observations and a paper-account journal | 0 | External opt-in |
+| `command.mcp-garmin-coach-mcp` | Reads Garmin Connect data (sleep, health metrics, activities, training load) and writes structured workouts to the Garmin calendar. Four tools change the account: create, schedule, unschedule and delete workouts. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-google-mcp-universal` | Manages Google Ads, Merchant Center and PageSpeed from an agent: GAQL queries, reports, audits and dashboards only read; tools that change campaigns, ads, keywords, bids, budgets, assets, conversion uploads or Merchant Center feeds are reviewed. Off until you turn it on. | 0 | External opt-in |
+| `command.tui-runner` | Reviews TUI Runner --reconfigure invocations, which overwrite a project's saved process configuration. Port cleanup, process spawning, and project scaffolding happen through TUI Runner's interactive menu after launch and are not observable command-line events, so this extension does not cover them. | 1 | External opt-in |
+| `command.mcp-axpilot` | Lets an agent see and operate macOS apps through the Accessibility API: snapshots, element search, OCR and screenshots, then clicks, typing, shortcuts, menus, apps and windows. Every tool that acts is reviewed; read-only tools inherit. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-ftp` | Conservative operation knowledge compiled from a contributor inventory. | 0 | External opt-in |
+| `command.mcp-melra` | Reviews MELRA alpha local MCP execution. Planning and status tools inherit Guard policy; task execution and workflow advancement require Review. MELRA applies its own policy and scoped approvals. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-pc-control` | Lets an agent see and operate Windows apps without taking focus or moving the mouse. Click, type, key, drag, steps and open_app are reviewed. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-repo-notebook` | Local shelf of saved GitHub repositories: list and search, save, annotate, clone, and remove entries. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-askjev` | Reviews AskJev browser navigation MCP tools. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-compose-bridge` | Deterministic AST-guided mutations for Jetpack Compose. Allows AI agents to safely inspect and edit UI tokens (colors, dimensions) with dry-run and git-style diffs. | 0 | External opt-in |
+| `command.mcp-evernode-mcp` | Reviews Evernode MCP tools that look up live hosts on api.onledger.net or generate contract files, deploy commands, and an unsigned Hook install command. Offline linting, pattern advice, and lease math are allowed. The server never signs, submits, or holds keys. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-figlens` | Reads saved Figma .fig files offline: tree, find, inspect, nodes and variables return design data; bundle and export write a zip or an image to a caller-named path. gs:// inputs are fetched through the local gcloud CLI. Off until enabled locally. | 0 | External opt-in |
+| `command.mcp-g-krusch` | Reviews Google Drive writes/deletes, RAG index syncs, Calendar event creation, and Gmail draft/send actions on a local-first Google Workspace MCP server. Workspace reads, hybrid Drive RAG search, and status checks follow your normal Guard policy. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-pinpoint` | Point at an element in your running app (browser, iOS Simulator or Android emulator), say what should change, and your coding agent gets the selector, styles, component, source file:line (also on minified builds via source maps) and a cropped screenshot. The bridge listens only on 127.0.0.1; notes and screenshots go to the coding agent you connect, which may send them to its hosted model. Reading, replying to and resolving notes is allowed; clearing all notes stays on Review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-thingery` | Reviews Thingery's write tools. Thingery is the open item database and MCP server for AI agents to list, find, and trade second-hand goods. Read tools keep Guard's usual handling; listings, images and the order path (ordering, payment, tracking, receipts, disputes, payout release) are gated on review because they publish public content or move money. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-x-reader` | Reviews x-reader external/local content reads. Off until enabled. | 0 | External opt-in |
+| `command.mcp-clipugc` | Reviews ClipUGC hosted MCP tools that spend the user's credits, permanently delete influencers, looks, clips or videos, or publish an influencer to the shared public cast. Read-only and free tools keep Guard's usual handling. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-contribos` | Reviews open-source contribution tools: policy radar, issue briefs, pre-submit checks, review coaching, and contribution records. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-jd-church-website-audit` | Local stdio server from tnvolman/jd-church-website-audit. To get Guard's review defaults, set the MCP server command to the script path itself, e.g. {"command": "/path/to/jd-church-website-audit/server/audit-mcp.js"} (executable since 6d723ee), not node + args. Guard matches only audit-mcp.js. audit_church_website only POSTs {url, source:"plugin", include_cta?} to https://journeydigital.ai/api/audit. It does not fetch or upload page HTML, read local files, or need credentials. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-seq-mcp` | Exposes Datalust Seq structured logs, SQL analytics, signal filters, and live event streaming to AI agents over MCP. Read-only search and query tools stay on inherit. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-azure-vm-pricing` | Azure VM sizes and USD list prices for 24 regions, refreshed weekly: find the cheapest size for requirements, estimate monthly cost with reservations and savings plans, and read weekly price changes. Read-only, no credentials. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-seminara` | Reviews and gates actions for Seminara's streamable HTTP MCP server (https://seminara.online/api/v1/mcp) that orchestrates live presentations, slides, and attendee lead capture. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-tether` | Adds the tether memory server: remember, recall, link and forget. Each tool keeps your existing approval policy until you change it. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-agent-wire` | Gives agents live, token-budgeted Markdown from 31 sites (X, Reddit, GitHub, YouTube, Hacker News, arXiv and more). Saved logins are opt-in, read-only and never reach the model. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-asdecided` | Read-only repository requirements, decisions, designs, roadmaps, and prompts for coding agents. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-google-workspace.gmail` | Reviews draft creation and label changes on Google's hosted Gmail MCP server and leaves search and reads on Guard's usual handling. The server is a Workspace developer-preview product and documents no send tool. | 0 | External opt-in |
+| `command.mcp-insumer` | Reviews the InsumerAPI tools that can spend money or credits or change merchant state: verification and trust calls that use credits or pay per call in USDC, payment registrations, API key and merchant creation, merchant configuration, domain verification and the public listing. Read-only lookups keep Guard's usual handling. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-krusch-agentic-proxy` | Dual-Engine (Thinker + Implementer) MCP server and local LLM tool-calling gateway with tokenized shlex command allowlists and sensitive dotfile isolation. Task delegation via krusch_execute_task and unknown tools require review. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-aseprite` | Runs one agent-written Lua script per call through Aseprite's headless CLI. Because the script is arbitrary code, the execute tool is reviewed. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-filesystem` | Reviews official filesystem MCP tools. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-musiccontext` | Music direction for AI agents: analyzes a video's cuts, narration and story, plans a timed soundtrack, generates music offline and renders the mix with FFmpeg. Local-first and sandboxed to the working directory. Off until you turn it on. | 0 | External opt-in |
+| `command.mcp-plim` | Desktop audio alerts, interactive Telegram questions, terminal command monitoring, and dynamic progress tracking for AI coding agents. | 0 | External opt-in |
+| `command.mcp-remote-pc-mcp` | Reviews remote-pc-mcp's act tools. remote-pc-mcp is a self-hosted daemon that exposes a PC to MCP clients over streamable HTTP, usually inside a tailnet. Shell, process, file-write, download, screenshot and desktop-input tools are gated on review; read and status tools keep Guard's usual handling. Every install has its own endpoint, so this matches on the configured server name. Off until you turn it on. | 0 | External opt-in |
+
+### Other extensions
+
+| Extension | What it protects | Rules | Protection model |
+| :--- | :--- | ---: | :--- |
+| `command.batterycontrol` | Reviews BatteryControl commands that change charging policy, discharge state, or the privileged daemon installation, while keeping read-only status, diagnostics, and help output automatic. | 5 | External opt-in |
+| `command.digline` | Reviews digline commands that spend model calls, write under .digline/, or expose a way to change the approved baseline. digline is a regression gate for LLM applications, the approved reference lives in your repo. | 6 | External opt-in |
+| `command.google-workspace.gog` | Opt-in review of finite pinned gog CLI delivery, sharing, event, export, generic API and identity-override routes. This does not authenticate accounts or mediate provider execution. | 6 | External opt-in |
+| `command.kim` | Reviews kim commands that mutate the local reminder config, daemon state, or notification settings; read-only inspection stays automatic. | 16 | External opt-in |
+| `command.showtime` | Reviews the showtime video-studio CLI's commands that reach beyond the video project: installing tools and models (setup), writing other coding agents' configuration (install), deleting files (setup --prune, clean, voice cache --clear), explicit network downloads (audio music\|lib\|packs fetch, assets media fetch, reference &lt;URL>) and driving a headless browser against a site or a walkthrough script (site capture\|component\|record, demo record). Project-local commands (new, check, render, qa, export, look, snap, receipt, doctor, guide, status) and --help are not matched and remain automatic. Components that ordinary commands fetch on first use (for example a speech model on the first transcription) are outside this extension; `showtime setup --plan` lists them. | 10 | External opt-in |
+| `command.storage-clearer` | Reviews Storage Clearer's run and app-run cleanup entry points while leaving audit, explain, reason, and plan read-only. | 1 | External opt-in |
+| `command.aether-vault` | Reviews Aether-Vault commands that publish, promote, or delete model and dataset state; read-only commands stay quiet. | 7 | External opt-in |
+| `command.blkcp` | Reviews blkcp commands that write directly to raw block devices or bypass safety guards with --force. | 2 | External opt-in |
+| `command.dearmour` | Reviews dearmour commands that can overwrite or merge into an existing destination directory. | 1 | External opt-in |
+| `command.errand` | Requires Errand 0.4.2 or later. Reviews job execution (any operand-bearing invocation) and `fetch --apply`; flag-only and help invocations remain automatic. Conservative port of the v1 detector: declarative matchers cannot exclude known read-only subcommands, so operand-bearing calls like `errand ps` also review. | 2 | External opt-in |
+| `command.snoboard` | Reviews snoboard commands that write initiative.md or fetch from origin. validate, status, and next-number without --fetch only read and are not matched. fix --dry-run, --help, and --version exit without writing. Upstream CLI 0.1.0. | 3 | External opt-in |
+| `command.uivoid` | Reviews uivoid commands that create or reconfigure a live MCP server mapped from an existing API, rotate the credential it calls that API with, or write local session and skill files a later command or agent session will trust. | 5 | External opt-in |
+| `command.agi-memory` | Reviews agi-memory commands that rewrite the canonical memory vault, permanently delete a memory across every synced machine, attach a remote that will receive the whole store, bulk-seed it from git history, or change the invariants injected into later sessions. Reads such as recall, log, inspect, blocks and sync status stay unreviewed. | 6 | External opt-in |
+| `command.librarybridge` | Reviews LibraryBridge commands that relocate or restore Steam Proton data, remove retained originals, record evidence, or write Lutris plans and import state. | 7 | External opt-in |
+| `command.omairc` | Reviews omairc commands that send IRC messages or raise the running window. Read-only inventory commands stay outside these rules. | 2 | External opt-in |
+| `command.repopy` | Reviews repopy CLI operations across repository cloning, dependency installation, remote Git linkage, and non-interactive workspace cleanup. | 3 | External opt-in |
+| `command.dataman` | Reviews state-mutating DataMan CLI commands that initialize projects, scaffold tables or databases, generate/apply migrations, modify credentials, or export sensitive audit and telemetry logs. | 10 | External opt-in |
+| `command.hashdup` | Reviews HashDup duplicate finder commands, approval-gating permanent --delete operations; read-only scans and --trash staging stay under review. | 1 | External opt-in |
+| `command.probe` | Reviews HTTP execution and OpenCollection workspace mutations through the Probe CLI. | 8 | External opt-in |
+| `command.simgit` | Reviews the two simgit flags that destroy work Git cannot return: discarding a dirty worktree and deleting an unmerged branch. | 2 | External opt-in |
+| `command.skills-check-updates` | Reviews skills-check-updates (scu) runs that change installed agent skills. --upgrade reinstalls skills listed in skills-lock.json from their GitHub sources through the skills CLI, rewrites the skill folders under .agents/skills and .claude/skills and updates skills-lock.json; --force overwrites local edits instead of merging them. Read-only reports and direct runs with --help, -h, --version or -v are not matched (launcher forms stay in review). Covers the scu and skills-check-updates executables and npx, bunx, pnpx, pnpm, yarn, npm exec, npm x, bun x, pnpm dlx and yarn dlx launches, including versioned launches (skills-check-updates@tag). | 2 | External opt-in |
+| `command.vaultsync` | Reviews VaultSync commands that prune snapshot history, restore backup data, unregister projects, or repoint project roots while keeping inspection-oriented commands outside the extension review boundary. | 4 | External opt-in |
+| `command.xencode` | Reviews Xencode state-changing CLI operations that can mutate Git worktrees or the local Xencode plugin environment. This community coverage does not certify Xencode or every future CLI feature. | 4 | External opt-in |
+| `command.formicx` | Reviews Formicx mutation lifecycle commands (register, start, stop, restart) while leaving read-only queries (list, status, resources) automatic. exec and xargs launches are already blocked outright by Guard. | 4 | External opt-in |
+| `command.framework.laravel` | Reviews destructive Artisan database wipes, migration resets, and queue purges. | 5 | Built in |
+| `command.macscope` | Reviews MacScopeMCPServer launches that opt into established feature writes, separately gated experimental feature writes, or allowlisted utility execution. | 3 | External opt-in |
+| `command.rungs` | Reviews rungs runs that execute registered gates or write module files, gates and records into a repository, and keeps doctor and the documented previews unreviewed. | 3 | External opt-in |
+| `command.seatbelt-guard` | Reviews seatbelt commands that remove or weaken the guardrail it installs for coding agents: removing its hook, installing it so a crashing hook fails open, and editing agent settings. | 3 | External opt-in |
+| `command.routed` | Reviews host adapter changes, environment reconciliation, and updates through the Routed CLI. | 5 | External opt-in |
+| `command.salesforce.sf` | Opt-in review of pinned Salesforce CLI sf data create, update, delete, export and bulk job resume routes; blocks hard delete. It does not resolve the target org or mediate provider execution. | 7 | External opt-in |
+| `command.genclave` | Reviews gEnclave (ge) security enclave operations that mutate credentials, modify access policies, or unlock persistent sessions. | 3 | External opt-in |
+| `command.redpen` | Reviews Redpen check, which independently executes repository-defined verification commands and writes an evidence report. Output formatting is not a dry run. Cached report/status/explain commands do not rerun project verification. Boundary reviewed against Redpen 0.3.0 and commit 466df0f (0.4.0 development). | 1 | External opt-in |
+| `command.codex-migrate` | Reviews Codex Migrate commands that enable destination-changing migration or recovery operations. | 3 | External opt-in |
+| `command.kindling` | Reviews kindling's `kling` CLI (Firecracker/Virtualization.framework microVMs with a docker-style interface) and the `kling-db`, `kling-mcp` and `kling-phone` extension binaries: credential and secret handoff and database copies at the strictest tier, removal and rollback of machines, volumes, templates and databases, provisioning of new machines, MCP services and extensions, and everyday command execution inside an existing machine. Read-only commands (ps, logs, inspect, top, status, doctor, version, machine audit, graph audit, db audit, the ls/inspect subcommands) match no rule here; kling is not on Guard's built-in safe-command list, so the unknown-executable review floor still applies to them. No safe variants are offered: kling answers -h/--help anywhere before `--` without running the command, but an environment variable kling reads can switch that interception off and a declarative matcher cannot see the inherited environment. | 5 | External opt-in |
+| `command.repo2nb` | Reviews repo2nb commands that can overwrite an existing destination directory or silently drop untracked notebook cells. | 2 | External opt-in |
+| `command.shellroute` | Reviews shellroute routed command execution, persistent proxy start and stop, and API key reveal while leaving status, balance, and country listings automatic. | 3 | External opt-in |
+| `command.vttforge` | Reviews VTTForge CLI commands that write a project: the scaffold, lint fixes, and the v14 migration written in place. The audit, the lint report and the migration preview stay unreviewed. | 3 | External opt-in |
+| `command.x402shield` | Reviews x402Shield commands that can directly affect authorization, signing, migration, or live payment execution. Payment-intent binding stays enforced by x402Shield itself; this descriptor only classifies each invocation. | 4 | External opt-in |
+| `command.claude-tmux` | Reviews claude-tmux-cleanup runs that kill agent-team sessions or Claude Code processes. | 2 | External opt-in |
+| `command.agentbridge` | Reviews AgentBridge CLI commands that can overwrite generated plugin files or execute with an attached app tool registry. | 2 | External opt-in |
+| `command.agentsocks` | Reviews agentsocks commands that edit agent configuration and hooks, message other agent sessions, bind a driver, send message text to a remote classifier, start or expose the gateway, issue gateway tokens and access, link another machine, or add a paid API peer. Read-only commands such as list, status, stats, doctor, whoami, channels, tasks and top are not matched. Based on agentsocks 0.4.0. | 10 | External opt-in |
+| `command.codesage` | Reviews CodeSage commands that install Git hooks or change MCP server registration. doctor, status, and search are outside these rules. | 3 | External opt-in |
+| `command.crisp-tui` | Reviews crisp-tui shell commands that change a Crisp support inbox. `crisp-tui ctl draft` writes a reply or internal note into the composer of the running TUI and never sends it. `crisp-tui cli` forwards every remaining argument to crispctl, whose reply, assign, segment, resolve, and reopen commands write immediately. Read-only control commands (ctl state, goto, screen, details, conversations, messages, drafts, read, and refresh) are not matched. ctl state is an inbox snapshot, not a resolve. The Unix-socket control protocol is not a shell command and is outside this extension. Pinned to crisp-tui 0.2.0 (ca38f362ea558cb09a82fbf3ef1aba3e6fb8692c). | 2 | External opt-in |
+| `command.ctty` | Reviews ctty remote execution (batch exec and bare-host SSH), file transfers (put/get/scp), SFTP/FTP/WebDAV mutations, and local inventory writes (add/edit/move/import), while leaving read-only inspection unmatched. | 7 | External opt-in |
+| `command.iterlay` | Reviews Iterlay CLI invocations that can spend provider quota, write managed or exported files, change workspace state, or install agent configuration. Explicit read-only paths narrow this rule; Guard independent floors remain in effect. | 1 | External opt-in |
+| `command.master-of` | Reviews bulk mutation commands from the master-of (mo) CLI — parking every unparked skill, confirming every pending classification, regenerating AGY gate skills, and toggling Cowork packs — before they run. Diagnostic and inspection commands (mo doctor, mo status/check, mo full, mo search) are not matched by this extension; Guard's default review floor still applies to them. | 4 | External opt-in |
+| `command.xrpl-muse-skill` | Guards the xrpl-muse-skill ceremony: xrpl-trade builds unsigned transaction proposals and never signs; xrpl-sign --approve is the sole hash-bound, policy-gated signer; fresh installs stay read-only until the typed xrpl-trade live ceremony. Proposal, signing, and gate-transition commands review; read-only queries stay inert. | 7 | External opt-in |
+| `command.agenticjobs` | Reviews AgenticJobs CLI commands that change a job board's state: posting or publishing a listing, submitting an application, and deciding on an applicant. Searching, reading drafts and listing applications stay automatic. | 4 | External opt-in |
+| `command.cloudg` | Reviews cloud credential use, security scanner execution, and Terraform file generation through the CloudG CLI. | 3 | External opt-in |
+| `command.faf-cli` | Reviews faf-cli commands that write agent instruction files (AGENTS.md, CLAUDE.md, .cursorrules, GEMINI.md, Copilot instructions), add an MCP server to an agent's config, install git hooks, git drivers or CI workflows, send project context off the machine, or rewrite faf's own project files (project.faf, .fafb, soul.fafm, cards). Read-only commands (score, check, dna, context, drift, log, diff, convert, search, share, wjttc, info, formats, demo) are not matched by this extension; Guard's default handling for commands no rule matches still applies to them. Covers the `faf` and `faf-cli` executables; npx, bunx, pnpx, pnpm, yarn, npm exec, yarn exec, npm x, bun x, pnpm dlx and yarn dlx launches of either bin name; and versioned launches (`pkg@tag`) of the `faf-cli` npm package. | 5 | External opt-in |
+| `command.netdoctor` | Reviews netdoctor, a network health-check CLI that writes nothing locally. Every run sends DNS queries, an ICMP ping, a TCP connect, HTTP GET requests, and usually a traceroute to hosts and paths taken from its arguments, so the arguments can carry data out. Live --watch and --mtr monitors repeat those probes until interrupted and are reviewed separately. | 2 | External opt-in |
+| `command.kelados` | Reviews Kelados CLI commands that write synthesized audio files to disk or start a local HTTP server for text-to-speech synthesis. The read-only `kelados voices` subcommand is not matched; Guard's default handling applies to it. | 2 | External opt-in |
+| `command.blitcp` | Reviews blitcp copies that leave the host, elevate privileges, or skip verification. | 4 | External opt-in |
+| `command.gitsync` | Reviews gitsync's live mirror sync, server-side webhook rewrites, and service install/uninstall. `check`, `status`, and plain `hooks` do not match any rule here; Guard's default floor still applies to them since gitsync is not on the built-in safe-command list and no rule in this extension matches those subcommands. Every mutating subcommand covered here always requires review, even with --help, -h or --dry-run present, because gitsync's flag parser can silently drop those flags depending on argument order and this matcher engine cannot detect when that happened. | 2 | External opt-in |
+| `command.golive` | Reviews the GoLive plan executions that carry an explicit destructive or live confirmation flag. GoLive already refuses account writes without an approved plan id, recomputes that plan's identity before running, and deletes only resources it recorded as its own; the confirmation flags themselves are passed by the caller on the human's behalf, so `golive apply` with --confirm-destroy, --confirm-live or --confirm-dns is where an independent review adds something. The read-only surface (`golive help`, `version`, `update-check`, `detect`, `menu`, `doctor`, `plan`, `teardown`, `verify`, `status`, `handoff`) is outside these rules: `teardown` is the inverse plan and deletes nothing, and `plan` is what prints the plan id a human approves. | 3 | External opt-in |
+| `command.kintsua` | Reviews Kintsua CLI commands that rewrite the committed MCP/OpenAPI tool lockfile or push captured tool schemas to a hosted service. Read-only diff and report runs stay automatic. | 3 | External opt-in |
+| `command.where-are-we` | Reviews where-are-we invocations whose flags write into the mapped repository, install agent hooks, or fetch from ticket trackers; the read surface stays quiet. | 3 | External opt-in |
+| `command.cogext` | Reviews the cogext CLI's mutating commitment operations (add, fulfill, fail). Read-only commands (extract, list, get, stats) are not matched and remain automatic. Note: `cogext add` may initialize ~/.cogext on a fresh machine; that side effect is covered structurally because `add` is in the reviewed set. | 3 | External opt-in |
+| `command.cs` | Reviews cs (Claude Sessions) commands that launch Claude Code in another folder, write pin or archive files, or send session text to a model for a recap. Read-only commands (ls, show) are not matched. | 4 | External opt-in |
+| `command.dispat` | Reviews Dispat release starts while leaving status previews quiet. | 1 | External opt-in |
+| `command.kranz` | Reviews Kranz action execution, runtime lifecycle changes, configuration replacement, and retained evidence deletion. | 10 | External opt-in |
+| `command.llmrig` | External, locally opt-in command safety rules for LLMRig execution, Rescue experiments and report file creation, while excluding read-only inspection commands. | 4 | External opt-in |
+| `command.ollama` | Reviews Ollama commands that publish models to a registry or remove local model data. | 2 | External opt-in |
+| `command.rls-saboteur` | Reviews rls-saboteur runs. It reads the source database read-only, creates temporary labelled copies of it on the same server, breaks policies only in those copies, and drops them. Also reviews the flags that let it run against a non-local database, terminate other sessions on the source, or leave outbound HTTP on in the copies. Direct runs with --help, -h, --version, -v, --dry-run or --checks-only are not matched (launcher forms stay in review). Covers the rls-saboteur executable and npx, bunx, pnpx, pnpm, yarn, npm exec, npm x, bun x, pnpm dlx and yarn dlx launches, including versioned launches (rls-saboteur@tag). | 4 | External opt-in |
+| `command.answerloops` | Reviews answerLoops CLI commands that start a self-hosted instance with Docker Compose or download agent skill files into ./.claude/skills/. Help and usage output are not reviewed. | 2 | External opt-in |
+| `command.envseal` | Reviews EnvSeal CLI commands that inject decrypted secrets into a child process, revoke recipient access and re-encrypt the vault, or rotate the vault encryption key. Read-only inventory commands (list, recipient ls) are not covered and remain automatic. | 3 | External opt-in |
+| `command.noodle` | Reviews request and collection execution through the Noodle terminal REST client. | 1 | External opt-in |
+| `command.repro-surgeon` | Reviews installed Repro Surgeon 0.2.1 execution commands. Doctor, init, and report are outside this rule; npm/npx launchers remain under Package Firewall. Direct node scripts are not covered. Review does not guarantee configuration integrity. | 1 | External opt-in |
+| `command.skill-base` | Reviews authenticated Skill Base CLI publications before local Skill files are uploaded as a new version. | 1 | External opt-in |
+| `command.theourgia` | Reviews Theourgia commands that run code through an external interpreter, delete blocks, install log segments, or change the committed store or a writer's drafts, while leaving the read-only verbs (outline, search, refs, read, grep, log, diff, check and the exports) unmatched. | 5 | External opt-in |
+| `command.ai-dev` | Detects sensitive ai-dev CLI operations and provides structured evidence for policy review. | 5 | External opt-in |
+| `command.appimg` | Conservative operation knowledge compiled from a contributor inventory. | 17 | External opt-in |
+| `command.google-workspace.gws` | Reviews consequential Gmail, Drive, Calendar and authentication/credential-export CLI operations. This opt-in compatibility extension does not authenticate accounts, isolate credentials or provide immutable managed dispatch. | 5 | External opt-in |
+| `command.keibidrop` | Reviews kd commands that share a local file with a peer, write a peer's file to local disk, or set which peer identity the session accepts. | 3 | External opt-in |
+| `command.mcpguard` | Reviews mcp-guard runs that start processes, approve a trust baseline or write message bodies to disk. proxy, test-injection --run and --live (inspect, lock, ui, snapshot save) start the MCP servers named in a config or on the command line, or the given agent script. lock writes the lock file that later runs compare against, so running it approves the current tools, including a changed description. proxy --record-bodies keeps full JSON-RPC messages, which can contain secrets, in the journal. Static audits (inspect, scan, ui, snapshot save and diff without --live), journal export, test-injection without --run, and direct runs with --help or --version (except proxy, whose later arguments go to the server) are not matched by this extension; Guard's default handling for commands no rule matches still applies to them. Covers the mcp-guard and mcp-guard-audit executables (including .cmd/.exe). uvx, uv tool run and pipx run launches of the package are covered by command.package.python. | 3 | External opt-in |
+| `command.pyrig` | Reviews pyrig project initialization, synchronization, scratch execution, scaffolding, cache deletion, and integration removal. Covers direct pyrig entrypoints and uv run pyrig, not arbitrary project CLIs, plugin commands, or other launchers. Help and version do not match operation rules; independent Guard requirements still apply. Based on pyrig 18.99.1; installed plugins and overrides can change behavior. | 8 | External opt-in |
+| `command.syngraphe` | Reviews shared repository context initialization, document creation, state archiving, and agent policy creation through syngraphe or syg. | 4 | External opt-in |
+
+<!-- END GENERATED EXTENSION DIRECTORY -->
+
+## Contribute
+
+Start with the [Extension contribution guide](contributing.md). It covers proposal quality, stable identity design,
+matcher constraints, safe-counterpart tests, privacy, validation, and the review rubric. New command coverage enters
+the vetted built-in registry; Guard does not import executable detector code from workspaces or downloaded bundles.
+
+For a large implementation, open a draft pull request with the **Command extension** template early so
+maintainers can confirm scope and avoid overlapping IDs before the implementation is complete.
+
+## Architecture and authority
+
+- [Command Extension architecture](../command-extension-architecture.md)
+- [Extension precedence and minimum actions](../command-extension-precedence.md)
+- [Command Extension threat model](../command-extension-threat-model.md)
+- [Local Extensions and protection settings](../managed-controls-local-extensions.md)
