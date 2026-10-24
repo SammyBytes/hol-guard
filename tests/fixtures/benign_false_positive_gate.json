@@ -25428,8 +25428,7 @@
         "codex",
         "zcode",
         "claude-code",
-        "omp",
-        "cursor"
+        "omp"
       ],
       "tool": "shell",
       "tool_input": {
@@ -25445,8 +25444,7 @@
         "codex",
         "zcode",
         "claude-code",
-        "omp",
-        "cursor"
+        "omp"
       ],
       "tool": "shell",
       "tool_input": {
@@ -25462,8 +25460,7 @@
         "codex",
         "zcode",
         "claude-code",
-        "omp",
-        "cursor"
+        "omp"
       ],
       "tool": "shell",
       "tool_input": {
