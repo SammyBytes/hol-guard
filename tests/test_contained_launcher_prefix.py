@@ -160,9 +160,7 @@ def _plan_only_pytest(command: list[str], **_: object) -> None:
         raise RestrictedPytestError(PYTEST_INVALID_COMMAND_REASON_CODE, "accepts only a pytest executable")
 
 
-@pytest.mark.parametrize(
-    "text", ["nice -n 10 pytest -q", "nice pytest -q", "stdbuf -oL pytest -q", "exec pytest -q"]
-)
+@pytest.mark.parametrize("text", ["nice -n 10 pytest -q", "nice pytest -q", "stdbuf -oL pytest -q", "exec pytest -q"])
 def test_the_sink_runs_the_program_the_receipt_authorized(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, text: str
 ) -> None:
@@ -197,3 +195,48 @@ def test_the_sink_still_refuses_a_launcher_native_authority_does_not_read(
             payload, workspace=tmp_path, timeout_seconds=20, authorize=lambda _: _required()
         )
     assert refused.value.reason_code == "contained_run_authorization_failed"
+
+
+def _unavailable(*_: object, **__: object) -> object:
+    raise RestrictedPytestError("native_contained_argv_unavailable", "native authority is unavailable")
+
+
+def test_a_native_failure_in_the_receipt_peel_still_reaches_the_workspace_sandbox(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The peel asks native authority, so its failure must not escape the sink.
+
+    Rust may still have chosen the workspace sandbox for this command. The
+    receipt-time peel raises `RestrictedPytestError`, not `ValueError`, so a
+    handler that reads only `ValueError` would refuse the command before the
+    live decision was ever asked for.
+    """
+    ran: list[object] = []
+    monkeypatch.setattr(native_restricted_pytest, "restricted_native", _unavailable)
+    monkeypatch.setattr(sink, "run_workspace_contained", lambda *_, **__: ran.append(True) or 0)
+    receipt = {
+        "decision": "deny",
+        "policy_action": "sandbox-required",
+        "reason_code": "native_workspace_containment_required",
+        "required_execution_profile": "workspace-contained-v1",
+        "command_binding_digest": "0" * 64,
+    }
+    payload = {"hook_event_name": "PreToolUse", "tool_name": "bash", "tool_input": {"command": "nice pytest -q"}}
+    assert (
+        sink.run_authorized_contained_test(payload, workspace=tmp_path, timeout_seconds=20, authorize=lambda _: receipt)
+        == 0
+    )
+    assert ran == [True]
+
+
+def test_a_native_failure_with_no_workspace_receipt_refuses(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """With no live workspace receipt the command is still refused, closed."""
+    monkeypatch.setattr(native_restricted_pytest, "restricted_native", _unavailable)
+    monkeypatch.setattr(sink, "run_workspace_contained", lambda *_, **__: pytest.fail("ran"))
+    monkeypatch.setattr(sink, "run_restricted_pytest", lambda *_, **__: pytest.fail("ran"))
+    payload = {"hook_event_name": "PreToolUse", "tool_name": "bash", "tool_input": {"command": "nice pytest -q"}}
+    with pytest.raises(RestrictedPytestError) as refused:
+        sink.run_authorized_contained_test(
+            payload, workspace=tmp_path, timeout_seconds=20, authorize=lambda _: _required()
+        )
+    assert refused.value.reason_code == "native_contained_argv_unavailable"
