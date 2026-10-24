@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/chunks/home-dashboard-v6Zkm68d.js","assets/chunks/home-protection-module-Du65PsUR.js","assets/chunks/about-content-Dr9zFg1V.js","assets/chunks/app-catalog-BU3dzTBu.js","assets/chunks/fleet-workspace-CbqphIX4.js","assets/chunks/harness-version-label-BEu-FrKY.js","assets/chunks/connect-guard-cloud-button-D3-S0tLq.js","assets/chunks/settings-save-proof-modal-DSJONzDi.js","assets/chunks/settings-workspace-CpitooFy.js","assets/chunks/confirm-dialog-DClNtuX1.js","assets/chunks/extensions-workspace-BiG33v6D.js","assets/chunks/app-detail-workspace-3cnkv6h5.js","assets/chunks/policy-workspace-page--QnvLElq.js","assets/chunks/about-workspace-C53pvFtC.js","assets/about-workspace.css"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/chunks/home-dashboard-v6Zkm68d.js","assets/chunks/home-protection-module-Du65PsUR.js","assets/chunks/about-content-Dr9zFg1V.js","assets/chunks/app-catalog-BU3dzTBu.js","assets/chunks/fleet-workspace-CbqphIX4.js","assets/chunks/harness-version-label-BEu-FrKY.js","assets/chunks/connect-guard-cloud-button-D3-S0tLq.js","assets/chunks/settings-save-proof-modal-DSJONzDi.js","assets/chunks/settings-workspace-CpitooFy.js","assets/chunks/confirm-dialog-DClNtuX1.js","assets/chunks/extensions-workspace-BiG33v6D.js","assets/chunks/app-detail-workspace-3cnkv6h5.js","assets/chunks/policy-workspace-page--QnvLElq.js","assets/chunks/about-workspace-CDlcFoNt.js","assets/about-workspace.css"])))=>i.map(i=>d[i]);
 (function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) return;
@@ -37103,7 +37103,7 @@ const PolicyWorkspacePage = lazyWorkspace(
 );
 const AboutWorkspace = lazyWorkspace(
   "about-workspace",
-  () => __vitePreload(() => import("./chunks/about-workspace-C53pvFtC.js"), true ? __vite__mapDeps([13,2,14]) : void 0).then((m) => ({ default: m.AboutWorkspace }))
+  () => __vitePreload(() => import("./chunks/about-workspace-CDlcFoNt.js"), true ? __vite__mapDeps([13,2,14]) : void 0).then((m) => ({ default: m.AboutWorkspace }))
 );
 const ReleasesWorkspace = lazyWorkspace(
   "releases-workspace",
@@ -37987,6 +37987,7 @@ function App() {
           cloudState: runtime.snapshot.cloud_state ?? "unknown",
           cloudStateLabel: runtime.snapshot.cloud_state_label ?? "Unknown",
           syncConfigured: runtime.snapshot.sync_configured ?? false,
+          syncHealth: runtime.snapshot.cloud_sync_health?.state ?? null,
           pendingCount: runtime.snapshot.pending_count ?? 0,
           receiptCount: runtime.snapshot.receipt_count ?? 0,
           protectedAppCount: 0

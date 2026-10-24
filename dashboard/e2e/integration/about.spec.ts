@@ -1,9 +1,31 @@
 import { expect, expectNoErrorBoundary, daemonApi, test } from "./fixtures";
 
-type RuntimeSnapshot = { pending_count: number; receipt_count: number; cloud_state?: string | null };
+type RuntimeSnapshot = {
+  pending_count: number;
+  receipt_count: number;
+  cloud_state?: string | null;
+  cloud_sync_health?: { state: string } | null;
+};
 
-// The figure only claims a sync state the daemon reports; anything else reads "Unavailable".
-const SYNC_LABEL: Record<string, string> = { paired_active: "On", paired_waiting: "First sync", local_only: "Off" };
+// The figure only claims a sync state the daemon reports; anything else reads
+// "Unavailable". A pairing reads "On" only while current sync health is landing.
+const PAIRED_ACTIVE_LABEL: Record<string, string> = {
+  healthy: "On",
+  pending: "On",
+  failed: "Not syncing",
+  degraded: "Not syncing",
+  stale: "Not syncing",
+  disabled: "Off",
+};
+
+function expectedSyncLabel(runtime: RuntimeSnapshot): string {
+  if (runtime.cloud_state === "paired_active") {
+    return PAIRED_ACTIVE_LABEL[runtime.cloud_sync_health?.state ?? ""] ?? "Unavailable";
+  }
+  if (runtime.cloud_state === "paired_waiting") return "First sync";
+  if (runtime.cloud_state === "local_only") return "Off";
+  return "Unavailable";
+}
 
 // Every outbound link the About page may show: name -> destination. A change
 // here is a change to what the page sends people to, so review it as one.
@@ -72,7 +94,7 @@ test.describe("About against the live daemon", () => {
     // Each readout on the figure is a label next to its value, so its text reads label+value.
     const chip = (label: string, value: string) => page.getByRole("main").getByText(`${label}${value}`, { exact: true });
     await expect(chip("Guard version", update.current_version)).toBeVisible();
-    await expect(chip("Sync", SYNC_LABEL[runtime.cloud_state ?? ""] ?? "Unavailable")).toBeVisible();
+    await expect(chip("Sync", expectedSyncLabel(runtime))).toBeVisible();
     await expect(chip("Receipts", new Intl.NumberFormat("en-US").format(runtime.receipt_count))).toBeVisible();
     await expect(
       chip("Local protection", runtime.pending_count > 0 ? `${runtime.pending_count} pending` : "Active"),

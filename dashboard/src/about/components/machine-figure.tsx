@@ -12,13 +12,32 @@ import { formatAboutCount } from "../about-format";
  * are outside. The numbered callouts point at the Trust Contract claims below.
  */
 
-type SyncState = "on" | "pairing" | "off" | "unavailable";
+type SyncState = "on" | "stalled" | "pairing" | "off" | "unavailable";
 
-/** What the figure may claim about sync. Unknown states claim nothing. */
+/**
+ * What the figure may claim about sync. Unknown states claim nothing.
+ *
+ * A pairing alone never proves a transfer: the gate opens only when Guard
+ * Cloud is paired and current sync health says uploads are landing. A device
+ * waiting on its first sync, or one whose connection needs a retry, reports
+ * `paired_waiting`, so that state is drawn closed.
+ */
 function resolveSyncState(runtimeSummary: AboutRuntimeSummary | null): SyncState {
   switch (runtimeSummary?.cloudState) {
     case "paired_active":
-      return "on";
+      switch (runtimeSummary.syncHealth) {
+        case "healthy":
+        case "pending":
+          return "on";
+        case "failed":
+        case "degraded":
+        case "stale":
+          return "stalled";
+        case "disabled":
+          return "off";
+        default:
+          return "unavailable";
+      }
     case "paired_waiting":
       return "pairing";
     case "local_only":
@@ -30,6 +49,7 @@ function resolveSyncState(runtimeSummary: AboutRuntimeSummary | null): SyncState
 
 export const SYNC_STATE_LABEL: Record<SyncState, string> = {
   on: "On",
+  stalled: "Not syncing",
   pairing: "First sync",
   off: "Off",
   unavailable: "Unavailable",
@@ -37,7 +57,8 @@ export const SYNC_STATE_LABEL: Record<SyncState, string> = {
 
 const SYNC_CAPTION: Record<SyncState, string> = {
   on: "Sync is on, so policy summaries and receipt history cross the gate to Guard Cloud.",
-  pairing: "First sync is in progress: this device is sending its first shared proof to Guard Cloud.",
+  stalled: "Guard Cloud is connected, but recent syncs have not landed, so nothing is crossing the gate right now.",
+  pairing: "This device is paired with Guard Cloud and waiting for its first sync; nothing has crossed the gate yet.",
   off: "Sync is off, so nothing on this device crosses the gate.",
   unavailable: "Guard could not report its sync state, so this figure makes no claim about the gate.",
 };
@@ -48,7 +69,7 @@ export function MachineFigure({
   runtimeSummary: AboutRuntimeSummary | null;
 }) {
   const sync = resolveSyncState(runtimeSummary);
-  const open = sync === "on" || sync === "pairing";
+  const open = sync === "on";
 
   return (
     <figure aria-labelledby="about-figure-caption" className="about-figure">
@@ -216,7 +237,7 @@ function StoreItem({
 
 /** The gate sits on the device's edge: it breaks the frame line it stands on. */
 function SyncGate({ sync }: { sync: SyncState }) {
-  const open = sync === "on" || sync === "pairing";
+  const open = sync === "on";
   return (
     <div className="relative z-10 -mt-5 flex justify-center lg:col-start-2 lg:row-start-2 lg:mt-0 lg:-ml-20 lg:w-40 lg:self-center">
       <div
@@ -229,7 +250,11 @@ function SyncGate({ sync }: { sync: SyncState }) {
           <Callout n={3} />
         </span>
         <span className="mt-2 block">
-          <Readout label="Sync" value={SYNC_STATE_LABEL[sync]} attention={sync === "pairing"} />
+          <Readout
+            label="Sync"
+            value={SYNC_STATE_LABEL[sync]}
+            attention={sync === "pairing" || sync === "stalled"}
+          />
         </span>
         <span className="mt-2 block text-xs leading-5 text-brand-dark/75">{GATE_CARRIES[sync]}</span>
       </div>
@@ -239,7 +264,8 @@ function SyncGate({ sync }: { sync: SyncState }) {
 
 const GATE_CARRIES: Record<SyncState, string> = {
   on: "Carries policy summaries and receipt history.",
-  pairing: "Sending the first shared proof now.",
+  stalled: "Would carry policy summaries and receipt history once sync recovers.",
+  pairing: "Waiting for the first sync to land.",
   off: "Would carry policy summaries and receipt history.",
   unavailable: "Would carry policy summaries and receipt history.",
 };

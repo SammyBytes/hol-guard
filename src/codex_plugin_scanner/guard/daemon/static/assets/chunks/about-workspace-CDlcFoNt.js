@@ -120,7 +120,19 @@ function formatAboutCount(value) {
 function resolveSyncState(runtimeSummary) {
   switch (runtimeSummary?.cloudState) {
     case "paired_active":
-      return "on";
+      switch (runtimeSummary.syncHealth) {
+        case "healthy":
+        case "pending":
+          return "on";
+        case "failed":
+        case "degraded":
+        case "stale":
+          return "stalled";
+        case "disabled":
+          return "off";
+        default:
+          return "unavailable";
+      }
     case "paired_waiting":
       return "pairing";
     case "local_only":
@@ -131,13 +143,15 @@ function resolveSyncState(runtimeSummary) {
 }
 const SYNC_STATE_LABEL = {
   on: "On",
+  stalled: "Not syncing",
   pairing: "First sync",
   off: "Off",
   unavailable: "Unavailable"
 };
 const SYNC_CAPTION = {
   on: "Sync is on, so policy summaries and receipt history cross the gate to Guard Cloud.",
-  pairing: "First sync is in progress: this device is sending its first shared proof to Guard Cloud.",
+  stalled: "Guard Cloud is connected, but recent syncs have not landed, so nothing is crossing the gate right now.",
+  pairing: "This device is paired with Guard Cloud and waiting for its first sync; nothing has crossed the gate yet.",
   off: "Sync is off, so nothing on this device crosses the gate.",
   unavailable: "Guard could not report its sync state, so this figure makes no claim about the gate."
 };
@@ -145,7 +159,7 @@ function MachineFigure({
   runtimeSummary
 }) {
   const sync = resolveSyncState(runtimeSummary);
-  const open = sync === "on" || sync === "pairing";
+  const open = sync === "on";
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("figure", { "aria-labelledby": "about-figure-caption", className: "about-figure", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid lg:grid-cols-[minmax(0,1fr)_5rem_2.5rem_minmax(0,11rem)] lg:grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)]", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(DevicePerimeter, { runtimeSummary }),
@@ -283,7 +297,7 @@ function StoreItem({
   ] });
 }
 function SyncGate({ sync }) {
-  const open = sync === "on" || sync === "pairing";
+  const open = sync === "on";
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "relative z-10 -mt-5 flex justify-center lg:col-start-2 lg:row-start-2 lg:mt-0 lg:-ml-20 lg:w-40 lg:self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
     "div",
     {
@@ -293,7 +307,14 @@ function SyncGate({ sync }) {
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-semibold text-brand-dark", children: "Sync gate" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(Callout, { n: 3 })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mt-2 block", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Readout, { label: "Sync", value: SYNC_STATE_LABEL[sync], attention: sync === "pairing" }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mt-2 block", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+          Readout,
+          {
+            label: "Sync",
+            value: SYNC_STATE_LABEL[sync],
+            attention: sync === "pairing" || sync === "stalled"
+          }
+        ) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mt-2 block text-xs leading-5 text-brand-dark/75", children: GATE_CARRIES[sync] })
       ]
     }
@@ -301,7 +322,8 @@ function SyncGate({ sync }) {
 }
 const GATE_CARRIES = {
   on: "Carries policy summaries and receipt history.",
-  pairing: "Sending the first shared proof now.",
+  stalled: "Would carry policy summaries and receipt history once sync recovers.",
+  pairing: "Waiting for the first sync to land.",
   off: "Would carry policy summaries and receipt history.",
   unavailable: "Would carry policy summaries and receipt history."
 };
