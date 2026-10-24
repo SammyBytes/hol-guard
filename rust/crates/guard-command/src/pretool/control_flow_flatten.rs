@@ -123,12 +123,33 @@ fn subject(rest: &str) -> Option<(&str, &str)> {
 /// Whether dropping this text would drop a command with it. A parameter the
 /// shell only expands carries none, and is kept out of the flat list the way
 /// a conditional keeps the expansions it held.
+///
+/// A process substitution runs its own command list before the `case` chooses
+/// anything, so `<(` and `>(` carry one as plainly as a backtick does.
 fn starts_a_command(text: &str) -> bool {
     text.contains('`')
         || text.contains("$(")
-        || text.match_indices("${").any(|(index, _)| {
-            !text[index + 2..].starts_with(|c: char| c.is_alphanumeric() || matches!(c, '_' | '#'))
-        })
+        || text.contains("<(")
+        || text.contains(">(")
+        || text
+            .match_indices("${")
+            .any(|(index, _)| !reads_a_value(&text[index + 2..]))
+}
+
+/// Whether this `${...}` only reads a value. `${NAME}` and `${#NAME}` do.
+/// Every other form does more than read: `${NAME@P}` expands the value as a
+/// prompt string, which runs a command substitution the value holds, and
+/// `${NAME:=word}` writes the variable that the lookup after it reads. The
+/// text of such a value is not in front of us, so the expansion is read as
+/// carrying a command rather than as inert.
+fn reads_a_value(rest: &str) -> bool {
+    let rest = rest.strip_prefix('#').unwrap_or(rest);
+    let Some(end) = rest.find('}') else {
+        return false;
+    };
+    let name = &rest[..end];
+    name.starts_with(|c: char| c.is_alphanumeric() || c == '_')
+        && name.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
 
 /// A pattern the flat list may drop: bare glob text, after the optional `(`
