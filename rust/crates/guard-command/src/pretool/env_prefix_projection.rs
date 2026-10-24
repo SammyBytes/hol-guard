@@ -213,11 +213,18 @@ fn strip_prefixes(
     // a floor that `env -u NODE_OPTIONS npm test` does not. `exec -c` runs
     // with an empty environment and `exec -a` renames the program, so only the
     // option-less spelling is transparent.
+    //
+    // Only an `env` wrapper may follow. A shell recognizes an assignment word
+    // only in front of the command word, and here `exec` is that word, so the
+    // `LC_ALL=C` of `exec LC_ALL=C ls src` is the program `exec` is asked to
+    // run, not a setting in front of `ls`. Reading past `exec` there would
+    // strip the word the shell actually executes and hand the reviewer a
+    // command the caller never wrote.
     let launcher = (tokens[index].value == "exec"
         && literal_word(chars, &tokens[index])
         && index + 1 < tokens.len()
         && !tokens[index + 1].is_control
-        && !tokens[index + 1].value.starts_with('-'))
+        && matches!(tokens[index + 1].value.as_str(), "env" | "/usr/bin/env"))
     .then(|| {
         let at = index;
         index += 1;
