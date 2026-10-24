@@ -288,3 +288,49 @@ fn a_relative_path_without_a_skills_ancestor_is_not_primary() {
         SkillDocumentReadabilityV1::NotPrimarySkillDocument
     );
 }
+
+#[test]
+fn the_long_s_spelling_of_the_primary_name_still_names_the_primary_document() {
+    let fixture = Fixture::new("long-s");
+    let directory = fixture.root.join("skills").join("alpha");
+    fs::create_dir_all(&directory).expect("skill directory");
+    // `str.casefold` in the reader this replaces folded `\u{17f}` to `s`, so
+    // this file named the primary document there. `to_lowercase` alone leaves
+    // the letter as it is, which would have quietly stopped reading it.
+    let document = directory.join("\u{17f}KILL.md");
+    fs::write(&document, "# Title\n").expect("skill document");
+
+    let evidence = read(&document, &fixture.safe_roots());
+
+    assert_eq!(
+        evidence.readability_status,
+        SkillDocumentReadabilityV1::Readable
+    );
+    assert_eq!(evidence.line_count, Some(1));
+}
+
+#[test]
+fn a_path_that_walks_upward_is_not_primary() {
+    let fixture = Fixture::new("walks-upward");
+    fixture.document("alpha", "# Title\n");
+    let outside = fixture.root.join("outside");
+    fs::create_dir_all(&outside).expect("outside directory");
+    fs::write(outside.join("skill.md"), "# Elsewhere\n").expect("outside document");
+    // The `skills` ancestor this path offers is real, so the safe-root check
+    // reads a root inside the fixture while the file is the one next door.
+    let document = fixture
+        .root
+        .join("skills")
+        .join("alpha")
+        .join("..")
+        .join("..")
+        .join("outside")
+        .join("skill.md");
+
+    let evidence = read(&document, &fixture.safe_roots());
+
+    assert_eq!(
+        evidence.readability_status,
+        SkillDocumentReadabilityV1::NotPrimarySkillDocument
+    );
+}

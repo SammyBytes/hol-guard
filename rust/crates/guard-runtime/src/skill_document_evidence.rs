@@ -54,9 +54,28 @@ fn is_symlink(path: &Path) -> bool {
     fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
 }
 
+/// Whether this path's last component is the expected name, compared the way
+/// the Python reader compared it.
+///
+/// `str::casefold` there folds `\u{17f}` to `s`, which `to_lowercase` leaves
+/// alone, so `\u{17f}KILL.md` named the primary document for the reader this
+/// replaces. Upper-casing first reaches the same letter, and folds `\u{df}` to
+/// `ss` the same way, so the two readers agree on which file is primary.
 fn component_name_is(path: &Path, expected: &str) -> bool {
     path.file_name()
-        .is_some_and(|name| name.to_string_lossy().to_lowercase() == expected)
+        .is_some_and(|name| name.to_string_lossy().to_uppercase().to_lowercase() == expected)
+}
+
+/// Whether the text walks upward out of the directories it names.
+///
+/// Nothing that discovers a skill document writes a `..` into its path, so a
+/// path carrying one is not a document this reader was handed. It matters
+/// because the safe-root check below reads the `skills` root rather than the
+/// document: `skills/x/../../../elsewhere/SKILL.md` keeps a root inside the
+/// safe roots while the file it resolves to sits outside the skills tree.
+fn walks_upward(path: &Path) -> bool {
+    path.components()
+        .any(|component| matches!(component, std::path::Component::ParentDir))
 }
 
 /// The nearest ancestor directory named `skills`.
@@ -92,7 +111,7 @@ pub(crate) fn read_skill_document_evidence(
     process_directory: &Path,
     safe_roots: &[PathBuf],
 ) -> SkillDocumentEvidenceV1 {
-    if !component_name_is(document, "skill.md") {
+    if !component_name_is(document, "skill.md") || walks_upward(document) {
         return stopped(SkillDocumentReadabilityV1::NotPrimarySkillDocument);
     }
     let Some(root) = skills_root(document) else {
@@ -119,7 +138,11 @@ pub(crate) fn read_skill_document_evidence(
         .iter()
         .filter_map(|root| fs::canonicalize(anchor(root, process_directory)).ok())
         .any(|root| resolved_root.starts_with(root));
-    if !within_a_safe_root {
+    // The root is what the safe roots are checked against, so the document has
+    // to be the one that root holds. Every symlink between the two is already
+    // refused above, which leaves this an assertion for the paths that reach
+    // here rather than a second resolution of its own.
+    if !within_a_safe_root || !resolved.starts_with(&resolved_root) {
         return stopped(SkillDocumentReadabilityV1::OutsideSafeRoots);
     }
     read_resolved_document(&resolved)

@@ -74,6 +74,19 @@ fn an_unbalanced_ipv6_bracket_is_not_a_remote_host() {
 }
 
 #[test]
+fn a_bracketed_host_that_is_not_an_address_is_not_a_remote_host() {
+    // `urlsplit` checks what the brackets hold, so a name in them raises
+    // there too and never reaches the scanner as a host.
+    assert!(!is_remote_url("https://[api.example.com]/items"));
+    assert!(!is_remote_url("https://[127.0.0.1]/items"));
+    assert!(!is_remote_url("https://[]/items"));
+    // An IPv6 literal and an IPvFuture address are what brackets are for.
+    assert!(is_remote_url("https://[2606:4700::1111]/items"));
+    assert!(is_remote_url("https://[v7.host]/items"));
+    assert!(!is_remote_url("https://[::1]:8080/items"));
+}
+
+#[test]
 fn a_bare_host_without_a_path_still_reads_as_remote() {
     assert!(is_remote_url("https://api.example.com"));
     assert!(is_remote_url("https://api.example.com:8443"));

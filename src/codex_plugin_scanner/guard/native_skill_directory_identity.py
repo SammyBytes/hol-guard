@@ -296,13 +296,20 @@ def native_skill_document_evidence(
 
     if not isinstance(skill_document, str) or not skill_document:
         return None
+    try:
+        process_directory = os.getcwd()
+    except OSError:
+        # A process whose working directory has been removed has no directory
+        # to anchor a relative document against, and the caller's own
+        # unavailable evidence is the answer that leaves.
+        return None
     encoding = "utf16le" if _is_windows() else "os_bytes"
     roots = [root for root in safe_roots if root is not None]
     payload = _exchange(
         {
             "kind": "document_evidence",
             "skill_document_hex": _encoded_text(skill_document),
-            "process_directory_hex": _encoded_path(Path(os.getcwd())),
+            "process_directory_hex": _encoded_path(Path(process_directory)),
             "safe_roots_hex": [_encoded_path(root) for root in roots],
             "path_encoding": encoding,
         },

@@ -4,8 +4,8 @@
 //! `SKILL.md`: how many lines and headings it has, whether it opens with
 //! frontmatter, and whether its prose documents network egress. Everything
 //! here is a pure function of the document text, so the parity vectors in
-//! `tests/fixtures/skill-document-evidence-parity.v1.json` pin it against the
-//! behaviour the scanner shipped.
+//! `tests/fixtures/skill-document-text-evidence-parity.v1.json` pin it
+//! against the behaviour the scanner shipped.
 //!
 //! Path checks, the `O_NOFOLLOW` open and the bounded read stay in
 //! `guard-runtime`, which owns filesystem access.
@@ -243,6 +243,27 @@ fn is_remote_url(value: &str) -> bool {
     }
 }
 
+/// `urllib.parse._check_bracketed_host`: what may stand between `[` and `]`.
+///
+/// Brackets in an authority carry an IPv6 literal or an IPvFuture address and
+/// nothing else, so `https://[api.example.com]/x` is a `ValueError` for the
+/// reader this replaces rather than a URL naming `api.example.com`. Reading it
+/// as a host would make a document remote that the scanner read as local.
+fn bracketed_host_is_an_address(host: &str) -> Result<(), ()> {
+    if let Some(version) = host.strip_prefix('v') {
+        // `\Av[a-fA-F0-9]+\..+\Z`: a hex version, a dot, then a body.
+        let (digits, body) = version.split_once('.').ok_or(())?;
+        let hex = !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_hexdigit());
+        return (hex && !body.is_empty()).then_some(()).ok_or(());
+    }
+    match IpAddr::from_str(host) {
+        Ok(IpAddr::V6(_)) => Ok(()),
+        // An IPv4 address in brackets is rejected by name there, and anything
+        // that is not an address at all never parsed to begin with.
+        Ok(IpAddr::V4(_)) | Err(_) => Err(()),
+    }
+}
+
 /// `urlsplit(value).hostname` for the `http(s)` URLs this module matches.
 ///
 /// `Err` is the `ValueError` Python raises for an unbalanced IPv6 bracket;
@@ -266,6 +287,10 @@ fn url_hostname(value: &str) -> Result<Option<String>, ()> {
     };
     if netloc.contains('[') != netloc.contains(']') {
         return Err(());
+    }
+    if let Some(open) = netloc.find('[') {
+        let close = netloc[open + 1..].find(']').ok_or(())?;
+        bracketed_host_is_an_address(&netloc[open + 1..open + 1 + close])?;
     }
     let host = match netloc.rfind('@') {
         Some(index) => &netloc[index + 1..],
