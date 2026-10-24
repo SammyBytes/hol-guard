@@ -14,9 +14,31 @@ fn a_trailing_brace_group_reads_as_its_command_list() {
 }
 
 #[test]
-fn a_group_that_does_not_end_the_command_keeps_its_review() {
-    assert_eq!(unwrap("{ pytest -q; } 2>&1"), None);
-    assert_eq!(unwrap("{ npm test; } && echo done"), None);
+fn a_group_of_one_command_reads_as_that_command_wherever_it_stands() {
+    // Braces group without a child shell, so one command inside them runs
+    // exactly as it runs without them, whatever follows the group.
+    assert_eq!(
+        unwrap("{ pytest -q; } 2>&1").as_deref(),
+        Some("pytest -q    2>&1")
+    );
+    assert_eq!(
+        unwrap("{ npm test; } && echo done").as_deref(),
+        Some("npm test    && echo done")
+    );
+    assert_eq!(unwrap("{ ls; } | wc -l").as_deref(), Some("ls    | wc -l"));
+    assert_eq!(
+        unwrap("npm test | { tee log; }").as_deref(),
+        Some("npm test |   tee log")
+    );
+}
+
+#[test]
+fn a_group_that_does_not_end_the_command_keeps_a_list_body() {
+    // Blanking these would end the pipeline or the conditional at the body's
+    // own separator, which is not the command that was submitted.
+    assert_eq!(unwrap("{ ls; cat Cargo.toml; } | head"), None);
+    assert_eq!(unwrap("{ npm ci; npm test; } && echo done"), None);
+    assert_eq!(unwrap("npm test | { tee log; cat log; }"), None);
 }
 
 #[test]
@@ -43,7 +65,7 @@ fn a_quoted_or_escaped_brace_is_not_a_group() {
 #[test]
 fn a_group_that_does_not_open_a_list_element_is_not_unwrapped() {
     assert_eq!(unwrap("echo hi { npm test; }"), None);
-    assert_eq!(unwrap("npm test | { tee log; }"), None);
+    assert_eq!(unwrap("echo hi; echo there { npm test; }"), None);
 }
 
 #[test]

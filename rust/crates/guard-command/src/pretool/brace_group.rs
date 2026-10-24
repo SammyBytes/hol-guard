@@ -14,6 +14,12 @@
 //! (`echo {a,b}`) and parameter expansion (`${HOME}`) are never read as a
 //! group. Anything this recognizer does not fully understand returns `None`,
 //! which keeps the existing review behavior.
+//!
+//! The group need not end the command. Braces group without a child shell,
+//! so a single command inside them runs exactly as it runs without them:
+//! `{ ls; } | wc -l` and `{ cd web; } && npm ci` are the blanked text written
+//! twice. A body that is itself a list keeps its braces, because blanking
+//! `{ a; b; } | c` would pipe `b` alone.
 
 const MAX_COMMAND_BYTES: usize = 8192;
 
@@ -36,9 +42,11 @@ pub(crate) fn unwrap(command: &str) -> Option<String> {
     }
     let chars: Vec<char> = command.chars().collect();
     let (open, close) = unquoted_braces(&chars)?;
-    if close + 1 != chars.len() || !super::trailing_group::opens_list_element(&chars, open) {
+    let piped_into = super::trailing_group::follows_a_pipe(&chars, open);
+    if !super::trailing_group::opens_list_element(&chars, open) && !piped_into {
         return None;
     }
+    let trailed = close + 1 != chars.len();
     // The reserved word is `{` followed by a blank; `{a,b}` is one word.
     if !matches!(chars.get(open + 1), Some(c) if c.is_whitespace()) {
         return None;
@@ -61,7 +69,16 @@ pub(crate) fn unwrap(command: &str) -> Option<String> {
     // its group. A group that opens the command, or holds a single command
     // behind one of those operators, means the same either way.
     let first = inner.iter().position(|c| !c.is_whitespace())?;
-    if follows_a_conditional(&chars, open) && holds_a_list_operator(&inner[first..last]) {
+    let body_is_a_list = holds_a_list_operator(&inner[first..last]);
+    if follows_a_conditional(&chars, open) && body_is_a_list {
+        return None;
+    }
+    // A group that is not the last element of the command keeps whatever
+    // follows it. One command answers for the group either way, so blanking
+    // the braces leaves the same list; a body that is itself a list does not,
+    // because its separators would then end the pipeline or the conditional
+    // the group stood in.
+    if (trailed || piped_into) && body_is_a_list {
         return None;
     }
     let mut ungrouped = chars;
@@ -165,7 +182,7 @@ fn follows_a_conditional(chars: &[char], open: usize) -> bool {
 
 /// Whether the body is itself a list rather than one command: a `;`, a newline
 /// or an unquoted `&` or `|` the shell would act on.
-fn holds_a_list_operator(inner: &[char]) -> bool {
+pub(super) fn holds_a_list_operator(inner: &[char]) -> bool {
     let mut single = false;
     let mut double = false;
     let mut escaped = false;
