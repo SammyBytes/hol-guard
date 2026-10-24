@@ -93,7 +93,10 @@ fn legacy_rule_floor(
     mode_floor(rule_default_mode)
 }
 
-/// `command_risk_effects` table (command_risk_effects.py:11); `None` = unknown.
+/// The `COMMAND_RISK_EFFECTS` table (`command_risk_effects.py`); `None` = a
+/// risk class the effect vocabulary does not name. The catalog is authored
+/// independently of this table, so an extension may ship a class that is not
+/// here, and `effect_claims` answers for one when it does.
 fn command_risk_effects(risk_class: &str) -> Option<EffectKind> {
     Some(match risk_class {
         "credential_exfiltration" => EffectKind::CredentialOrSecretOperation,
@@ -109,8 +112,10 @@ fn command_risk_effects(risk_class: &str) -> Option<EffectKind> {
     })
 }
 
-/// `_effect_claims` (adapter.py:267): mapped set, `PROCESS_EXECUTION`
-/// fallback for unknown classes, non-empty.
+/// The claimed effects of one rule's risk classes: the mapped set, with a
+/// `PROCESS_EXECUTION` fallback for a class this vocabulary does not name, and
+/// never empty. `_activity_match` (`command_activity_lifecycle.py`) claims the
+/// same for the activity record it writes beside this decision.
 fn effect_claims(risk_classes: &[String]) -> Vec<EffectKind> {
     let mut effects: BTreeSet<EffectKind> = BTreeSet::new();
     for risk_class in risk_classes {
