@@ -80,7 +80,12 @@ for (const [name, root, reason] of [
   test("refuse to attest zod once " + name, () => {
     const built = root();
     try {
-      assert.throws(() => verifyClassicZodEntry(built), new RegExp(reason.replace(/[.:]/g, "\\$&")));
+      // A predicate, not a built regex: the reason is prose and escaping it by hand
+      // is both unnecessary and easy to get wrong.
+      assert.throws(
+        () => verifyClassicZodEntry(built),
+        (thrown) => thrown instanceof Error && thrown.message.includes(reason),
+      );
     } finally {
       fs.rmSync(built, { recursive: true });
     }
