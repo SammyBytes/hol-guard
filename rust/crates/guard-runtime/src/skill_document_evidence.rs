@@ -193,6 +193,6 @@ fn open_without_following(path: &Path) -> std::io::Result<fs::File> {
     fs::File::open(path)
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 #[path = "skill_document_evidence_tests.rs"]
 mod tests;

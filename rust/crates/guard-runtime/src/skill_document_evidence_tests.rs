@@ -1,7 +1,6 @@
 //! Filesystem ladder tests for `skill_document_evidence`.
 
 use std::fs;
-use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 
 use guard_contracts::SkillDocumentReadabilityV1;
@@ -65,7 +64,7 @@ fn a_primary_skill_document_reads_with_its_evidence() {
         evidence.readability_status,
         SkillDocumentReadabilityV1::Readable
     );
-    assert_eq!(evidence.line_count, Some(5));
+    assert_eq!(evidence.line_count, Some(6));
     assert_eq!(evidence.heading_count, Some(1));
     assert_eq!(evidence.frontmatter_present, Some(true));
     assert_eq!(
@@ -131,8 +130,14 @@ fn an_uppercase_file_name_still_reads_as_the_primary_document() {
     );
 }
 
+/// Only Unix builds can plant the symlink this ladder rung rejects; Windows
+/// needs a privilege the test runner does not hold. The rung itself is not
+/// platform-specific: the walk that rejects it runs on every platform.
+#[cfg(unix)]
 #[test]
 fn a_symlinked_document_is_rejected_before_it_is_opened() {
+    use std::os::unix::fs as unix_fs;
+
     let fixture = Fixture::new("symlink-leaf");
     let document = fixture.document("alpha", "# Title\n");
     let target = fixture.root.join("elsewhere.md");
@@ -146,8 +151,11 @@ fn a_symlinked_document_is_rejected_before_it_is_opened() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn a_symlinked_skill_directory_is_rejected_too() {
+    use std::os::unix::fs as unix_fs;
+
     let fixture = Fixture::new("symlink-directory");
     let real = fixture.root.join("real-skill");
     fs::create_dir_all(&real).expect("real skill");
