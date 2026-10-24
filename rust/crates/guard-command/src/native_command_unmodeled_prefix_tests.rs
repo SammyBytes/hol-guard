@@ -171,7 +171,7 @@ fn a_transparent_env_behind_a_launcher_reaches_its_owners_floor() {
         "exec env CI=1 npm test",
         "exec env CI=1 FOO=bar cargo build",
         "exec /usr/bin/env CI=1 npm test",
-        "exec env -u NODE_OPTIONS npm test",
+        "exec env -u LANG npm test",
         "stdbuf -oL env CI=1 cargo build",
         "nice -n 10 env RUST_LOG=info cargo build",
         "timeout -k 5 30 env CI=1 npm test",
@@ -179,6 +179,18 @@ fn a_transparent_env_behind_a_launcher_reaches_its_owners_floor() {
         let (action, code) = decision(&controls, command);
         assert_ne!(code, FAILED, "{command}");
         assert_eq!(action, "review", "{command}: {code}");
+    }
+    // A name the compatibility layer reads as one that loads code or moves
+    // the search path keeps whatever the bare spelling keeps: `NODE_OPTIONS`
+    // can load code whether the prefix writes it or removes it, and reading
+    // the prefix changes none of that. What this scan owes is that the two
+    // spellings read alike, so the launcher cannot be the thing that decides.
+    for command in ["env -u NODE_OPTIONS npm test", "env -u PATH npm test"] {
+        assert_eq!(
+            decision(&controls, &format!("exec {command}")),
+            decision(&controls, command),
+            "{command}"
+        );
     }
 }
 
