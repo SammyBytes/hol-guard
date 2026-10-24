@@ -1,0 +1,102 @@
+use std::path::PathBuf;
+
+use serde_json::Value;
+
+use super::{analyze_skill_document_text, is_remote_url, EXPLICIT_HTTP_CLIENT};
+
+fn parity_vectors() -> Value {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join("tests/fixtures/skill-document-text-evidence-parity.v1.json");
+    let bytes = std::fs::read(&path).unwrap_or_else(|err| panic!("read {path:?}: {err}"));
+    serde_json::from_slice(&bytes).expect("parity vectors parse")
+}
+
+#[test]
+fn the_analyzer_matches_every_recorded_vector() {
+    let document = parity_vectors();
+    let cases = document["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty(), "the parity fixture lost its cases");
+    for case in cases {
+        let id = case["id"].as_str().expect("case id");
+        let evidence = analyze_skill_document_text(case["text"].as_str().expect("case text"));
+        assert_eq!(
+            evidence.line_count,
+            case["lineCount"].as_u64().expect("lineCount") as usize,
+            "{id}: lineCount"
+        );
+        assert_eq!(
+            evidence.heading_count,
+            case["headingCount"].as_u64().expect("headingCount") as usize,
+            "{id}: headingCount"
+        );
+        assert_eq!(
+            evidence.frontmatter_present,
+            case["frontmatterPresent"]
+                .as_bool()
+                .expect("frontmatterPresent"),
+            "{id}: frontmatterPresent"
+        );
+        assert_eq!(
+            evidence.documented_network_capability,
+            case["documentedNetworkCapability"].as_str(),
+            "{id}: documentedNetworkCapability"
+        );
+    }
+}
+
+#[test]
+fn the_vectors_cover_both_evidence_codes_and_a_quiet_document() {
+    let document = parity_vectors();
+    let codes: Vec<Option<&str>> = document["cases"]
+        .as_array()
+        .expect("cases array")
+        .iter()
+        .map(|case| case["documentedNetworkCapability"].as_str())
+        .collect();
+    for expected in [
+        Some("explicit_http_client"),
+        Some("explicit_remote_api_statement"),
+        None,
+    ] {
+        assert!(
+            codes.contains(&expected),
+            "the parity fixture stopped covering {expected:?}"
+        );
+    }
+}
+
+#[test]
+fn an_unbalanced_ipv6_bracket_is_not_a_remote_host() {
+    // `urlsplit` raises for this, and the Python scanner answered false.
+    assert!(!is_remote_url("https://[::1/items"));
+    assert!(!is_remote_url("https://]::1/items"));
+}
+
+#[test]
+fn a_bare_host_without_a_path_still_reads_as_remote() {
+    assert!(is_remote_url("https://api.example.com"));
+    assert!(is_remote_url("https://api.example.com:8443"));
+    assert!(!is_remote_url("http://LOCALHOST:9000"));
+}
+
+#[test]
+fn only_the_first_documented_capability_is_reported() {
+    let text = concat!(
+        "The skill calls the Example API to resolve names.\n",
+        "Run curl https://api.example.com/v1/items for the list.\n",
+    );
+    assert_eq!(
+        analyze_skill_document_text(text).documented_network_capability,
+        Some("explicit_remote_api_statement"),
+    );
+}
+
+#[test]
+fn a_localhost_url_beside_a_remote_one_still_counts() {
+    let text = "Run curl http://127.0.0.1:1 then curl https://api.example.com/v1\n";
+    assert_eq!(
+        analyze_skill_document_text(text).documented_network_capability,
+        Some(EXPLICIT_HTTP_CLIENT),
+    );
+}
