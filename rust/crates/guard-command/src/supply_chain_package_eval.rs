@@ -1,10 +1,17 @@
 //! Rust port of `runtime/supply_chain_package_eval.py` — local package-request
 //! evaluation for HOL Guard supply-chain protection.
 //!
-//! TODO(deps): several Python dependencies are not yet ported to this crate.
-//! They are modeled as injected seams (`SupplyChainEvalDeps`) or small local
-//! ports kept byte-parity where cheap:
-//!   - `supply_chain_support.ecosystem_support_metadata` — local port.
+//! TODO(deps): the Python dependencies below are reached either through the
+//! injected seams of `SupplyChainEvalDeps` or through a module this crate
+//! already owns. A seam is not evidence that the module behind it is
+//! unported; the entries say which is which, so this list stays usable for
+//! deciding what is left to port.
+//!
+//! Still absent from this crate: `lockfile_evaluation_support`,
+//! `lockfile_parse_result`, `manifest_dependency_targets`, `npm_policy_range`
+//! and `restricted_archive_download`.
+//!   - `supply_chain_support.ecosystem_support_metadata` — reused from
+//!     `supply_chain_support`.
 //!   - `text.ensure_terminal_punctuation` — local port.
 //!   - `workspace_path_guard.{read_bytes_within_workspace,read_text_within_workspace,
 //!     resolve_path_within_workspace}` — `resolve_path_within_workspace` reused
@@ -18,18 +25,21 @@
 //!   - `store.GuardStore` — `local_supply_chain::SupplyChainStore` seam.
 //!   - `store_evidence.EvidenceRecord` — `Value`-dict seam.
 //!   - `js_semver.{highest_js_version_for_selector,version_matches_js_selector}` —
-//!     seam (per-package policy resolution; not yet ported).
+//!     ported in `js_semver`; still reached here through the `JsSemverApi`
+//!     seam, which is what per-package policy resolution is injected on.
 //!   - `lockfile_evaluation_support.*` / `lockfile_parse_result.*` — seam via
 //!     `LockfileEvaluationApi`.
 //!   - `manifest_dependency_targets.evaluation_targets` — seam.
 //!   - `npm_policy_range.*` — seam via `NpmPolicyRangeApi`.
 //!   - `npm_source_spec.NpmSourceSpec`/`parse_npm_source_spec` — reused from
-//!     `npm_source_spec` module.
+//!     the `npm_source_spec` module.
 //!   - `restricted_archive_download.*` — `RestrictedArchiveDownload` seam +
 //!     `ExternalArchiveDownloadApi` for the network path.
-//!   - `supply_chain_bundle*.*` — `SupplyChainBundleResponse`/`…Package` seams +
-//!     `SupplyChainBundleApi` for freshness/cached evaluation.
-//!   - `supply_chain_package_identity.*` — local port (pure logic).
+//!   - `supply_chain_bundle*.*` — ported in `supply_chain_bundle`; reached
+//!     here through the `SupplyChainBundleResponse`/`…Package` shapes and the
+//!     `SupplyChainBundleApi` seam for freshness/cached evaluation.
+//!   - `supply_chain_package_identity.*` — reused from
+//!     `supply_chain_package_identity`.
 //!   - `subprocess` (bundled pip audit fallback) — `// TODO(deps): subprocess`
 //!     fail-closed stub.
 //!   - `urllib.request.urlopen` (cloud validation) — `CloudValidationApi` seam.
