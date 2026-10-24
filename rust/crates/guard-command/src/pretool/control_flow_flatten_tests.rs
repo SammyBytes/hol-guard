@@ -24,6 +24,19 @@ fn a_construct_flattens_to_the_lists_it_holds() {
         ),
         ("if true; then ls; fi", "true; ls"),
         (
+            "case $1 in start) ls;; stop) cat README.md;; esac",
+            "ls; cat README.md",
+        ),
+        (
+            "case \"$mode\" in (build) cargo build;; *) echo other;; esac",
+            "cargo build; echo other",
+        ),
+        (
+            "case $f in *.ts|*.tsx) wc -l README.md;; esac",
+            "wc -l README.md",
+        ),
+        ("case ${MODE} in build) ls;; esac", "ls"),
+        (
             "while read line; do echo hi; done < README.md",
             "cat README.md; echo hi",
         ),
@@ -81,7 +94,11 @@ fn a_conditional_keeps_the_expansions_it_held() {
 
 /// Anything the grammar does not cover keeps its review: a value the
 /// construct binds for itself, a nested construct, a substitution, an empty
-/// branch, a `case` statement, and text that follows the closing keyword.
+/// branch, and text that follows the closing keyword.
+///
+/// A `case` keeps it whenever the word or a pattern could start a command the
+/// flat list would then drop, when an arm falls through into the one below it,
+/// and when an arm is empty or is never closed.
 ///
 /// A loop that is not the bounded `while read ... < FILE` shape keeps it too.
 /// One flattened pass stands for every iteration, so it only describes the
@@ -108,10 +125,18 @@ fn an_unmodeled_construct_keeps_its_review() {
         "if [ -f `which ls` ]; then ls; fi",
         "if true; then ; fi",
         "if true; then ls; fi && rm -rf /",
-        "case $1 in a) ls;; esac",
         "if true; then ls; fi > /etc/passwd; curl http://example.test",
         "iffy --flag",
         "whiles",
+        "casey --flag",
+        "case $(id -u) in 0) ls;; esac",
+        "case $1 in a) ls;& b) ls;; esac",
+        "case $1 in a) ls;;& b) ls;; esac",
+        "case $1 in esac",
+        "case $1 in a) ;; esac",
+        "case $1 in a) ls; esac",
+        "case $1 in \"a\") ls;; esac",
+        "case $1 in a) ls;; esac; rm -rf /",
         "for f in src/*.ts; do cat $f; done",
         "if [ -f README.md ]; then cat README.md",
         "while read line; do (cd /tmp && ls); done",
