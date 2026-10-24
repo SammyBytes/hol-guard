@@ -1,14 +1,40 @@
-import { r as reactExports, ea as fetchSupplyChainBundle, j as jsxRuntimeExports, S as SectionLabel, N as EmptyState, co as HiMiniArrowTopRightOnSquare, T as Tag, f as formatRelativeTime, a6 as Badge, a4 as HiMiniExclamationTriangle, dn as HiMiniBugAnt, d2 as guardActionPresentation, eb as isSupplyChainScannerEvidence, ec as isBlockedGuardAction, d as HiMiniArrowPath, e9 as HiMiniDocumentMagnifyingGlass, ed as HiMiniShieldExclamation, ee as HiMiniComputerDesktop, a0 as HiMiniCloud, s as HiMiniCheckCircle, ap as HiMiniWrenchScrewdriver, A as ActionButton, c as HiMiniChevronDown, ab as HiMiniExclamationCircle, dE as fetchReceipts, aC as HiMiniXCircle, h as harnessDisplayName, b as HiMiniChevronUp } from "../guard-dashboard.js";
-import { resolveFeedStaleness } from "./feed-health-workspace-D2ViXtFt.js";
+import { j as jsxRuntimeExports, r as reactExports, ea as fetchSupplyChainBundle, f as formatRelativeTime, co as HiMiniArrowTopRightOnSquare, a4 as HiMiniExclamationTriangle, dn as HiMiniBugAnt, a6 as Badge, d2 as guardActionPresentation, eb as isSupplyChainScannerEvidence, ec as isBlockedGuardAction, T as Tag, ed as HiMiniComputerDesktop, a0 as HiMiniCloud, s as HiMiniCheckCircle, d as HiMiniArrowPath, ap as HiMiniWrenchScrewdriver, A as ActionButton, c as HiMiniChevronDown, ab as HiMiniExclamationCircle, dE as fetchReceipts, aC as HiMiniXCircle, h as harnessDisplayName, b as HiMiniChevronUp } from "../guard-dashboard.js";
+import { resolveFeedStaleness } from "./feed-health-workspace-CdF42t_-.js";
 import { r as resolveHomeProtectionStatus } from "./home-protection-module-Du65PsUR.js";
 import { b as buildSupplyChainStats, r as resolveManagerCoverageManagers, a as resolveManagerCoverageStatus } from "./supply-chain-protection-stats-CJkxdP0r.js";
-import { s as supplyChainFixAllIsPending, a as supplyChainFixAllNeedsCloudConnect, b as supplyChainFixAllButtonLabel, S as SUPPLY_CHAIN_WORKSPACE_SHELL_CLASS } from "./supply-chain-hub-workspace-DabvDO9V.js";
+import { s as supplyChainFixAllIsPending, a as supplyChainFixAllNeedsCloudConnect, b as supplyChainFixAllButtonLabel } from "./supply-chain-hub-workspace-BDxPy2cU.js";
+function SupplyChainDetailSection({
+  id,
+  title,
+  lead,
+  action,
+  children,
+  ...sectionProps
+}) {
+  const labelled = sectionProps["aria-label"] === void 0 ? { "aria-labelledby": id } : {};
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    "section",
+    {
+      ...labelled,
+      ...sectionProps,
+      className: "grid min-w-0 gap-x-10 gap-y-3 py-5 md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]",
+      children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { id, className: "text-sm font-semibold text-brand-dark", children: title }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-0.5 text-sm leading-6 text-slate-600", children: lead }),
+          action ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-2", children: action }) : null
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "min-w-0", children })
+      ]
+    }
+  );
+}
 function SeverityBadge({ severity }) {
   const tone = severity === "critical" || severity === "high" ? "destructive" : severity === "medium" ? "attention" : "default";
   return /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { tone, children: severity });
 }
 function AdvisoryRow({ advisory }) {
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-3 px-4 py-3 border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40 transition-colors", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex items-start gap-3 py-3", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-0.5 shrink-0", children: advisory.knownExploited ? /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniExclamationTriangle, { className: "h-4 w-4 text-red-500", "aria-hidden": "true" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniBugAnt, { className: "h-4 w-4 text-slate-400", "aria-hidden": "true" }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0 flex-1", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
@@ -24,6 +50,25 @@ function AdvisoryRow({ advisory }) {
       ] })
     ] })
   ] });
+}
+const SEVERITY_LEVELS = ["critical", "high", "medium", "low"];
+const SEVERITY_TEXT_CLASS = {
+  critical: "text-brand-purple",
+  high: "text-brand-purple",
+  medium: "text-brand-attention-text",
+  low: "text-brand-dark"
+};
+function IntelSection({ action, children }) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    SupplyChainDetailSection,
+    {
+      id: "supply-chain-intel-heading",
+      title: "Supply chain intel",
+      lead: "The signed advisory feed Guard checks each install against.",
+      action,
+      children
+    }
+  );
 }
 function SupplyChainBundlePanel() {
   const [bundle, setBundle] = reactExports.useState(null);
@@ -74,113 +119,82 @@ function SupplyChainBundlePanel() {
     window.open("https://hol.org/guard", "_blank", "noopener,noreferrer");
   }, []);
   if (loading) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-b border-slate-100 px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Supply chain intel" }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-8", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-4 w-32 mb-3" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-4 w-48 mb-2" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-4 w-40" })
-      ] })
-    ] });
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(IntelSection, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2 py-1", "aria-hidden": "true", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-4 w-48" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-4 w-40" })
+    ] }) });
   }
   if (error) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-b border-slate-100 px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Supply chain intel" }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 py-6", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-        EmptyState,
-        {
-          title: "Could not load intel",
-          body: error
-        }
-      ) })
-    ] });
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(IntelSection, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm text-slate-600", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-brand-dark", children: "Could not load intel." }),
+      " ",
+      error
+    ] }) });
   }
   if (!bundle) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-b border-slate-100 px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Supply chain intel" }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 py-6", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-        EmptyState,
-        {
-          title: "No intel available",
-          body: "Guard has not synced a supply chain bundle yet. Connect to Guard Cloud for live advisory data.",
-          tone: "teach"
-        }
-      ) })
-    ] });
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(IntelSection, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm text-slate-600", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-brand-dark", children: "No intel available." }),
+      " Guard has not synced a supply chain bundle yet. Connect to Guard Cloud for live advisory data."
+    ] }) });
   }
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-6", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-b border-slate-100 px-4 py-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Supply chain bundle" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              type: "button",
-              onClick: handleOpenCloud,
-              className: "inline-flex items-center gap-1 text-xs font-medium text-brand-blue hover:text-brand-blue-dark focus:outline-none focus:ring-2 focus:ring-brand-blue/30 rounded px-1.5 py-0.5",
-              children: [
-                "View in cloud",
-                /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniArrowTopRightOnSquare, { className: "h-3 w-3", "aria-hidden": "true" })
-              ]
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-sm text-slate-500", children: "Signed advisory feed and package risk data." })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-4 space-y-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap gap-3", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]", children: "Version:" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: "blue", children: bundle.bundleVersion })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]", children: "Advisories:" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: "slate", children: bundle.advisories.length })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]", children: "Packages:" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: "slate", children: bundle.packages.length })
-          ] })
-        ] }),
-        bundle.expiresAt && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-slate-400", children: [
-          "Expires ",
-          formatRelativeTime(bundle.expiresAt)
-        ] })
-      ] })
-    ] }),
-    severityCounts && Object.keys(severityCounts).length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-b border-slate-100 px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Severity breakdown" }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 py-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-3", children: ["critical", "high", "medium", "low"].map((sev) => {
-        const count = severityCounts[sev] ?? 0;
-        const tone = sev === "critical" || sev === "high" ? "destructive" : sev === "medium" ? "attention" : "default";
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs font-semibold uppercase tracking-[0.15em] text-slate-400", children: sev }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-xl font-bold tabular-nums", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { tone, children: count }) })
-        ] }, sev);
-      }) }) })
-    ] }),
-    topAdvisories.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-b border-slate-100 px-4 py-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Top advisories" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-sm text-slate-500", children: "Highest severity and confidence advisories in this bundle." })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: topAdvisories.map((advisory) => /* @__PURE__ */ jsxRuntimeExports.jsx(AdvisoryRow, { advisory }, advisory.advisoryId)) }),
-      bundle.advisories.length > 10 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-t border-slate-100 px-4 py-2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    IntelSection,
+    {
+      action: /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "button",
         {
           type: "button",
           onClick: handleOpenCloud,
-          className: "text-xs font-medium text-brand-blue hover:text-brand-blue-dark focus:outline-none focus:ring-2 focus:ring-brand-blue/30 rounded px-1.5 py-0.5",
+          className: "inline-flex items-center gap-1 rounded text-xs font-medium text-brand-blue hover:text-brand-blue-dark focus:outline-none focus:ring-2 focus:ring-brand-blue/30",
           children: [
-            "View all ",
-            bundle.advisories.length,
-            " advisories in Guard Cloud"
+            "View in cloud",
+            /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniArrowTopRightOnSquare, { className: "h-3 w-3", "aria-hidden": "true" })
           ]
         }
-      ) })
-    ] })
-  ] });
+      ),
+      children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("dl", { className: "flex flex-wrap gap-x-8 gap-y-2 text-sm", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-baseline gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { className: "text-slate-600", children: "Bundle" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { className: "font-mono font-medium text-brand-dark", children: bundle.bundleVersion })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-baseline gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { className: "text-slate-600", children: "Advisories" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { className: "font-medium tabular-nums text-brand-dark", children: bundle.advisories.length })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-baseline gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { className: "text-slate-600", children: "Packages" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { className: "font-medium tabular-nums text-brand-dark", children: bundle.packages.length })
+          ] }),
+          bundle.expiresAt && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-baseline gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { className: "text-slate-600", children: "Expires" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { className: "font-medium text-brand-dark", children: formatRelativeTime(bundle.expiresAt) })
+          ] })
+        ] }),
+        severityCounts && Object.keys(severityCounts).length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm", "aria-label": "Advisories by severity", children: SEVERITY_LEVELS.map((sev) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex items-baseline gap-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `font-semibold tabular-nums ${SEVERITY_TEXT_CLASS[sev]}`, children: severityCounts[sev] ?? 0 }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-600", children: sev })
+        ] }, sev)) }),
+        topAdvisories.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h4", { className: "text-xs font-medium text-slate-600", children: "Top advisories by severity and confidence" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "mt-1 divide-y divide-slate-100", children: topAdvisories.map((advisory) => /* @__PURE__ */ jsxRuntimeExports.jsx(AdvisoryRow, { advisory }, advisory.advisoryId)) }),
+          bundle.advisories.length > 10 && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              type: "button",
+              onClick: handleOpenCloud,
+              className: "mt-1 rounded text-xs font-medium text-brand-blue hover:text-brand-blue-dark focus:outline-none focus:ring-2 focus:ring-brand-blue/30",
+              children: [
+                "View all ",
+                bundle.advisories.length,
+                " advisories in Guard Cloud"
+              ]
+            }
+          )
+        ] })
+      ]
+    }
+  );
 }
 function readOperation(value) {
   if (!isSupplyChainScannerEvidence(value)) {
@@ -361,63 +375,58 @@ const kindLabels = {
   audit: "Last audit",
   sync: "Last sync"
 };
-const kindIcons = {
-  block: HiMiniShieldExclamation,
-  audit: HiMiniDocumentMagnifyingGlass,
-  sync: HiMiniArrowPath
-};
 function EvidenceRailRow({ item }) {
-  const Icon = kindIcons[item.kind];
   const href = supplyChainEvidenceHref(item.receiptId, item.harness);
   const tagTone = item.tone === "green" ? "green" : item.tone === "attention" ? "attention" : "slate";
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-3", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx(
-      "span",
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "min-w-0 space-y-1 py-3 sm:py-0", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs font-medium text-slate-600", children: kindLabels[item.kind] }),
+      item.timestamp !== null ? /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: tagTone, children: formatRelativeTime(item.timestamp) }) : null
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: `text-sm ${item.timestamp !== null ? "font-medium text-brand-dark" : "text-slate-500"}`, children: item.title }),
+    item.timestamp !== null ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs leading-relaxed text-slate-500", children: item.detail }) : null,
+    href !== null ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "a",
       {
-        className: "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-500",
-        "aria-hidden": "true",
-        children: /* @__PURE__ */ jsxRuntimeExports.jsx(Icon, { className: "h-4 w-4" })
+        href,
+        className: "inline-flex items-center gap-1 rounded text-xs font-medium text-brand-blue hover:underline focus:outline-none focus:ring-2 focus:ring-brand-blue/30",
+        children: [
+          "Open evidence",
+          /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniArrowTopRightOnSquare, { className: "h-3.5 w-3.5", "aria-hidden": "true" })
+        ]
       }
-    ),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0 flex-1 space-y-1.5", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400", children: kindLabels[item.kind] }),
-        item.timestamp !== null ? /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: tagTone, children: formatRelativeTime(item.timestamp) }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: "slate", children: "Waiting" })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-brand-dark", children: item.title }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs leading-relaxed text-slate-500", children: item.detail }),
-      href !== null ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "a",
-        {
-          href,
-          className: "inline-flex items-center gap-1 text-xs font-medium text-brand-blue hover:underline focus:outline-none focus:ring-2 focus:ring-brand-blue/30 rounded",
-          children: [
-            "Open evidence",
-            /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniArrowTopRightOnSquare, { className: "h-3.5 w-3.5", "aria-hidden": "true" })
-          ]
-        }
-      ) : null
-    ] })
-  ] }) });
+    ) : null
+  ] });
+}
+function SupplyChainEvidenceRailPlaceholder() {
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    SupplyChainDetailSection,
+    {
+      id: "supply-chain-evidence-heading",
+      title: "Recent activity",
+      lead: "The latest blocked install, project audit, and policy sync on this device.",
+      children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid gap-6 sm:grid-cols-3", "aria-hidden": "true", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-10" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-10" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "guard-skeleton h-10" })
+      ] })
+    }
+  );
 }
 function SupplyChainEvidenceRail({ rail }) {
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-    "section",
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    SupplyChainDetailSection,
     {
-      className: "overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm",
+      id: "supply-chain-evidence-heading",
+      title: "Recent activity",
+      lead: "The latest blocked install, project audit, and policy sync on this device.",
       "aria-label": "Recent supply chain evidence",
       "data-testid": "supply-chain-evidence-rail",
-      children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-b border-slate-100 px-4 py-3", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Recent activity" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-sm leading-relaxed text-slate-500", children: "The latest blocked install, project audit, and policy sync on this device." })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "divide-y divide-slate-100", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(EvidenceRailRow, { item: rail.block }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(EvidenceRailRow, { item: rail.audit }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(EvidenceRailRow, { item: rail.sync })
-        ] })
-      ]
+      children: /* @__PURE__ */ jsxRuntimeExports.jsxs("ul", { className: "grid min-w-0 divide-y divide-slate-100 sm:grid-cols-3 sm:gap-6 sm:divide-y-0", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(EvidenceRailRow, { item: rail.block }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(EvidenceRailRow, { item: rail.audit }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(EvidenceRailRow, { item: rail.sync })
+      ] })
     }
   );
 }
@@ -472,64 +481,28 @@ function resolveSupplyChainCloudCapabilities(snapshot) {
     cloudCapabilities: CLOUD_CAPABILITIES
   };
 }
-function CapabilityList({ heading, icon: Icon, items }) {
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0 rounded-xl border border-slate-100 bg-white/80 p-4", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-3 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(Icon, { className: "h-4 w-4 shrink-0 text-slate-500", "aria-hidden": "true" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-semibold text-brand-dark", children: heading })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "space-y-2", children: items.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex min-w-0 items-start gap-2 text-xs leading-relaxed", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        HiMiniCheckCircle,
-        {
-          className: `mt-0.5 h-3.5 w-3.5 shrink-0 ${item.available ? "text-brand-green" : "text-slate-300"}`,
-          "aria-hidden": "true"
-        }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: item.available ? "text-slate-600" : "text-slate-400", children: item.label })
+function CapabilityList({ heading, items }) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h4", { className: "text-xs font-medium text-slate-600", children: heading }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "mt-2 space-y-1", children: items.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "min-w-0 text-sm leading-6", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: item.available ? "text-brand-dark" : "text-slate-500", children: item.label }),
+      item.available ? null : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-2 text-xs font-medium text-slate-500", children: "Not available" })
     ] }, item.label)) })
   ] });
 }
-function panelToneClass(tone) {
-  if (tone === "green") {
-    return "border-brand-green/20 bg-brand-green/[0.04]";
-  }
-  if (tone === "blue") {
-    return "border-brand-blue/20 bg-brand-blue/[0.04]";
-  }
-  return "border-slate-200 bg-slate-50/80";
-}
 function SupplyChainCloudCapabilitiesPanel({ state }) {
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-    "section",
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    SupplyChainDetailSection,
     {
-      className: `rounded-2xl border px-4 py-4 ${panelToneClass(state.tone)}`,
+      id: "supply-chain-cloud-heading",
+      title: state.title,
+      lead: state.detail,
       "aria-label": "Local and Guard Cloud capabilities",
       "data-testid": "supply-chain-cloud-capabilities",
-      children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0 space-y-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-brand-dark", children: state.title }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs leading-relaxed text-slate-600", children: state.detail })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-4 grid min-w-0 gap-3 md:grid-cols-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            CapabilityList,
-            {
-              heading: state.localHeading,
-              icon: HiMiniComputerDesktop,
-              items: state.localCapabilities
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            CapabilityList,
-            {
-              heading: state.cloudHeading,
-              icon: HiMiniCloud,
-              items: state.cloudCapabilities
-            }
-          )
-        ] })
-      ]
+      children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid min-w-0 gap-x-10 gap-y-4 sm:grid-cols-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(CapabilityList, { heading: state.localHeading, items: state.localCapabilities }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(CapabilityList, { heading: state.cloudHeading, items: state.cloudCapabilities })
+      ] })
     }
   );
 }
@@ -889,14 +862,14 @@ function AppFirewallRow({ install, protection }) {
   const [open, setOpen] = reactExports.useState(false);
   const toggle = reactExports.useCallback(() => setOpen((p) => !p), []);
   const protectedManagers = protection?.protected_managers ?? [];
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-b border-slate-100 last:border-b-0", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "button",
       {
         type: "button",
         onClick: toggle,
         "aria-expanded": open,
-        className: "flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-blue/30",
+        className: "flex w-full items-center justify-between gap-3 py-2.5 text-left hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-blue/30",
         children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex min-w-0 items-center gap-2.5", children: [
             install.active ? /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniCheckCircle, { className: "h-4 w-4 shrink-0 text-brand-green", "aria-hidden": "true" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniXCircle, { className: "h-4 w-4 shrink-0 text-brand-attention", "aria-hidden": "true" }),
@@ -909,8 +882,8 @@ function AppFirewallRow({ install, protection }) {
         ]
       }
     ),
-    open && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 pb-3 pt-1", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs font-semibold uppercase tracking-[0.15em] text-slate-400 mb-2", children: "Shim coverage" }),
+    open && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pb-3 pt-1", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mb-2 text-xs font-medium text-slate-600", children: "Shim coverage" }),
       protectedManagers.length > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-1.5", children: protectedManagers.map((mgr) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "span",
         {
@@ -944,37 +917,52 @@ function SupplyChainAuditTeaser({ auditSnapshot, auditRunning, onOpenAudit }) {
     onOpenAudit();
   }, [onOpenAudit]);
   const teaserBody = auditTeaserBody(auditRunning, auditSnapshot);
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Workspace audit" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-sm text-slate-500", children: teaserBody })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs(ActionButton, { variant: "outline", onClick: handleOpenAudit, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniBugAnt, { className: "mr-1.5 h-4 w-4", "aria-hidden": "true" }),
-      "Open Audit tab"
-    ] })
-  ] }) });
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    SupplyChainDetailSection,
+    {
+      id: "supply-chain-audit-heading",
+      title: "Workspace audit",
+      lead: "Index a project's dependencies and flag the packages that need review.",
+      children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center justify-between gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-brand-dark", children: teaserBody }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(ActionButton, { variant: "outline", onClick: handleOpenAudit, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(HiMiniBugAnt, { className: "mr-1.5 h-4 w-4", "aria-hidden": "true" }),
+          "Open Audit tab"
+        ] })
+      ] })
+    }
+  );
 }
-function SupplyChainWorkspace({
+function SupplyChainWorkspace({ snapshot, fixAllState, onFixAll }) {
+  const supplyChainIssues = reactExports.useMemo(() => resolveSupplyChainIssues(snapshot), [snapshot]);
+  const workspaceHero = reactExports.useMemo(
+    () => resolveSupplyChainWorkspaceHero(snapshot, { openIssueCount: supplyChainIssues.length }),
+    [snapshot, supplyChainIssues.length]
+  );
+  return supplyChainIssues.length > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+    SupplyChainRecovery,
+    {
+      issues: supplyChainIssues,
+      state: fixAllState,
+      onFixAll,
+      guidance: workspaceHero.stagedGuidance
+    }
+  ) : /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainWorkspaceHero, { hero: workspaceHero });
+}
+function SupplyChainWorkspaceDetails({
   snapshot,
   onGoHome,
   onAuditNavigate,
   auditSnapshot,
-  auditRunning,
-  fixAllState,
-  onFixAll
+  auditRunning
 }) {
   const protection = snapshot.supply_chain?.package_manager_protection;
   const managedInstalls = reactExports.useMemo(
     () => snapshot.managed_installs ?? [],
     [snapshot.managed_installs]
   );
-  const [evidenceRail, setEvidenceRail] = reactExports.useState(null);
+  const [evidenceRail, setEvidenceRail] = reactExports.useState(void 0);
   const supplyChainIssues = reactExports.useMemo(() => resolveSupplyChainIssues(snapshot), [snapshot]);
-  const workspaceHero = reactExports.useMemo(
-    () => resolveSupplyChainWorkspaceHero(snapshot, { openIssueCount: supplyChainIssues.length }),
-    [snapshot, supplyChainIssues.length]
-  );
   const cloudCapabilities = reactExports.useMemo(
     () => resolveSupplyChainCloudCapabilities(snapshot),
     [snapshot]
@@ -999,96 +987,97 @@ function SupplyChainWorkspace({
       cancelled = true;
     };
   }, [snapshot.generated_at, snapshot.receipt_count]);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: SUPPLY_CHAIN_WORKSPACE_SHELL_CLASS, "data-testid": "supply-chain-workspace", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap items-start justify-end gap-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ActionButton, { variant: "ghost", onClick: onGoHome, children: "Back to Home" }) }),
-    supplyChainIssues.length > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-      SupplyChainRecovery,
-      {
-        issues: supplyChainIssues,
-        state: fixAllState,
-        onFixAll,
-        guidance: workspaceHero.stagedGuidance
-      }
-    ) : /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainWorkspaceHero, { hero: workspaceHero }),
-    supplyChainIssues.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainCloudCapabilitiesPanel, { state: cloudCapabilities }) : null,
-    evidenceRail !== null ? /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainEvidenceRail, { rail: evidenceRail }) : null,
-    /* @__PURE__ */ jsxRuntimeExports.jsx(
-      SupplyChainAuditTeaser,
-      {
-        auditSnapshot,
-        auditRunning,
-        onOpenAudit: onAuditNavigate
-      }
-    ),
-    /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainBundlePanel, {}),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-b border-slate-100 px-4 py-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Connected apps" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-sm leading-relaxed text-slate-500", children: "Which package tools Guard is watching inside each connected app." })
-      ] }),
-      managedInstalls.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-        EmptyState,
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { "data-testid": "supply-chain-workspace", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-semibold tracking-tight text-brand-dark", children: "Activity and sources" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-2 divide-y divide-slate-200 border-y border-slate-200", children: [
+      evidenceRail === void 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainEvidenceRailPlaceholder, {}) : evidenceRail !== null ? /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainEvidenceRail, { rail: evidenceRail }) : null,
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        SupplyChainAuditTeaser,
         {
-          title: "No apps connected",
-          body: "Connect an AI app to see per-app package manager coverage here.",
-          tone: "teach"
+          auditSnapshot,
+          auditRunning,
+          onOpenAudit: onAuditNavigate
         }
-      ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: managedInstalls.map((install) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-        AppFirewallRow,
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainBundlePanel, {}),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        SupplyChainDetailSection,
         {
-          install,
-          protection
-        },
-        `${install.harness}-${install.workspace ?? "global"}`
-      )) })
+          id: "supply-chain-apps-heading",
+          title: "Connected apps",
+          lead: "Which package tools Guard is watching inside each connected app.",
+          children: managedInstalls.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm text-slate-600", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-brand-dark", children: "No apps connected." }),
+            " Connect an AI app to see per-app package manager coverage here."
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "divide-y divide-slate-100", children: managedInstalls.map((install) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            AppFirewallRow,
+            {
+              install,
+              protection
+            },
+            `${install.harness}-${install.workspace ?? "global"}`
+          )) })
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        SupplyChainDetailSection,
+        {
+          id: "supply-chain-source-heading",
+          title: "Safety check source",
+          lead: "Whether this device uses sample data or live Guard Cloud updates.",
+          children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+            FeedHealthPanel,
+            {
+              snapshot,
+              hideLocalOnlyWarning: supplyChainIssues.some((issue) => issue.id === "cloud_connect")
+            }
+          )
+        }
+      ),
+      supplyChainIssues.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(SupplyChainCloudCapabilitiesPanel, { state: cloudCapabilities }) : null
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-100 bg-white shadow-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-b border-slate-100 px-4 py-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(SectionLabel, { children: "Safety check source" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-sm leading-relaxed text-slate-500", children: "Whether this device uses sample data or live Guard Cloud updates." })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(FeedHealthPanel, { snapshot, hideLocalOnlyWarning: supplyChainIssues.some((issue) => issue.id === "cloud_connect") })
-    ] })
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-4 -ml-3 sm:-ml-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ActionButton, { variant: "ghost", onClick: onGoHome, children: "Back to Home" }) })
   ] });
 }
 function FeedHealthPanel({ snapshot, hideLocalOnlyWarning = false }) {
   const cloudState = snapshot.cloud_state;
   const isSample = cloudState === "local_only";
   const isStale = snapshot.latest_receipts.length > 0 && Date.now() - new Date(snapshot.latest_receipts[0].timestamp).getTime() > 7 * 24 * 60 * 60 * 1e3;
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-4 space-y-3", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap gap-3", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("dl", { className: "flex flex-wrap gap-x-8 gap-y-2", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]", children: "Data source" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: isSample ? "attention" : "green", children: isSample ? "On this device only" : "Live from Guard Cloud" })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { className: "text-sm text-slate-600", children: "Data source" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { children: /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: isSample ? "attention" : "green", children: isSample ? "On this device only" : "Live from Guard Cloud" }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]", children: "Last update" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: isStale ? "attention" : "green", children: isStale ? "Older than 7 days" : "Recent" })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { className: "text-sm text-slate-600", children: "Last update" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { children: /* @__PURE__ */ jsxRuntimeExports.jsx(Tag, { tone: isStale ? "attention" : "green", children: isStale ? "Older than 7 days" : "Recent" }) })
       ] })
     ] }),
-    isSample && !hideLocalOnlyWarning && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2 rounded-xl border border-brand-attention/20 bg-brand-attention/[0.04] px-3 py-2.5", children: [
+    isSample && !hideLocalOnlyWarning && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "flex items-start gap-2 text-sm leading-6 text-slate-600", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         HiMiniExclamationTriangle,
         {
-          className: "mt-0.5 h-4 w-4 shrink-0 text-brand-attention",
+          className: "mt-1 h-4 w-4 shrink-0 text-brand-attention",
           "aria-hidden": "true"
         }
       ),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs leading-relaxed text-slate-600", children: "This device is using sample safety data. Connect Guard Cloud for live package warnings and protection across your machines." })
+      "This device is using sample safety data. Connect Guard Cloud for live package warnings and protection across your machines."
     ] }),
-    isStale && !isSample && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2 rounded-xl border border-brand-attention/20 bg-brand-attention/[0.04] px-3 py-2.5", children: [
+    isStale && !isSample && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "flex items-start gap-2 text-sm leading-6 text-slate-600", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         HiMiniArrowPath,
         {
-          className: "mt-0.5 h-4 w-4 shrink-0 text-brand-attention",
+          className: "mt-1 h-4 w-4 shrink-0 text-brand-attention",
           "aria-hidden": "true"
         }
       ),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs leading-relaxed text-slate-600", children: "Safety checks have not refreshed recently. Make sure Guard is running, then sync policy or run an audit." })
+      "Safety checks have not refreshed recently. Make sure Guard is running, then sync policy or run an audit."
     ] })
   ] });
 }
 export {
   SupplyChainWorkspace,
+  SupplyChainWorkspaceDetails,
   buildSupplyChainStats
 };

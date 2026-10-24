@@ -87,8 +87,8 @@ assert(
   "firewall controls drop duplicate next-step hero",
 );
 assert(
-  controlsSource.includes('layout="card"'),
-  "firewall controls render manager cards",
+  controlsSource.includes('aria-label="Package manager controls"') && !controlsSource.includes('layout="card"'),
+  "firewall controls render one ruled manager roster instead of cards",
 );
 assert(
   !issueFocusSource.includes("amber-"),

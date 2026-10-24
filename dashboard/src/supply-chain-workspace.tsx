@@ -8,7 +8,7 @@ import {
   HiMiniChevronUp,
   HiMiniBugAnt,
 } from "react-icons/hi2";
-import { SectionLabel, Badge, Tag, ActionButton, EmptyState } from "./approval-center-primitives";
+import { Badge, Tag, ActionButton } from "./approval-center-primitives";
 import { harnessDisplayName, formatRelativeTime } from "./approval-center-utils";
 import type {
   GuardManagedInstall,
@@ -22,7 +22,7 @@ import {
   deriveSupplyChainEvidenceRail,
   type SupplyChainEvidenceRailSnapshot,
 } from "./supply-chain-evidence-rail";
-import { SupplyChainEvidenceRail } from "./supply-chain-evidence-rail-panel";
+import { SupplyChainEvidenceRail, SupplyChainEvidenceRailPlaceholder } from "./supply-chain-evidence-rail-panel";
 import { resolveSupplyChainCloudCapabilities } from "./supply-chain-cloud-capabilities";
 import { SupplyChainCloudCapabilitiesPanel } from "./supply-chain-cloud-capabilities-panel";
 import { resolveSupplyChainIssues } from "./supply-chain-issues";
@@ -30,9 +30,26 @@ import { resolveSupplyChainWorkspaceHero } from "./supply-chain-workspace-hero-s
 import { SupplyChainWorkspaceHero } from "./supply-chain-workspace-hero";
 import { SupplyChainRecovery } from "./supply-chain-recovery";
 import type { SupplyChainFixAllState } from "./supply-chain-fix-all";
-import { SUPPLY_CHAIN_WORKSPACE_SHELL_CLASS } from "./supply-chain-workspace-layout";
+import { SupplyChainDetailSection } from "./supply-chain-detail-section";
 
 export { buildSupplyChainStats } from "./supply-chain-protection-stats";
+
+/*
+ * Design contract: Supply chain tab
+ * THESIS: The page answers one question, "is every package tool on this device
+ *   guarded?", and lets you fix the one that is not without scrolling past
+ *   explanations.
+ * OWN-WORLD: A roster of the package managers on this machine, one ruled line
+ *   each, like a ledger: tool, how the shell finds it, state, action.
+ * STORY: Status first (all clear, or what to restore), then the roster, then
+ *   the facts behind it: recent activity, audit, intel, apps and sources.
+ * FIRST VIEWPORT: The status line and the top of the roster with its first
+ *   rows, so a broken tool and its Fix PATH button are visible on arrival.
+ * FORM: Seed 5d2c9e97, "Manager roster ledger". Ruled rows, side headings for
+ *   details, no card grids, no small-caps labels, colour only for state.
+ * FINISH: Remove stays quiet until its inline Confirm; empty sections say so
+ *   in one line instead of a centred placeholder.
+ */
 
 type AppFirewallRowProps = {
   install: GuardManagedInstall;
@@ -45,12 +62,12 @@ function AppFirewallRow({ install, protection }: AppFirewallRowProps) {
   const protectedManagers = protection?.protected_managers ?? [];
 
   return (
-    <div className="border-b border-slate-100 last:border-b-0">
+    <div>
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-blue/30"
+        className="flex w-full items-center justify-between gap-3 py-2.5 text-left hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-blue/30"
       >
         <div className="flex min-w-0 items-center gap-2.5">
           {install.active ? (
@@ -74,10 +91,8 @@ function AppFirewallRow({ install, protection }: AppFirewallRowProps) {
         </div>
       </button>
       {open && (
-        <div className="px-4 pb-3 pt-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400 mb-2">
-            Shim coverage
-          </p>
+        <div className="pb-3 pt-1">
+          <p className="mb-2 text-xs font-medium text-slate-600">Shim coverage</p>
           {protectedManagers.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {protectedManagers.map((mgr) => (
@@ -131,51 +146,72 @@ function SupplyChainAuditTeaser({ auditSnapshot, auditRunning, onOpenAudit }: Su
   const teaserBody = auditTeaserBody(auditRunning, auditSnapshot);
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <SectionLabel>Workspace audit</SectionLabel>
-          <p className="mt-1 text-sm text-slate-500">{teaserBody}</p>
-        </div>
+    <SupplyChainDetailSection
+      id="supply-chain-audit-heading"
+      title="Workspace audit"
+      lead="Index a project's dependencies and flag the packages that need review."
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-brand-dark">{teaserBody}</p>
         <ActionButton variant="outline" onClick={handleOpenAudit}>
           <HiMiniBugAnt className="mr-1.5 h-4 w-4" aria-hidden="true" />
           Open Audit tab
         </ActionButton>
       </div>
-    </div>
+    </SupplyChainDetailSection>
   );
 }
 
 type SupplyChainWorkspaceProps = {
   snapshot: GuardRuntimeSnapshot;
-  onGoHome: () => void;
-  onAuditNavigate: () => void;
-  auditSnapshot: SupplyChainAuditSnapshot | null;
-  auditRunning: boolean;
   fixAllState: SupplyChainFixAllState;
   onFixAll: () => void;
 };
 
-export function SupplyChainWorkspace({
-  snapshot,
-  onGoHome,
-  onAuditNavigate,
-  auditSnapshot,
-  auditRunning,
-  fixAllState,
-  onFixAll,
-}: SupplyChainWorkspaceProps) {
-  const protection = snapshot.supply_chain?.package_manager_protection;
-  const managedInstalls = useMemo(
-    () => snapshot.managed_installs ?? [],
-    [snapshot.managed_installs],
-  );
-  const [evidenceRail, setEvidenceRail] = useState<SupplyChainEvidenceRailSnapshot | null>(null);
+/** The status line above the roster: all clear, or what to restore. */
+export function SupplyChainWorkspace({ snapshot, fixAllState, onFixAll }: SupplyChainWorkspaceProps) {
   const supplyChainIssues = useMemo(() => resolveSupplyChainIssues(snapshot), [snapshot]);
   const workspaceHero = useMemo(
     () => resolveSupplyChainWorkspaceHero(snapshot, { openIssueCount: supplyChainIssues.length }),
     [snapshot, supplyChainIssues.length],
   );
+
+  return supplyChainIssues.length > 0 ? (
+    <SupplyChainRecovery
+      issues={supplyChainIssues}
+      state={fixAllState}
+      onFixAll={onFixAll}
+      guidance={workspaceHero.stagedGuidance}
+    />
+  ) : (
+    <SupplyChainWorkspaceHero hero={workspaceHero} />
+  );
+}
+
+type SupplyChainWorkspaceDetailsProps = {
+  snapshot: GuardRuntimeSnapshot;
+  onGoHome: () => void;
+  onAuditNavigate: () => void;
+  auditSnapshot: SupplyChainAuditSnapshot | null;
+  auditRunning: boolean;
+};
+
+/** The facts behind the roster, below it, as ruled sections. */
+export function SupplyChainWorkspaceDetails({
+  snapshot,
+  onGoHome,
+  onAuditNavigate,
+  auditSnapshot,
+  auditRunning,
+}: SupplyChainWorkspaceDetailsProps) {
+  const protection = snapshot.supply_chain?.package_manager_protection;
+  const managedInstalls = useMemo(
+    () => snapshot.managed_installs ?? [],
+    [snapshot.managed_installs],
+  );
+  // undefined while receipts load, null when they could not be read.
+  const [evidenceRail, setEvidenceRail] = useState<SupplyChainEvidenceRailSnapshot | null | undefined>(undefined);
+  const supplyChainIssues = useMemo(() => resolveSupplyChainIssues(snapshot), [snapshot]);
   const cloudCapabilities = useMemo(
     () => resolveSupplyChainCloudCapabilities(snapshot),
     [snapshot],
@@ -203,72 +239,67 @@ export function SupplyChainWorkspace({
   }, [snapshot.generated_at, snapshot.receipt_count]);
 
   return (
-    <div className={SUPPLY_CHAIN_WORKSPACE_SHELL_CLASS} data-testid="supply-chain-workspace">
-      <div className="flex flex-wrap items-start justify-end gap-3">
+    <div data-testid="supply-chain-workspace">
+      <h2 className="text-lg font-semibold tracking-tight text-brand-dark">Activity and sources</h2>
+      <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200">
+        {evidenceRail === undefined ? (
+          <SupplyChainEvidenceRailPlaceholder />
+        ) : evidenceRail !== null ? (
+          <SupplyChainEvidenceRail rail={evidenceRail} />
+        ) : null}
+
+        <SupplyChainAuditTeaser
+          auditSnapshot={auditSnapshot}
+          auditRunning={auditRunning}
+          onOpenAudit={onAuditNavigate}
+        />
+
+        <SupplyChainBundlePanel />
+
+        <SupplyChainDetailSection
+          id="supply-chain-apps-heading"
+          title="Connected apps"
+          lead="Which package tools Guard is watching inside each connected app."
+        >
+          {managedInstalls.length === 0 ? (
+            <p className="text-sm text-slate-600">
+              <span className="font-medium text-brand-dark">No apps connected.</span> Connect an AI app to see
+              per-app package manager coverage here.
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {managedInstalls.map((install) => (
+                <AppFirewallRow
+                  key={`${install.harness}-${install.workspace ?? "global"}`}
+                  install={install}
+                  protection={protection}
+                />
+              ))}
+            </div>
+          )}
+        </SupplyChainDetailSection>
+
+        <SupplyChainDetailSection
+          id="supply-chain-source-heading"
+          title="Safety check source"
+          lead="Whether this device uses sample data or live Guard Cloud updates."
+        >
+          <FeedHealthPanel
+            snapshot={snapshot}
+            hideLocalOnlyWarning={supplyChainIssues.some((issue) => issue.id === "cloud_connect")}
+          />
+        </SupplyChainDetailSection>
+
+        {supplyChainIssues.length === 0 ? (
+          <SupplyChainCloudCapabilitiesPanel state={cloudCapabilities} />
+        ) : null}
+      </div>
+
+      {/* Pulled left so the label lines up with the content edge. */}
+      <div className="mt-4 -ml-3 sm:-ml-4">
         <ActionButton variant="ghost" onClick={onGoHome}>
           Back to Home
         </ActionButton>
-      </div>
-
-      {supplyChainIssues.length > 0 ? (
-        <SupplyChainRecovery
-          issues={supplyChainIssues}
-          state={fixAllState}
-          onFixAll={onFixAll}
-          guidance={workspaceHero.stagedGuidance}
-        />
-      ) : (
-        <SupplyChainWorkspaceHero hero={workspaceHero} />
-      )}
-
-      {supplyChainIssues.length === 0 ? (
-        <SupplyChainCloudCapabilitiesPanel state={cloudCapabilities} />
-      ) : null}
-
-      {evidenceRail !== null ? <SupplyChainEvidenceRail rail={evidenceRail} /> : null}
-
-      <SupplyChainAuditTeaser
-        auditSnapshot={auditSnapshot}
-        auditRunning={auditRunning}
-        onOpenAudit={onAuditNavigate}
-      />
-
-      <SupplyChainBundlePanel />
-
-      <div className="rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-4 py-3">
-          <SectionLabel>Connected apps</SectionLabel>
-          <p className="mt-1 text-sm leading-relaxed text-slate-500">
-            Which package tools Guard is watching inside each connected app.
-          </p>
-        </div>
-        {managedInstalls.length === 0 ? (
-          <EmptyState
-            title="No apps connected"
-            body="Connect an AI app to see per-app package manager coverage here."
-            tone="teach"
-          />
-        ) : (
-          <div>
-            {managedInstalls.map((install) => (
-              <AppFirewallRow
-                key={`${install.harness}-${install.workspace ?? "global"}`}
-                install={install}
-                protection={protection}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-4 py-3">
-          <SectionLabel>Safety check source</SectionLabel>
-          <p className="mt-1 text-sm leading-relaxed text-slate-500">
-            Whether this device uses sample data or live Guard Cloud updates.
-          </p>
-        </div>
-        <FeedHealthPanel snapshot={snapshot} hideLocalOnlyWarning={supplyChainIssues.some((issue) => issue.id === "cloud_connect")} />
       </div>
     </div>
   );
@@ -282,48 +313,44 @@ function FeedHealthPanel({ snapshot, hideLocalOnlyWarning = false }: { snapshot:
     Date.now() - new Date(snapshot.latest_receipts[0].timestamp).getTime() > 7 * 24 * 60 * 60 * 1000;
 
   return (
-    <div className="px-4 py-4 space-y-3">
-      <div className="flex flex-wrap gap-3">
+    <div className="space-y-3">
+      <dl className="flex flex-wrap gap-x-8 gap-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]">
-            Data source
-          </span>
-          <Tag tone={isSample ? "attention" : "green"}>
-            {isSample ? "On this device only" : "Live from Guard Cloud"}
-          </Tag>
+          <dt className="text-sm text-slate-600">Data source</dt>
+          <dd>
+            <Tag tone={isSample ? "attention" : "green"}>
+              {isSample ? "On this device only" : "Live from Guard Cloud"}
+            </Tag>
+          </dd>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]">
-            Last update
-          </span>
-          <Tag tone={isStale ? "attention" : "green"}>
-            {isStale ? "Older than 7 days" : "Recent"}
-          </Tag>
+          <dt className="text-sm text-slate-600">Last update</dt>
+          <dd>
+            <Tag tone={isStale ? "attention" : "green"}>
+              {isStale ? "Older than 7 days" : "Recent"}
+            </Tag>
+          </dd>
         </div>
-      </div>
+      </dl>
       {isSample && !hideLocalOnlyWarning && (
-        <div className="flex items-start gap-2 rounded-xl border border-brand-attention/20 bg-brand-attention/[0.04] px-3 py-2.5">
+        <p className="flex items-start gap-2 text-sm leading-6 text-slate-600">
           <HiMiniExclamationTriangle
-            className="mt-0.5 h-4 w-4 shrink-0 text-brand-attention"
+            className="mt-1 h-4 w-4 shrink-0 text-brand-attention"
             aria-hidden="true"
           />
-          <p className="text-xs leading-relaxed text-slate-600">
-            This device is using sample safety data. Connect Guard Cloud for live package warnings and
-            protection across your machines.
-          </p>
-        </div>
+          This device is using sample safety data. Connect Guard Cloud for live package warnings and
+          protection across your machines.
+        </p>
       )}
       {isStale && !isSample && (
-        <div className="flex items-start gap-2 rounded-xl border border-brand-attention/20 bg-brand-attention/[0.04] px-3 py-2.5">
+        <p className="flex items-start gap-2 text-sm leading-6 text-slate-600">
           <HiMiniArrowPath
-            className="mt-0.5 h-4 w-4 shrink-0 text-brand-attention"
+            className="mt-1 h-4 w-4 shrink-0 text-brand-attention"
             aria-hidden="true"
           />
-          <p className="text-xs leading-relaxed text-slate-600">
-            Safety checks have not refreshed recently. Make sure Guard is running, then sync policy or
-            run an audit.
-          </p>
-        </div>
+          Safety checks have not refreshed recently. Make sure Guard is running, then sync policy or
+          run an audit.
+        </p>
       )}
     </div>
   );

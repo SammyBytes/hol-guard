@@ -584,6 +584,16 @@ export function ActivationSummary({
     return null;
   }
   const copy = resolvePackageManagerProtectionCopy(protection);
+  // The status line above already says protection is live, so a healthy
+  // PATH only adds where the shims sit and when they last proved themselves.
+  if (protection.path_status === "in_path" && activationAssistError === null) {
+    return (
+      <p className="text-xs leading-5 text-slate-600">
+        {copy.pathDetail}
+        {lastAuditProofAt !== null ? <> Last audit proof {formatRelativeTime(lastAuditProofAt)}.</> : null}
+      </p>
+    );
+  }
   const Icon =
     protection.path_status === "in_path"
       ? HiMiniCheckCircle
@@ -629,7 +639,7 @@ export function ActivationSummary({
             </div>
           )}
           {activationAssistError !== null && (
-            <p className="mt-2 text-xs text-brand-attention">{activationAssistError}</p>
+            <p className="mt-2 text-xs text-brand-attention-text">{activationAssistError}</p>
           )}
         </div>
       </div>
