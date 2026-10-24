@@ -1,13 +1,14 @@
 //! The git subcommands that only print: `shortlog`, `check-ignore`,
-//! `count-objects` and `check-attr`.
+//! `count-objects`, `check-attr` and `sparse-checkout list`.
 //!
 //! `shortlog` counts the commits history already holds, `check-ignore`
 //! answers which ignore rule a path matches, `count-objects` reports how much
-//! the object store holds, and `check-attr` answers which attributes apply to
-//! a path. None writes a ref, an object or a file, and none reads a file's
-//! contents. All still run under the repository's configuration, so the
-//! configuration probe clears them before the read is proven, and options
-//! outside these lists keep their review.
+//! the object store holds, `check-attr` answers which attributes apply to a
+//! path, and `sparse-checkout list` prints the patterns the working tree is
+//! already narrowed to. None writes a ref, an object or a file, and none
+//! reads a file's contents. All still run under the repository's
+//! configuration, so the configuration probe clears them before the read is
+//! proven, and options outside these lists keep their review.
 
 /// `shortlog` flags that take no value. `-w` carries an optional inline
 /// width instead, which [`shortlog_read_form`] checks.
@@ -105,8 +106,21 @@ pub(crate) fn read_form(subcommand: &str, rest: &[String]) -> bool {
         "check-ignore" => check_ignore_read_form(rest),
         "count-objects" => count_objects_read_form(rest),
         "check-attr" => check_attr_read_form(rest),
+        "sparse-checkout" => sparse_checkout_read_form(rest),
         _ => false,
     }
+}
+
+/// Whether a `sparse-checkout` spelling is the one that only prints.
+///
+/// `list` writes nothing: it prints the patterns `.git/info/sparse-checkout`
+/// already holds. Every other spelling — `init`, `set`, `add`, `reapply`,
+/// `disable`, and `check-rules`, which reads the patterns off its own input —
+/// narrows or widens the working tree, so each keeps its review. `list` takes
+/// no options of its own, so a word beside it is a spelling this grammar has
+/// not read.
+fn sparse_checkout_read_form(rest: &[String]) -> bool {
+    rest.len() == 1 && rest[0] == "list"
 }
 
 /// Whether a one-dash spelling is a bundle of single-letter flags. Git's

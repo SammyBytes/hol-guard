@@ -147,7 +147,7 @@ fn read_only_plumbing(arguments: &[String]) -> bool {
         "cat-file" => crate::pretool::git_object_reads::read_form(command, rest),
         // These listings only print, and their grammars already exclude the
         // forms that run a configured program; the read proof still decides.
-        "shortlog" | "check-ignore" | "count-objects" | "check-attr" => {
+        "shortlog" | "check-ignore" | "count-objects" | "check-attr" | "sparse-checkout" => {
             crate::pretool::git_listing_reads::read_form(command, rest)
         }
         "rev-list" => !rest.iter().any(|argument| {
@@ -209,6 +209,11 @@ pub(super) fn inspection_arguments<'a>(
         // write in every other, so each is admitted only in that grammar.
         Some(record @ ("bisect" | "notes")) => {
             crate::pretool::git_side_record_reads::read_form(record, &remaining[1..])
+        }
+        // `sparse-checkout` prints the patterns the tree is narrowed to in one
+        // spelling and changes that narrowing in every other.
+        Some("sparse-checkout") => {
+            crate::pretool::git_listing_reads::read_form("sparse-checkout", &remaining[1..])
         }
         _ => false,
     };

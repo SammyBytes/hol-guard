@@ -103,6 +103,7 @@ pub(super) fn execution_free_paging(
             | "check-ignore"
             | "count-objects"
             | "check-attr"
+            | "sparse-checkout"
             | "apply"
             | "bisect"
             | "notes"
@@ -130,7 +131,7 @@ pub(super) fn execution_free_paging(
     }
     if matches!(
         operation,
-        "shortlog" | "check-ignore" | "count-objects" | "check-attr"
+        "shortlog" | "check-ignore" | "count-objects" | "check-attr" | "sparse-checkout"
     ) && !super::git_listing_reads::read_form(operation, &remaining[1..])
     {
         return None;
@@ -403,7 +404,7 @@ fn probe(
         // a pager.
         "status" | "hash-object" | "merge-base" | "ls-tree" | "cat-file" | "show-ref"
         | "for-each-ref" | "rev-list" | "describe" | "clean" | "apply" | "count-objects"
-        | "check-attr" => false,
+        | "check-attr" | "sparse-checkout" => false,
         "config" => super::git_config_reads::pages_by_default(&remaining[1..]),
         _ => true,
     };

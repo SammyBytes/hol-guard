@@ -26,6 +26,10 @@ pub struct PathContext<'a> {
     /// `--pre`, `--hidden` or extra search paths to an `rg` command that
     /// omits `--no-config`. Literal contexts leave this false.
     pub ripgrep_config_absent: bool,
+    /// No step of this command creates a filesystem entry, so a path with
+    /// nothing at it now still has nothing at it when a read runs and cannot
+    /// be a link a peer step planted. Literal contexts leave this false.
+    pub creates_nothing: bool,
     /// What a `psql` read inherits from the session: startup files only a
     /// read without `-X` runs, and the server libpq picks. Literal contexts
     /// leave both false.
@@ -109,6 +113,7 @@ mod git_routes;
 mod git_session_probe;
 mod git_worktree;
 pub(crate) mod github_conversation;
+mod glob_words;
 mod guard_diagnostics;
 mod list_wrapper;
 mod listing_reads;
@@ -1148,6 +1153,7 @@ fn evaluate_single_command(
         &data_heredocs::without_data_bodies(normalized),
         git_search_text::command_without_patterns(&model),
     ) || secret_aliases::names_secret_alias(&model, context)
+        || glob_words::names_hidden_glob(&model, context)
     {
         return Ok(pretool_decision(
             model,

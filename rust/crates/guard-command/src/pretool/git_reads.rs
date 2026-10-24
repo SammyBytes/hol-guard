@@ -2,7 +2,7 @@
 //!
 //! Status, diff, log, show, grep, rev-parse, merge-base, ls-files, `remote -v`, `worktree list`,
 //! branch listings, `show-ref`, `for-each-ref`, `rev-list` commit walks, `hash-object`, `config`,
-//! `ls-tree` and `cat-file` reads. Diff-style reads that can run a configured helper need the
+//! `ls-tree`, `cat-file` and `sparse-checkout list` reads. Diff-style reads that can run a configured helper need the
 //! helper-context probe or both `--no-ext-diff` and `--no-textconv`.
 
 #[path = "git_log_names.rs"]
@@ -115,7 +115,7 @@ pub(super) fn safe_git_arguments(
     }
     if matches!(
         subcommand,
-        "shortlog" | "check-ignore" | "count-objects" | "check-attr"
+        "shortlog" | "check-ignore" | "count-objects" | "check-attr" | "sparse-checkout"
     ) {
         // A shortlog pages (pager.shortlog) and all of them run under the
         // repository's configuration, so the probe clears them first.
