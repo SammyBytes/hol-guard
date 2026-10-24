@@ -18,11 +18,11 @@ pub(crate) use launchers::launcher_program;
 /// clock. They stay in the wrapper chain, and the duration is still skipped
 /// so the program they name stays the executable. `command` and `time` run
 /// the next word as the program.
-/// `env` does that for the assignments it carries, whatever they name; those
-/// names join `environment_names`. An operand `env` would take as an
-/// assignment of its own leaves `env` as the executable.
-/// Any option on a prefix leaves it as the executable, which keeps
-/// `command -v`, `time -p` and `env -i` on their existing paths.
+/// `env` does that for the assignments it carries, whatever they name, and for
+/// the names it removes; all of them join `environment_names`. An operand
+/// `env` would take as an assignment of its own leaves `env` as the executable.
+/// Any option on `command` or `time` leaves that prefix as the executable,
+/// which keeps `command -v` and `time -p` on their existing paths.
 pub(super) fn unwrap_wrappers(
     tokens: &[String],
     mut index: usize,
@@ -131,19 +131,63 @@ pub(super) fn unwrap_wrappers(
 /// compatibility layer reads the rest; an `env` that names no program at all,
 /// or whose next operand `env` would take as an assignment of its own, is
 /// still the environment dump, and keeps its own spelling.
+///
+/// The controls that only decide which names the program starts with are read
+/// the same way, because `env -u NODE_OPTIONS npm test` runs the test suite
+/// `npm test` runs. Each removed name joins `environment_names` as a written
+/// one does, so `-u PATH` keeps the review a written `PATH=` keeps. Every
+/// other option leaves `env` as the executable: `-i` clears the environment,
+/// which takes the search path the program is resolved against with it, `-C`
+/// runs the program in another directory, and `-S` carries a whole command
+/// line inside the option's own value. None of those is the program this text
+/// names. Assignments end option parsing for the shell as they do for `env`,
+/// so a `-u` behind one is the program.
 fn transparent_prefix(tokens: &[String], index: usize) -> Option<(usize, Vec<String>)> {
     let mut next = index + 1;
     let mut names = Vec::new();
+    let mut env_prefix = false;
     match tokens.get(index)?.as_str() {
         "command" | "time" => {}
         "env" | "/usr/bin/env" | "/bin/env" => {
+            env_prefix = true;
+            let mut controls = 0usize;
+            loop {
+                match tokens.get(next)?.as_str() {
+                    "-u" | "--unset" => {
+                        names.push(tokens.get(next + 1)?.to_owned());
+                        controls += 1;
+                        next += 2;
+                        continue;
+                    }
+                    value if value.starts_with("--unset=") => {
+                        names.push(value["--unset=".len()..].to_owned());
+                    }
+                    value if value.len() > 2 && value.starts_with("-u") => {
+                        names.push(value[2..].to_owned());
+                    }
+                    "--" => {
+                        controls += 1;
+                        next += 1;
+                        break;
+                    }
+                    value if value.starts_with('-') => return None,
+                    _ => break,
+                }
+                controls += 1;
+                next += 1;
+            }
             while let Some(name) = tokens.get(next).and_then(|value| assignment_name(value)) {
                 names.push(name.to_owned());
                 next += 1;
             }
-            if names.is_empty() {
+            if names.is_empty() && controls == 0 {
                 return None;
             }
+            // `-u HOME -u HOME` names one variable, and `-u CI CI=1` both
+            // removes and writes one. Either way the set of names this prefix
+            // decided is what the review reads.
+            let mut seen = std::collections::BTreeSet::new();
+            names.retain(|name| seen.insert(name.clone()));
         }
         _ => return None,
     }
@@ -154,7 +198,7 @@ fn transparent_prefix(tokens: &[String], index: usize) -> Option<(usize, Vec<Str
     // named `A-B=1`, so reading the two alike would model the wrong program.
     // A word the shell would not take as an assignment ends the prefix and
     // leaves `env` itself to be judged.
-    let consumed_by_env = !names.is_empty() && program.contains('=');
+    let consumed_by_env = env_prefix && program.contains('=');
     (!program.is_empty()
         && !program.starts_with('-')
         && assignment_name(program).is_none()
@@ -673,9 +717,23 @@ mod tests {
             "command -p bun run build",
             "time -p bun run build",
             "env bun run build",
+            // Clearing the environment takes the search path with it, so the
+            // program this text names is not the program that runs.
             "env -i bun run build",
+            "env --ignore-environment bun run build",
+            "env - bun run build",
             "env -u HOME -i bun run build",
             "env -S 'bun run build'",
+            "env -Sbun",
+            "env --split-string='bun run build'",
+            // `-C` runs the program somewhere else, which is not the
+            // directory the rest of this evaluation reads.
+            "env -C /tmp bun run build",
+            // An assignment ends option parsing, so the program here is a
+            // file named `-u`, not `bun`.
+            "env CI=1 -u DEBUG bun run build",
+            "env -u",
+            "env --",
             "env CI=1 sh -c 'rm -rf x'",
             "command sh -c 'rm -rf x'",
             "command env",
@@ -691,6 +749,36 @@ mod tests {
                 model.segments.first().map(|segment| &segment.executable)
             );
         }
+    }
+
+    /// The `env` options that only decide which names the program starts
+    /// with leave the program itself untouched, so the command models as the
+    /// program it runs. Every name the prefix adds or removes joins
+    /// `environment_names`, which is what keeps `PATH` under review.
+    #[test]
+    fn env_controls_that_only_name_the_environment_expose_the_program() {
+        for (command, names) in [
+            ("env -u NODE_OPTIONS npm test", vec!["NODE_OPTIONS"]),
+            ("env --unset NODE_OPTIONS npm test", vec!["NODE_OPTIONS"]),
+            ("env --unset=NODE_OPTIONS npm test", vec!["NODE_OPTIONS"]),
+            ("env -uNODE_OPTIONS npm test", vec!["NODE_OPTIONS"]),
+            ("env -u A -u B npm test", vec!["A", "B"]),
+            ("env -u CI CI=1 npm test", vec!["CI"]),
+            ("env -u NODE_OPTIONS -- npm test", vec!["NODE_OPTIONS"]),
+            ("env -- npm test", vec![]),
+        ] {
+            let model = parse(command);
+            assert_eq!(model.confidence, "exact", "{command}");
+            assert_eq!(
+                model.segments[0].executable.as_deref(),
+                Some("npm"),
+                "{command}"
+            );
+            assert_eq!(model.segments[0].environment_names, names, "{command}");
+        }
+        // Removing `PATH` leaves the program resolved against a search path
+        // this text does not hold, the same question a written `PATH=` asks.
+        assert!(parse("env -u PATH npm test").path_overridden);
     }
 
     /// `env` takes any operand holding an `=`, so the word after the names it
