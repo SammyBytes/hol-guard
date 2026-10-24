@@ -391,8 +391,10 @@ pub fn evaluate(operation: &str, input: &Value) -> Option<Value> {
         "vitest_arguments" => vitest_arguments(&command).map(|v| json!(v)),
         "contained_kind" => contained_kind(&command),
         "launcher_program" => Ok(json!(crate::parser_wrappers::launcher_program(&command, 0))),
-        "transparent_prefix" => Ok(json!(crate::parser_wrappers::transparent_prefix(&command, 0)
-            .map(|(index, _)| index))),
+        "transparent_prefix" => {
+            let prefix = crate::parser_wrappers::transparent_prefix(&command, 0);
+            Ok(json!(prefix.map(|(index, _)| index)))
+        }
         _ => unreachable!(),
     };
     Some(match result {

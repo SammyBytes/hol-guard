@@ -217,7 +217,10 @@ fn transparent_prefix_reports_where_the_parser_reads_the_program() {
         |command: &[&str]| evaluate("transparent_prefix", &json!({ "command": command })).unwrap();
     assert_eq!(offset(&["command", "pytest", "-q"]), json!({"value": 1}));
     assert_eq!(offset(&["time", "pytest", "-q"]), json!({"value": 1}));
-    assert_eq!(offset(&["env", "CI=1", "pytest", "-q"]), json!({"value": 2}));
+    assert_eq!(
+        offset(&["env", "CI=1", "pytest", "-q"]),
+        json!({"value": 2})
+    );
     // The parser reads the two system paths as the `env` they name, so the
     // sink peels them too rather than planning `/usr/bin/env` as the program.
     assert_eq!(
