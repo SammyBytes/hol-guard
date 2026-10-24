@@ -446,6 +446,25 @@ def _runtime_data_flow_naming(
 _CODEX_PROMPT_SECRET_KEY_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "PASS", "API_KEY", "API-KEY", "AUTH", "CREDENTIAL")
 
 
+# How much of the request a whole tool response may take beside the flattened
+# text, under the resident's own `CODEX_POST_TOOL_OUTPUT_MAX_BYTES`.
+_CODEX_TOOL_RESPONSE_WIRE_BUDGET = 2 * 1024 * 1024
+
+
+def _codex_tool_response_within_budget(value: object, response_text: str) -> object | None:
+    """The tool response to send whole, or ``None`` when it will not fit."""
+
+    if value is None:
+        return None
+    try:
+        encoded = json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return None
+    if len(encoded.encode("utf-8")) + len(response_text.encode("utf-8")) > _CODEX_TOOL_RESPONSE_WIRE_BUDGET:
+        return None
+    return value
+
+
 def _codex_post_tool_output_review(
     *,
     harness: str = "codex",
@@ -464,20 +483,30 @@ def _codex_post_tool_output_review(
     if stdout_text:
         response_text = f"{response_text}\n{stdout_text}".strip() if response_text else stdout_text
     tool_label = _coalesce_string(payload.get("tool_name"), "Bash")
+    body: dict[str, object] = {
+        "harness_label": harness_label,
+        "tool_label": tool_label,
+        "tool_name": payload.get("tool_name"),
+        "tool_input": payload.get("tool_input"),
+        "arguments": payload.get("arguments"),
+        "tool_input_present": "tool_input" in payload,
+        "response_text": response_text,
+        "cwd": None if cwd is None else anchor_to_process_directory(cwd),
+        "home_dir": None if home_dir is None else anchor_to_process_directory(home_dir),
+        "deadline_ms": 8_000,
+    }
+    # The flattened text is still sent, because only this side knows what it
+    # appended to the response. The response itself travels whole beside it so
+    # the resident decides what the scan reads, rather than trusting whichever
+    # caller flattened it. It travels only when it fits: the resident refuses a
+    # request over its bound, and a refused review is worse than the flattened
+    # text every caller sent before the resident could read the response.
+    whole_response = _codex_tool_response_within_budget(payload.get("tool_response"), response_text)
+    if whole_response is not None:
+        body["tool_response"] = whole_response
     answer = codex_tool_output_native(
         "post_tool_output",
-        body={
-            "harness_label": harness_label,
-            "tool_label": tool_label,
-            "tool_name": payload.get("tool_name"),
-            "tool_input": payload.get("tool_input"),
-            "arguments": payload.get("arguments"),
-            "tool_input_present": "tool_input" in payload,
-            "response_text": response_text,
-            "cwd": None if cwd is None else anchor_to_process_directory(cwd),
-            "home_dir": None if home_dir is None else anchor_to_process_directory(home_dir),
-            "deadline_ms": 8_000,
-        },
+        body=body,
         timeout_seconds=9.0,
     )
     if not answer.allowed or answer.value is None or answer.error_code is not None:
