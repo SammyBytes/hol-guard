@@ -126,9 +126,17 @@ fn subject(rest: &str) -> Option<(&str, &str)> {
 ///
 /// A process substitution runs its own command list before the `case` chooses
 /// anything, so `<(` and `>(` carry one as plainly as a backtick does.
+///
+/// Arithmetic carries one too. The shell evaluates a variable's value as an
+/// expression, and an array subscript in that value runs a command
+/// substitution the text in front of us never spells, so
+/// `x='a[$(id)]'; case $[x] in *) ls;; esac` runs `id`. `$((` holds a `$(`
+/// and is already read as carrying a command; the legacy `$[` spelling has to
+/// be named.
 fn starts_a_command(text: &str) -> bool {
     text.contains('`')
         || text.contains("$(")
+        || text.contains("$[")
         || text.contains("<(")
         || text.contains(">(")
         || text

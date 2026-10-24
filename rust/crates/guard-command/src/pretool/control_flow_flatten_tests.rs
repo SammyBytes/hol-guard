@@ -139,6 +139,10 @@ fn an_unmodeled_construct_keeps_its_review() {
         // substitution the value holds, and `:=` writes what the lookup reads.
         "case ${MODE@P} in build) ls;; esac",
         "case ${PATH:=/tmp/tools} in *) ls;; esac",
+        // Legacy arithmetic evaluates the value a bare name holds, and an
+        // array subscript in that value runs a command substitution.
+        "case $[x] in *) ls;; esac",
+        "case $[ x + 1 ] in *) ls;; esac",
         "case $1 in a) ls;& b) ls;; esac",
         "case $1 in a) ls;;& b) ls;; esac",
         "case $1 in esac",
