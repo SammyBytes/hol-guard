@@ -151,10 +151,7 @@ fn an_unknown_origin_override_falls_through_to_the_markers() {
         Some("codex")
     );
     assert_eq!(
-        resolve_environment_harness_from(&env(&[(
-            "HOL_GUARD_ORIGIN_HARNESS",
-            "../../etc/passwd"
-        )])),
+        resolve_environment_harness_from(&env(&[("HOL_GUARD_ORIGIN_HARNESS", "../../etc/passwd")])),
         None
     );
     assert_eq!(
@@ -205,8 +202,14 @@ fn an_app_bundle_path_attributes_its_harness() {
         ("/Applications/Codex.app/Contents/MacOS/helper", "codex"),
         ("/Applications/Cursor.app/Contents/MacOS/helper", "cursor"),
         ("/Applications/Grok.app/Contents/MacOS/helper", "grok"),
-        ("/Applications/Claude.app/Contents/MacOS/helper", "claude-code"),
-        ("/Applications/OpenCode.app/Contents/MacOS/helper", "opencode"),
+        (
+            "/Applications/Claude.app/Contents/MacOS/helper",
+            "claude-code",
+        ),
+        (
+            "/Applications/OpenCode.app/Contents/MacOS/helper",
+            "opencode",
+        ),
         ("/Applications/ZCode.app/Contents/MacOS/helper", "zcode"),
         ("/Applications/Devin.app/Contents/MacOS/helper", "devin"),
     ] {
