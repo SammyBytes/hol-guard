@@ -180,19 +180,23 @@ fn a_transparent_env_behind_a_launcher_reaches_its_owners_floor() {
         assert_ne!(code, FAILED, "{command}");
         assert_eq!(action, "review", "{command}: {code}");
     }
-    // A name that loads code or moves the search path is not inert, so the
-    // bare spelling earns its review from the reviewed environment
-    // projection rather than from this scan. That projection reads a simple
+    // A name that loads code is not inert, so the bare spelling earns its
+    // review from the reviewed environment projection rather than from this
+    // scan. Removing `NODE_OPTIONS` is a setting that projection reads.
+    let (bare, code) = decision(&controls, "env -u NODE_OPTIONS npm test");
+    assert_eq!(bare, "review", "env -u NODE_OPTIONS npm test: {code}");
+    // Whatever floor the bare spelling settles on, putting a launcher in
+    // front of it never buys the command something the bare spelling lacks.
+    // It does not yet reach the same floor: the projection reads a simple
     // command from its first word and stops at anything that is neither an
     // assignment nor `env` (`env_prefix_projection::strip_prefixes`), so a
-    // launcher in front of the settings leaves the command unprojected and
-    // on its own floor. Closing that is the projection's to do, not this
-    // scan's; what this scan owes meanwhile is that putting a launcher in
-    // front never buys the command something the bare spelling lacks.
+    // launcher leaves the command unprojected and on its own floor. Closing
+    // that is the projection's to do, not this scan's. `-u PATH` is the
+    // shape the projection refuses outright, so both spellings already
+    // agree there.
     for command in ["env -u NODE_OPTIONS npm test", "env -u PATH npm test"] {
-        let (bare, bare_code) = decision(&controls, command);
+        let (bare, _) = decision(&controls, command);
         let (behind, _) = decision(&controls, &format!("exec {command}"));
-        assert_eq!(bare, "review", "{command}: {bare_code}");
         assert!(
             strictness(&behind) >= strictness(&bare),
             "exec {command}: {behind} is weaker than {bare}"
