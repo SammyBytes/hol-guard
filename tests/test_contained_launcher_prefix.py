@@ -1,4 +1,9 @@
-"""`nice` and `stdbuf` run the program they name; the sink plans that program."""
+"""A launcher runs the program it names; the sink plans that program.
+
+Which names are launchers is the native parser's to answer. The sink keeps no
+list of its own, so a name the parser learns to read reaches the planners
+without a second edit here.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +26,7 @@ _PROGRAM = {
     ("nice", "-n", "10", "pytest", "-q"): 3,
     ("nice", "pytest", "-q"): 1,
     ("stdbuf", "-oL", "pytest", "-q"): 2,
+    ("exec", "pytest", "-q"): 1,
     ("nice", "-n", "10", "timeout", "20", "pytest", "-q"): 3,
     ("stdbuf", "-oL", "env", "CI=1", "pytest", "-q"): 2,
 }
@@ -42,6 +48,7 @@ def test_launchers_and_clocks_peel_in_either_order() -> None:
     assert peel_run_prefixes(shlex.split("nice -n 10 timeout 20 pytest -q")) == (["pytest", "-q"], 20)
     assert peel_run_prefixes(shlex.split("timeout 20 stdbuf -oL pytest -q")) == (["pytest", "-q"], 20)
     assert peel_run_prefixes(shlex.split("stdbuf -oL env CI=1 pytest -q")) == (["pytest", "-q"], None)
+    assert peel_run_prefixes(shlex.split("exec pytest -q")) == (["pytest", "-q"], None)
     assert peel_run_prefixes(shlex.split("nohup pytest -q")) == (["nohup", "pytest", "-q"], None)
 
 
@@ -51,7 +58,14 @@ def test_an_answer_outside_the_command_leaves_it_whole(monkeypatch: pytest.Monke
         assert peel_run_prefixes(["nice", "pytest"]) == (["nice", "pytest"], None), answer
 
 
-def test_only_a_launcher_name_asks_native_authority(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_parser_names_the_launchers_and_the_sink_does_not(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every command that could carry one is put to the parser, and only it decides.
+
+    Holding the names here instead is what drifted: the parser learned to read
+    the shell's `exec`, the copy in the sink did not, and `exec pytest -q`
+    reached the planners with `exec` as its program.
+    """
+
     asked: list[object] = []
 
     def native(operation: str, fields: dict[str, object], expected: object) -> object:
@@ -59,11 +73,27 @@ def test_only_a_launcher_name_asks_native_authority(monkeypatch: pytest.MonkeyPa
         return _native(operation, fields, expected)
 
     monkeypatch.setattr(native_restricted_pytest, "restricted_native", native)
-    for text in ("pytest -q", "timeout 20 pytest -q", "./nice pytest -q"):
+    # A launcher stands as a bare name in front of a program. A command with
+    # nothing behind the first word cannot carry one, and a first word spelled
+    # as a path is a program of the user's own that shares the name.
+    for text in ("pytest", "./nice pytest -q", "/usr/bin/nice pytest -q"):
         peel_run_prefixes(shlex.split(text))
     assert asked == []
+    # Every other command is asked about, including the ones the sink once
+    # held a name for and the one it did not.
     assert peel_run_prefixes(shlex.split("nice pytest -q")) == (["pytest", "-q"], None)
-    assert asked == [["nice", "pytest", "-q"]]
+    assert peel_run_prefixes(shlex.split("exec pytest -q")) == (["pytest", "-q"], None)
+    assert peel_run_prefixes(shlex.split("wget https://example.test")) == (
+        ["wget", "https://example.test"],
+        None,
+    )
+    assert asked == [
+        ["nice", "pytest", "-q"],
+        ["pytest", "-q"],
+        ["exec", "pytest", "-q"],
+        ["pytest", "-q"],
+        ["wget", "https://example.test"],
+    ]
 
 
 def _required() -> dict[str, object]:
@@ -80,7 +110,9 @@ def _plan_only_pytest(command: list[str], **_: object) -> None:
         raise RestrictedPytestError(PYTEST_INVALID_COMMAND_REASON_CODE, "accepts only a pytest executable")
 
 
-@pytest.mark.parametrize("text", ["nice -n 10 pytest -q", "nice pytest -q", "stdbuf -oL pytest -q"])
+@pytest.mark.parametrize(
+    "text", ["nice -n 10 pytest -q", "nice pytest -q", "stdbuf -oL pytest -q", "exec pytest -q"]
+)
 def test_the_sink_runs_the_program_the_receipt_authorized(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, text: str
 ) -> None:
@@ -100,7 +132,9 @@ def test_the_sink_runs_the_program_the_receipt_authorized(
     assert executed == [["pytest", "-q"]]
 
 
-@pytest.mark.parametrize("text", ["./nice -n 10 pytest -q", "stdbuf pytest -q", "nohup pytest -q"])
+@pytest.mark.parametrize(
+    "text", ["./nice -n 10 pytest -q", "stdbuf pytest -q", "nohup pytest -q", "exec -a name pytest -q"]
+)
 def test_the_sink_still_refuses_a_launcher_native_authority_does_not_read(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, text: str
 ) -> None:

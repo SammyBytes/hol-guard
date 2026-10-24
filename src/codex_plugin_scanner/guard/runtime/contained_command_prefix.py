@@ -178,19 +178,24 @@ def _assignment_word(word: str) -> bool:
     return bool(separator and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name))
 
 
-# Native authority reads a launcher only when the first word is exactly one of
-# these names, so any other command keeps its words without asking it.
-_LAUNCHERS = frozenset({"nice", "stdbuf"})
-
-
 def _peel_launcher(command: list[str]) -> list[str]:
-    """The program a system `nice` or `stdbuf` runs, as the native parser reads it.
+    """The program a system launcher runs, as the native parser reads it.
 
-    Native authority owns that grammar, so the sink asks it for the program's
-    position and never parses launcher options itself. A launcher the parser
-    leaves in place stays in place, and the planners refuse it.
+    Native authority owns that grammar — which names are launchers, and where
+    each one's options end — so the sink asks it for the program's position and
+    keeps no list of the names itself. A second copy of that list is what drift
+    looks like: the parser learned to read the shell's `exec` as a launcher
+    while the copy here still held `nice` and `stdbuf`, so `exec pytest -q`
+    reached the planners with `exec` as its program and was refused, though
+    native authority had already read it as the `pytest -q` it runs.
+
+    A launcher stands as a bare name in front of a program, so a command too
+    short to hold both, or one whose first word is spelled as a path, is not
+    one and is not asked about. Every other command is, and the parser answers
+    for the names it reads. A launcher it leaves in place stays in place, and
+    the planners refuse it.
     """
-    if not command or command[0] not in _LAUNCHERS:
+    if len(command) < 2 or not command[0] or "/" in command[0] or "\\" in command[0]:
         return command
     from ..native_restricted_pytest import restricted_native
 
@@ -201,13 +206,14 @@ def _peel_launcher(command: list[str]) -> list[str]:
 def peel_run_prefixes(command: list[str]) -> tuple[list[str], int | None]:
     """Peel the prefixes native authority reads through, and the tightest clock.
 
-    A system `timeout`, `nice` and `stdbuf` each run the program they name
-    unchanged, so the planners are handed that program, as native authority
-    is. Each peel is followed by the inert `command`/`env` prefix and
-    assignment split the planners already receive. `nice` and `stdbuf` set
-    only scheduling priority and stdio buffering; the contained runner applies
-    its own process limits and returns the output when the run ends, so
-    neither setting changes what the caller reads.
+    A system `timeout`, and every launcher the native parser reads, run the
+    program they name unchanged, so the planners are handed that program, as
+    native authority is. Each peel is followed by the inert `command`/`env`
+    prefix and assignment split the planners already receive. `nice` and
+    `stdbuf` set only scheduling priority and stdio buffering, and the shell's
+    `exec` replaces the shell process rather than forking one; the contained
+    runner applies its own process limits and returns the output when the run
+    ends, so none of them changes what the caller reads.
     """
     seconds: int | None = None
     for _ in range(4):

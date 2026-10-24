@@ -192,6 +192,9 @@ fn launcher_program_reports_where_the_parser_reads_the_program() {
         offset(&["stdbuf", "-oL", "pytest", "-q"]),
         json!({"value": 2})
     );
+    // The shell's `exec` is read here too. The sink keeps no list of launcher
+    // names of its own, so every name this op answers for is one it peels.
+    assert_eq!(offset(&["exec", "pytest", "-q"]), json!({"value": 1}));
     // The sink refuses every shape the native parser leaves in place.
     for command in [
         &["./nice", "-n", "10", "pytest"][..],
@@ -200,6 +203,9 @@ fn launcher_program_reports_where_the_parser_reads_the_program() {
         &["nohup", "pytest", "-q"],
         &["nice", "-n", "10", "python3", "deploy.py"],
         &["pytest", "-q"],
+        &["exec"],
+        &["exec", "-a", "name", "pytest"],
+        &["exec", "./deploy.sh"],
     ] {
         assert_eq!(offset(command), json!({"value": null}), "{command:?}");
     }

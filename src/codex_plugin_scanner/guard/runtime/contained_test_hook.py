@@ -431,10 +431,10 @@ def run_authorized_contained_test(
             command, _ = _split_command_prefix(shlex.split(tool_input["command"], posix=True))
         except ValueError as error:
             raise _reject() from error
-        # Native authority reads a system `timeout`, `nice` and `stdbuf`
-        # through to the program they run, so the planners below are handed
-        # that program. A clock still bounds this run: it only ever shortens
-        # the deadline.
+        # Native authority reads a system `timeout` and each launcher it
+        # knows through to the program they run, so the planners below are
+        # handed that program. A clock still bounds this run: it only ever
+        # shortens the deadline.
         command, clock = peel_run_prefixes(command)
         if clock is not None:
             timeout_seconds = min(timeout_seconds, clock)
