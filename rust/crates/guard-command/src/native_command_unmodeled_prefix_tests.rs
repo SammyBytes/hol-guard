@@ -157,3 +157,50 @@ fn an_exec_without_a_named_program_keeps_the_failure() {
         assert_eq!(decision(&controls, command).1, FAILED, "{command}");
     }
 }
+
+/// `exec env CI=1 npm test` runs what `exec npm test` runs, with one name
+/// decided in front of it. The parser already reads the bare `env CI=1 npm
+/// test` that way, and the contained-launcher sink peels the same prefix;
+/// only this scan still read the word `env` as a program it never saw, so an
+/// ordinary test run behind a launcher blocked outright while the same run
+/// without the names went through.
+#[test]
+fn a_transparent_env_behind_a_launcher_reaches_its_owners_floor() {
+    let controls = controls(github("enabled", None), false);
+    for command in [
+        "exec env CI=1 npm test",
+        "exec env CI=1 FOO=bar cargo build",
+        "exec /usr/bin/env CI=1 npm test",
+        "exec env -u NODE_OPTIONS npm test",
+        "stdbuf -oL env CI=1 cargo build",
+        "nice -n 10 env RUST_LOG=info cargo build",
+        "timeout -k 5 30 env CI=1 npm test",
+    ] {
+        let (action, code) = decision(&controls, command);
+        assert_ne!(code, FAILED, "{command}");
+        assert_eq!(action, "review", "{command}: {code}");
+    }
+}
+
+/// An `env` that is anything other than a list of names keeps the failure.
+/// `-i` empties the environment the program starts with, `-S` carries a whole
+/// shell line in its own value, `-C` moves the directory, and a bare `env
+/// prog` is the spelling the extension floors key on. Walking the names also
+/// does not read past the program they are decided for: an interpreter or a
+/// script file behind them is still one nothing here opened.
+#[test]
+fn an_env_that_is_not_a_name_list_keeps_the_failure() {
+    let controls = controls(github("enabled", None), false);
+    for command in [
+        "exec env -i npm test",
+        "exec env -S'sh -c id'",
+        "exec env -C /tmp npm test",
+        "exec env npm test",
+        "exec env CI=1 bash -lc 'npm run build'",
+        "exec env CI=1 ./deploy.sh",
+        "stdbuf -oL env CI=1 python3 deploy.py",
+        "nice -n 10 env CI=1 xargs rm -f",
+    ] {
+        assert_eq!(decision(&controls, command).1, FAILED, "{command}");
+    }
+}
