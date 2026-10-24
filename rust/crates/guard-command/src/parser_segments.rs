@@ -8,6 +8,14 @@ mod tokens;
 
 pub(crate) use tokens::{shell_tokens, shell_tokens_preserving_redirects};
 
+#[path = "parser_segment_shapes.rs"]
+mod shapes;
+
+use shapes::sole_command_group;
+pub(super) use shapes::{
+    is_stderr_to_null_redirect, is_stderr_to_stdout_redirect, stderr_null_sink_is_inert,
+};
+
 pub(super) fn split_execution_segments(
     command: &str,
     preserve_unquoted_backslash: bool,
@@ -331,64 +339,6 @@ pub(super) fn trimmed_bounds(chars: &[char], start: usize, end: usize) -> Option
     (left < right).then_some((left, right))
 }
 
-pub(super) fn is_stderr_to_stdout_redirect(
-    chars: &[char],
-    index: usize,
-    preserve_backslash: bool,
-) -> bool {
-    let start = match chars.get(index) {
-        Some('&') => index.checked_sub(2),
-        Some('>') => index.checked_sub(1),
-        _ => None,
-    };
-    let Some(start) = start else {
-        return false;
-    };
-    let Some(redirect) = chars.get(start..start.saturating_add(4)) else {
-        return false;
-    };
-    redirect == ['2', '>', '&', '1']
-        && starts_at_shell_token_boundary(chars, start, preserve_backslash)
-        && chars.get(start + 4).is_none_or(|value| {
-            is_shell_token_whitespace(*value) || matches!(*value, '|' | '&' | ';')
-        })
-}
-
-pub(super) fn is_stderr_to_null_redirect(
-    chars: &[char],
-    start: usize,
-    preserve_backslash: bool,
-) -> bool {
-    // Only a fixed stderr sink known to be inert is dropped; arbitrary paths
-    // and descriptors must still pass through the unsupported-redirection
-    // guard.
-    stderr_null_sink_is_inert()
-        && chars.get(start..start.saturating_add(11))
-            == Some(&['2', '>', '/', 'd', 'e', 'v', '/', 'n', 'u', 'l', 'l'])
-        && starts_at_shell_token_boundary(chars, start, preserve_backslash)
-        && chars.get(start + 11).is_none_or(|value| {
-            is_shell_token_whitespace(*value) || matches!(*value, '|' | '&' | ';')
-        })
-}
-
-/// `/dev/null` is the null device on Unix. On Windows, Git Bash (the shell
-/// harnesses run POSIX commands in) maps it to the null device too, while
-/// PowerShell and cmd open `\dev\null` on the shell's current drive. That
-/// open fails without writing anything while the drive has no `\dev`. The
-/// shell may have changed drive since Guard started, or earlier in the same
-/// command, so the sink is inert only while no drive letter has a `\dev`.
-pub(super) fn stderr_null_sink_is_inert() -> bool {
-    cfg!(unix)
-        || (cfg!(windows)
-            && (b'A'..=b'Z').all(|drive| {
-                std::fs::symlink_metadata(format!("{}:\\dev", drive as char)).is_err_and(|error| {
-                    // Not found, no such drive, or no media in the drive.
-                    error.kind() == std::io::ErrorKind::NotFound
-                        || matches!(error.raw_os_error(), Some(15 | 21))
-                })
-            }))
-}
-
 pub(super) fn starts_at_shell_token_boundary(
     chars: &[char],
     start: usize,
@@ -415,52 +365,6 @@ pub(super) fn is_plain_cd_target(value: &str) -> bool {
                 '$' | '`' | '<' | '>' | '|' | ';' | '&' | '(' | ')' | '{' | '}' | '\0'
             )
         })
-}
-
-/// The span inside a command that is nothing but one group: a `( list )`
-/// subshell or a `{ list; }` brace group, with no second bracket of its own
-/// kind anywhere in the text.
-///
-/// Requiring the group to be the whole command, and to be the only one, is
-/// what makes stripping it sound. A bracket left over would mean a nesting,
-/// an expansion such as `$(` or `${`, or a glob this pass has not read, and a
-/// redirect, a pipe or a background `&` after the closing bracket would leave
-/// text outside the group that the list inside it does not account for.
-///
-/// A subshell runs its list in a child, so the directory, environment and
-/// options it sets do not outlive it; reading the list as though they did can
-/// only widen what the command is taken to own, never narrow it.
-fn sole_command_group(chars: &[char]) -> Option<std::ops::Range<usize>> {
-    let open = chars.iter().position(|value| !value.is_whitespace())?;
-    let close = chars.iter().rposition(|value| !value.is_whitespace())?;
-    let (opener, closer) = match (chars[open], chars[close]) {
-        ('(', ')') => ('(', ')'),
-        ('{', '}') => ('{', '}'),
-        _ => return None,
-    };
-    if close <= open + 1 {
-        return None;
-    }
-    let brackets = chars
-        .iter()
-        .filter(|value| **value == opener || **value == closer)
-        .count();
-    if brackets != 2 {
-        return None;
-    }
-    // `{` is a word unless whitespace separates it from the list, so `{ls; }`
-    // runs a program named `{ls`. The list itself has to be terminated, which
-    // is what keeps `}` a bracket rather than the list's last word.
-    if opener == '{'
-        && !(is_shell_token_whitespace(chars[open + 1])
-            && chars[open + 1..close]
-                .iter()
-                .rposition(|value| !is_shell_token_whitespace(*value))
-                .is_some_and(|last| matches!(chars[open + 1 + last], ';' | '&')))
-    {
-        return None;
-    }
-    Some(open + 1..close)
 }
 
 pub(super) fn push_segment(

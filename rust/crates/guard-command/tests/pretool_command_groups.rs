@@ -61,6 +61,11 @@ fn a_whole_command_group_is_read_as_the_list_inside_it() {
             // this pass has not read.
             (format!("((cd {inside} && cat one.txt))"), false),
             (format!("(cd {inside} && cat \"${{HOME}}/one.txt\")"), false),
+            // A newline ends a list the way `;` does, so a brace group
+            // written over two lines is the group its one-line spelling is.
+            (format!("{{ cd {inside} && cat one.txt\n}}"), true),
+            (format!("{{ cat {inside}/one.txt\n  }}"), true),
+            (format!("{{ cd {inside} && cat .env\n}}"), false),
             // `{` is a word unless whitespace separates it from the list, and
             // the list has to be terminated for `}` to be a bracket.
             (format!("{{cd {inside} && cat one.txt; }}"), false),
