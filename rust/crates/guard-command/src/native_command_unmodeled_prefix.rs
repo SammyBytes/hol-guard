@@ -300,6 +300,26 @@ fn transparent_env_program(words: &[&str]) -> Option<usize> {
     }
     let tokens: Vec<String> = words.iter().map(|word| (*word).to_owned()).collect();
     let (program, _names) = crate::parser_wrappers::transparent_prefix(&tokens, 0)?;
+    // Only a prefix that writes ordinary values walks through. Nothing
+    // further along this path reads the names it decided, while on the parser
+    // path they reach `environment_names`, where a name that steers lookup,
+    // loading, configuration, credentials, the trust anchor or the endpoint
+    // keeps the command under review. Without this, `exec env LD_PRELOAD=x.so
+    // pytest -q` earned pytest's owner floor while the bare
+    // `LD_PRELOAD=x.so pytest -q` beside it was still reviewed, so writing a
+    // launcher in front of a loader hook made the command less strict.
+    //
+    // Only a name this prefix writes is read. `-u LD_PRELOAD` takes the hook
+    // away from the program rather than handing it one, so an unset keeps the
+    // walk the launcher was added for.
+    if words[..program].iter().any(|word| {
+        is_assignment(word)
+            && word.split_once('=').is_some_and(|(name, _)| {
+                !crate::command_compatibility::environment::ordinary_setting_name(name)
+            })
+    }) {
+        return None;
+    }
     // The program always stands past the prefix, so the walk moves forward.
     (program > 0).then_some(program)
 }
@@ -365,7 +385,11 @@ fn reads_a_program_file(words: &[&str], index: usize) -> bool {
     let program = command_basename(program);
     if program == "env" || program == "env.exe" {
         if let Some(next) = transparent_env_program(&words[index..]) {
-            return reads_a_program_file(words, index + next);
+            // The words behind the prefix are asked the same question a
+            // handover anywhere else asks, so a path or a script name there
+            // stays a file nothing here opened: `env CI=1 ./deploy.sh` is
+            // that file, not the one word `deploy.sh`.
+            return reads_behind_a_prefix(&words[index + next..]);
         }
         return env_runs_a_program(&words[index + 1..]);
     }

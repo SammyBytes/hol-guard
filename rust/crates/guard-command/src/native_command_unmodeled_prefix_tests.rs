@@ -218,12 +218,18 @@ fn strictness(action: &str) -> u8 {
     }
 }
 
-/// An `env` that is anything other than a list of names keeps the failure.
-/// `-i` empties the environment the program starts with, `-S` carries a whole
-/// shell line in its own value, `-C` moves the directory, and a bare `env
-/// prog` is the spelling the extension floors key on. Walking the names also
-/// does not read past the program they are decided for: an interpreter or a
-/// script file behind them is still one nothing here opened.
+/// An `env` that is anything other than a list of ordinary names keeps the
+/// failure. `-i` empties the environment the program starts with, `-S`
+/// carries a whole shell line in its own value, `-C` moves the directory, and
+/// a bare `env prog` is the spelling the extension floors key on. Walking the
+/// names also does not read past the program they are decided for: an
+/// interpreter or a script file behind them is still one nothing here opened.
+///
+/// A name the prefix writes that steers lookup, loading, configuration,
+/// credentials, the trust anchor or the endpoint keeps the failure too. The
+/// walk drops the names it read, and nothing further along this path asks
+/// what they were, so letting one through would hand `pytest` its owner floor
+/// while the parser still reviews the same hook written without a launcher.
 #[test]
 fn an_env_that_is_not_a_name_list_keeps_the_failure() {
     let controls = controls(github("enabled", None), false);
@@ -236,7 +242,33 @@ fn an_env_that_is_not_a_name_list_keeps_the_failure() {
         "exec env CI=1 ./deploy.sh",
         "stdbuf -oL env CI=1 python3 deploy.py",
         "nice -n 10 env CI=1 xargs rm -f",
+        "exec env LD_PRELOAD=/tmp/x.so pytest -q",
+        "exec env NODE_OPTIONS=--require=/tmp/hook.js npm test",
+        "exec env PATH=. npm test",
+        "exec env GIT_SSH_COMMAND=/tmp/ssh git fetch",
+        "nice -n 10 env PYTHONPATH=/tmp pytest -q",
     ] {
         assert_eq!(decision(&controls, command).1, FAILED, "{command}");
+    }
+}
+
+/// A launcher in front of a written loader hook never buys the command what
+/// the hook written on its own is refused. The names an `env` prefix decides
+/// are dropped by the walk, so the only thing that can keep them read is
+/// refusing the walk itself.
+#[test]
+fn a_written_loader_hook_is_no_weaker_behind_a_launcher() {
+    let controls = controls(github("enabled", None), false);
+    for command in [
+        "env LD_PRELOAD=/tmp/x.so pytest -q",
+        "env NODE_OPTIONS=--require=/tmp/hook.js npm test",
+        "env PATH=. npm test",
+    ] {
+        let (bare, _) = decision(&controls, command);
+        let (behind, _) = decision(&controls, &format!("exec {command}"));
+        assert!(
+            strictness(&behind) >= strictness(&bare),
+            "exec {command}: {behind} is weaker than {bare}"
+        );
     }
 }
