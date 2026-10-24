@@ -1,4 +1,4 @@
-use super::super::evaluate_pre_tool_with_context;
+use crate::pretool::evaluate_pre_tool_with_context;
 use crate::CommandModelRequestV1;
 
 fn decide(command: &str) -> (String, String) {
