@@ -118,6 +118,24 @@ pub(super) fn unwrap_wrappers(
     Ok((index, wrappers))
 }
 
+/// The name `env -u` can actually remove.
+///
+/// `unsetenv` refuses anything that is not a plain environment variable name,
+/// so `env -u -S '/bin/bash -c' ...` fails before it runs a program: the `-S`
+/// it reads as the name is not one. A prefix that never reaches its program
+/// does not name the command that runs, so it stays unmodeled.
+fn removable_name(token: &str) -> Option<&str> {
+    let mut characters = token.chars();
+    let first = characters.next()?;
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return None;
+    }
+    if !characters.all(|value| value == '_' || value.is_ascii_alphanumeric()) {
+        return None;
+    }
+    Some(token)
+}
+
 /// `command X`, `time X` and `env NAME=value... X` run `X` with no other
 /// change. Bare `env X` is left alone: it only bypasses shell functions, and
 /// extension floors key on that spelling.
@@ -154,16 +172,16 @@ fn transparent_prefix(tokens: &[String], index: usize) -> Option<(usize, Vec<Str
             loop {
                 match tokens.get(next)?.as_str() {
                     "-u" | "--unset" => {
-                        names.push(tokens.get(next + 1)?.to_owned());
+                        names.push(removable_name(tokens.get(next + 1)?)?.to_owned());
                         controls += 1;
                         next += 2;
                         continue;
                     }
                     value if value.starts_with("--unset=") => {
-                        names.push(value["--unset=".len()..].to_owned());
+                        names.push(removable_name(&value["--unset=".len()..])?.to_owned());
                     }
                     value if value.len() > 2 && value.starts_with("-u") => {
-                        names.push(value[2..].to_owned());
+                        names.push(removable_name(&value[2..])?.to_owned());
                     }
                     "--" => {
                         controls += 1;
@@ -734,6 +752,13 @@ mod tests {
             "env CI=1 -u DEBUG bun run build",
             "env -u",
             "env --",
+            // `unsetenv` refuses these names, so `env` exits before it runs
+            // anything and the program this text names never starts.
+            "env -u -S '/bin/bash -c' 'rm -rf workspace/target'",
+            "env -u 1BAD npm test",
+            "env -u NODE-OPTIONS npm test",
+            "env --unset= npm test",
+            "env -u= npm test",
             "env CI=1 sh -c 'rm -rf x'",
             "command sh -c 'rm -rf x'",
             "command env",
