@@ -165,7 +165,10 @@ fn an_exec_without_a_named_program_keeps_the_failure() {
 /// ordinary test run behind a launcher blocked outright while the same run
 /// without the names went through. `exec env npm test` decides no name at
 /// all, so it is that same run spelled twice over and settles where `npm
-/// test` settles.
+/// test` settles. A local script behind the same prefix lands here too: the
+/// projection hands the scan `./deploy.sh`, which this repository reviews on
+/// its own terms, so the launcher stops being the reason the command is
+/// refused.
 #[test]
 fn a_transparent_env_behind_a_launcher_reaches_its_owners_floor() {
     let controls = controls(github("enabled", None), false);
@@ -173,6 +176,7 @@ fn a_transparent_env_behind_a_launcher_reaches_its_owners_floor() {
         "exec env CI=1 npm test",
         "exec env npm test",
         "exec env CI=1 FOO=bar cargo build",
+        "exec env CI=1 ./deploy.sh",
         "exec /usr/bin/env CI=1 npm test",
         "exec env -u LANG npm test",
         "stdbuf -oL env CI=1 cargo build",
@@ -240,7 +244,6 @@ fn an_env_that_is_not_a_name_list_keeps_the_failure() {
         "exec env -S'sh -c id'",
         "exec env -C /tmp npm test",
         "exec env CI=1 bash -lc 'npm run build'",
-        "exec env CI=1 ./deploy.sh",
         "stdbuf -oL env CI=1 python3 deploy.py",
         "nice -n 10 env CI=1 xargs rm -f",
         "exec env LD_PRELOAD=/tmp/x.so pytest -q",
