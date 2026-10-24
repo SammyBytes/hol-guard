@@ -205,6 +205,24 @@ fn strip_prefixes(
 ) -> Option<usize> {
     let mut stripped = false;
     let mut required = Vec::new();
+    // A bare `exec` hands the shell's process to the command that follows, so
+    // the program the rest of the words run, and the arguments it runs with,
+    // are the ones the bare spelling runs. Read past it so a setting behind it
+    // is projected the way the bare spelling's is; without this the loop below
+    // stops at the first word and `exec env -u NODE_OPTIONS npm test` carries
+    // a floor that `env -u NODE_OPTIONS npm test` does not. `exec -c` runs
+    // with an empty environment and `exec -a` renames the program, so only the
+    // option-less spelling is transparent.
+    let launcher = (tokens[index].value == "exec"
+        && literal_word(chars, &tokens[index])
+        && index + 1 < tokens.len()
+        && !tokens[index + 1].is_control
+        && !tokens[index + 1].value.starts_with('-'))
+    .then(|| {
+        let at = index;
+        index += 1;
+        at
+    });
     while index < tokens.len() && !tokens[index].is_control {
         let token = &tokens[index];
         if let Some((name, value)) = shell_assignment(chars, token) {
@@ -249,6 +267,11 @@ fn strip_prefixes(
     }
     if !required.is_empty() && !search_path::admits(&required, &tokens[index].value) {
         return None;
+    }
+    // The launcher only leaves the text when a setting behind it did. On its
+    // own it is the command the caller wrote, and nothing here has read it.
+    if let (Some(at), true) = (launcher, stripped) {
+        removed[at] = true;
     }
     Some(index)
 }
