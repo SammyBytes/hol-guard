@@ -296,6 +296,21 @@ pub(crate) fn parse_posix_command(
                 arguments = operands;
             }
         }
+        // `[[ -d NAME ]]` asks what `[ -d NAME ]` asks, of less: inside
+        // `[[ ]]` the shell splits no word and expands no glob, so the
+        // modeled `[` form stands for at least the work this text does.
+        // Only a complete bracket pair is read that way. A `[[` the segment
+        // never closes is some other shape, and so is one `&&` or `||` has
+        // already split, because the closing `]]` is then in another segment.
+        if executable.as_deref() == Some("[[") && arguments.last().is_some_and(|last| last == "]]")
+        {
+            executable = Some("[".to_owned());
+            tokens[executable_index] = "[".to_owned();
+            let closing = tokens.len() - 1;
+            tokens[closing] = "]".to_owned();
+            let closing = arguments.len() - 1;
+            arguments[closing] = "]".to_owned();
+        }
         if executable.as_deref().is_some_and(is_shell_control_keyword) {
             return Ok(uncertain(request, raw, "compound_shell_not_yet_supported"));
         }
