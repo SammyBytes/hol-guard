@@ -87,9 +87,15 @@ fn request(identity: Value, canonical: Option<&str>) -> CodexHookFileIdentityReq
 
 #[cfg(unix)]
 fn current_uid() -> Option<u32> {
-    // SAFETY: `getuid` reads the calling process's own real user id. It takes
-    // no arguments, touches no memory and cannot fail.
-    Some(unsafe { libc::getuid() })
+    // The owner of a file this process just created is the user the resident
+    // would compare a manifest entry against. `getuid` would answer directly,
+    // but the crate forbids unsafe code, and the file's owner is the effective
+    // user the identity check actually cares about.
+    let root = tempfile::tempdir().ok()?;
+    let path = root.path().join("owner-probe");
+    fs::File::create(&path).ok()?;
+    let metadata = fs::symlink_metadata(&path).ok()?;
+    Some(file_uid(&metadata))
 }
 
 #[cfg(not(unix))]
