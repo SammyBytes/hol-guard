@@ -176,7 +176,7 @@
       ]
     },
     {
-      "name": "a variable expansion is not an exact reading",
+      "name": "a variable stays a literal token",
       "command_text": "npx -y srv --token $TOKEN",
       "tokens": [
         "npx",
@@ -211,7 +211,7 @@
       "tokens": null
     },
     {
-      "name": "a stderr redirect is not one invocation",
+      "name": "a stderr dup stays a literal argument",
       "command_text": "npx -y srv 2>&1",
       "tokens": [
         "npx",
@@ -243,7 +243,7 @@
       ]
     },
     {
-      "name": "a heredoc is not read as a redirect",
+      "name": "a heredoc is more than one invocation",
       "command_text": "npx -y srv <<EOF\nbody\nEOF",
       "tokens": null
     },
