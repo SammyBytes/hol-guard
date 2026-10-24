@@ -70,9 +70,32 @@ def test_a_shipped_rule_with_an_unmapped_class_still_builds_its_record(rule_id: 
     assert match.identity.rule_id == rule_id
 
 
-def test_the_decision_plane_claims_the_same_fallback() -> None:
-    """`effect_claims` (command_decision_adapter.rs) answers `process-execution` too."""
+def test_the_fallback_is_reached_only_through_a_class_the_table_omits() -> None:
+    """The record above claims `process-execution` because its class is unmapped.
+
+    The decision plane claims the same beside it, and pins that half itself
+    (`effect_claims_answer_for_a_risk_class_the_vocabulary_does_not_name`,
+    command_decision_adapter.rs): a Python-only assertion here would still
+    pass if the Rust table or its fallback changed on its own.
+    """
 
     owned = _owned("command.cloud.digitalocean.credential-exposure")
     assert set(owned.match.rule.risk_classes) - set(COMMAND_RISK_EFFECTS) == {"credential_access"}
-    assert EffectKind.PROCESS_EXECUTION in _activity_match("activity:02", 0, owned).effect_claims
+    assert set(owned.match.rule.risk_classes) & set(COMMAND_RISK_EFFECTS) == {"network_egress"}
+    assert COMMAND_RISK_EFFECTS["network_egress"] == frozenset({EffectKind.NETWORK_WRITE})
+    assert _activity_match("activity:02", 0, owned).effect_claims == frozenset(
+        {EffectKind.NETWORK_WRITE, EffectKind.PROCESS_EXECUTION}
+    )
+
+
+def test_every_mapped_class_names_exactly_one_effect() -> None:
+    """Rust holds the same table as `Option<EffectKind>`, one kind per class.
+
+    A class mapped to two kinds would still build a Python record and have no
+    faithful Rust spelling, so the shape is pinned where it can be seen rather
+    than left to the next person to notice.
+    """
+
+    assert {name: len(effects) for name, effects in COMMAND_RISK_EFFECTS.items()} == dict.fromkeys(
+        COMMAND_RISK_EFFECTS, 1
+    )

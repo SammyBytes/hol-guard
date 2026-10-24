@@ -505,6 +505,68 @@ mod tests {
     use super::*;
     use crate::extension_evidence::ExtensionRuleIdentity;
 
+    fn claims(risk_classes: &[&str]) -> Vec<EffectKind> {
+        let owned: Vec<String> = risk_classes
+            .iter()
+            .map(|class| String::from(*class))
+            .collect();
+        effect_claims(&owned)
+    }
+
+    /// `_activity_match` (`command_activity_lifecycle.py`) claims the same for
+    /// the record it writes beside this decision, and its own test pins that
+    /// half; this one pins the decision plane, so a change to either table or
+    /// to the fallback cannot pass as agreement.
+    #[test]
+    fn effect_claims_answer_for_a_risk_class_the_vocabulary_does_not_name() {
+        // Every class `COMMAND_RISK_EFFECTS` (`command_risk_effects.py`) names.
+        assert_eq!(
+            claims(&["credential_exfiltration"]),
+            [EffectKind::CredentialOrSecretOperation]
+        );
+        assert_eq!(
+            claims(&["data_flow_exfiltration"]),
+            [EffectKind::NetworkWrite]
+        );
+        assert_eq!(
+            claims(&["destructive_shell"]),
+            [EffectKind::DestructiveOrIrreversibleOperation]
+        );
+        assert_eq!(
+            claims(&["encoded_execution"]),
+            [EffectKind::ProcessExecution]
+        );
+        assert_eq!(claims(&["execution"]), [EffectKind::ProcessExecution]);
+        assert_eq!(claims(&["local_secret_read"]), [EffectKind::SensitiveRead]);
+        assert_eq!(claims(&["network_egress"]), [EffectKind::NetworkWrite]);
+        assert_eq!(
+            claims(&["policy_bypass"]),
+            [EffectKind::GuardControlOperation]
+        );
+        assert_eq!(
+            claims(&["supply_chain"]),
+            [EffectKind::PackageOrSourceInstallation]
+        );
+        // The classes the shipped DigitalOcean rules declare beside their
+        // `network_egress`, which this vocabulary does not name.
+        assert_eq!(
+            claims(&["credential_access"]),
+            [EffectKind::ProcessExecution]
+        );
+        assert_eq!(
+            claims(&["permission_change"]),
+            [EffectKind::ProcessExecution]
+        );
+        // Those rules as authored: the fallback beside the mapped claim, in
+        // the order `EffectKind` declares the two.
+        assert_eq!(
+            claims(&["network_egress", "credential_access"]),
+            [EffectKind::ProcessExecution, EffectKind::NetworkWrite]
+        );
+        // Never empty, so a rule declaring no class at all still claims one.
+        assert_eq!(claims(&[]), [EffectKind::ProcessExecution]);
+    }
+
     fn unsafe_evidence() -> ExtensionEvidence {
         ExtensionEvidence {
             identity: ExtensionRuleIdentity {
