@@ -310,6 +310,26 @@ fn the_long_s_spelling_of_the_primary_name_still_names_the_primary_document() {
 }
 
 #[test]
+fn the_dotless_i_spelling_of_the_primary_name_is_not_the_primary_document() {
+    let fixture = Fixture::new("dotless-i");
+    let directory = fixture.root.join("skills").join("alpha");
+    fs::create_dir_all(&directory).expect("skill directory");
+    // `str.casefold` in the reader this replaces left `\u{131}` alone, so this
+    // file was never the primary document there. Upper-casing reaches `I` and
+    // lower-casing it reaches `i`, which would have quietly started reading a
+    // file the reader this replaces refused.
+    let document = directory.join("SK\u{131}LL.md");
+    fs::write(&document, "# Title\n").expect("skill document");
+
+    let evidence = read(&document, &fixture.safe_roots());
+
+    assert_eq!(
+        evidence.readability_status,
+        SkillDocumentReadabilityV1::NotPrimarySkillDocument
+    );
+}
+
+#[test]
 fn a_path_that_walks_upward_is_not_primary() {
     let fixture = Fixture::new("walks-upward");
     fixture.document("alpha", "# Title\n");

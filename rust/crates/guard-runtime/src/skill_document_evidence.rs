@@ -61,9 +61,17 @@ fn is_symlink(path: &Path) -> bool {
 /// alone, so `\u{17f}KILL.md` named the primary document for the reader this
 /// replaces. Upper-casing first reaches the same letter, and folds `\u{df}` to
 /// `ss` the same way, so the two readers agree on which file is primary.
+///
+/// The one letter the two routes read apart is `\u{131}`: CaseFolding.txt maps
+/// it only under the Turkic status, so `str.casefold` leaves it alone, while
+/// upper-casing reaches `I` and lower-casing it reaches `i`. That would make
+/// `SK\u{131}LL.md` primary here and not primary there, so this refuses the
+/// letter rather than letting it spell the name.
 fn component_name_is(path: &Path, expected: &str) -> bool {
-    path.file_name()
-        .is_some_and(|name| name.to_string_lossy().to_uppercase().to_lowercase() == expected)
+    path.file_name().is_some_and(|name| {
+        let name = name.to_string_lossy();
+        !name.contains('\u{131}') && name.to_uppercase().to_lowercase() == expected
+    })
 }
 
 /// Whether the text walks upward out of the directories it names.
