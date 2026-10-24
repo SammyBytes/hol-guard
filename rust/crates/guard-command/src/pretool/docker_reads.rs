@@ -47,10 +47,25 @@
 //! `--follow` stays out, and so does `--details`, which prints the extra
 //! attributes a logging driver was given.
 //!
+//! `docker volume ls`, `docker network ls`, `docker system df` and
+//! `docker stats --no-stream` are the daemon's own summaries over the
+//! connection `docker ps` already uses. They resolve no compose project, read
+//! no `.env`, print no container environment and start nothing. A volume
+//! listing is the one that cannot take `--format`: the default table prints a
+//! driver and a name, while `--format json` serializes the driver options a
+//! volume was created with, and a CIFS or NFS volume carries its credentials
+//! there. A stats reading must say `--no-stream`, because the streaming form
+//! never returns, which is why `logs --follow` is out as well.
+//!
 //! Still reviewed:
 //! - any option before the subcommand. `-H`/`--host`, `--context` and
 //!   `--config` move the client to another daemon or configuration, and
 //!   `--tls*` options read local key files.
+//! - `docker info`, whose output names the proxy the daemon was configured
+//!   with, and a proxy URL is written with its credentials in it. `top` prints
+//!   a container's process command lines and `history` the commands an image
+//!   was built from, both of which routinely hold a secret in an argument.
+//!   `search`, `manifest inspect` and `trust inspect` each query a registry.
 //! - `inspect`, which prints each container's environment, and every `compose`
 //!   verb that resolves the project, `compose ps` and `compose logs` among
 //!   them: resolution reads the project's `.env`, `COMPOSE_FILE`,
@@ -103,6 +118,26 @@ const CONTEXT_VALUES: [&str; 1] = ["--format"];
 const REGISTRY_FLAGS: [&str; 1] = ["--raw"];
 const REGISTRY_VALUES: [&str; 1] = ["--format"];
 
+/// A volume listing filters and may print names alone. It has no `--format`:
+/// the default table prints only a driver and a name, while `--format json`
+/// serializes the `--opt` values the volume was created with, and a CIFS or
+/// NFS volume is created with its credentials among them.
+const VOLUME_FLAGS: [&str; 3] = ["-q", "--quiet", "--help"];
+const VOLUME_VALUES: [&str; 2] = ["-f", "--filter"];
+/// A network listing prints an id, name, driver and scope, and `--format`
+/// reads that same summary. It has no `--all` of its own.
+const NETWORK_FLAGS: [&str; 4] = ["-q", "--quiet", "--no-trunc", "--help"];
+const NETWORK_VALUES: [&str; 3] = ["-f", "--filter", "--format"];
+/// A disk-usage summary counts images, containers, volumes and the build
+/// cache. `--verbose` names each row the totals are made of.
+const DISK_FLAGS: [&str; 3] = ["-v", "--verbose", "--help"];
+const DISK_VALUES: [&str; 1] = ["--format"];
+/// A stats reading prints each container's CPU, memory, network and block
+/// counters. `--no-stream` is required, not optional: without it the command
+/// redraws until it is interrupted and never returns a result.
+const STATS_FLAGS: [&str; 5] = ["-a", "--all", "--no-stream", "--no-trunc", "--help"];
+const STATS_VALUES: [&str; 1] = ["--format"];
+
 /// Single-letter flags that may be clustered (`-aq`).
 const CONTAINER_SHORT: &str = "aqsl";
 const IMAGE_SHORT: &str = "aq";
@@ -110,6 +145,10 @@ const BUILDER_SHORT: &str = "";
 const PROJECT_SHORT: &str = "aq";
 const CONTEXT_SHORT: &str = "q";
 const REGISTRY_SHORT: &str = "";
+const VOLUME_SHORT: &str = "q";
+const NETWORK_SHORT: &str = "q";
+const DISK_SHORT: &str = "v";
+const STATS_SHORT: &str = "a";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Listing {
@@ -119,6 +158,10 @@ enum Listing {
     Projects,
     Contexts,
     Manifest,
+    Volumes,
+    Networks,
+    Disk,
+    Stats,
 }
 
 pub(super) fn safe_docker_segment(
@@ -177,6 +220,12 @@ pub(super) fn safe_docker_arguments(arguments: &[String]) -> bool {
         ["compose", "ls" | "list", rest @ ..] => (Listing::Projects, rest),
         ["context", "ls" | "list", rest @ ..] => (Listing::Contexts, rest),
         ["buildx", "imagetools", "inspect", rest @ ..] => (Listing::Manifest, rest),
+        ["volume", "ls" | "list", rest @ ..] => (Listing::Volumes, rest),
+        ["network", "ls" | "list", rest @ ..] => (Listing::Networks, rest),
+        ["system", "df", rest @ ..] => (Listing::Disk, rest),
+        // The streaming form never returns, so the word that bounds it has to
+        // be in the text rather than left to the caller.
+        ["stats", rest @ ..] if rest.contains(&"--no-stream") => (Listing::Stats, rest),
         _ => return super::docker_start::safe_start_arguments(&words),
     };
     listing_options_safe(listing, rest)
@@ -184,7 +233,11 @@ pub(super) fn safe_docker_arguments(arguments: &[String]) -> bool {
 
 fn listing_options_safe(listing: Listing, words: &[&str]) -> bool {
     let shared: &[&str] = match listing {
-        Listing::Contexts => &[],
+        Listing::Contexts
+        | Listing::Volumes
+        | Listing::Networks
+        | Listing::Disk
+        | Listing::Stats => &[],
         _ => &LISTING_FLAGS[..],
     };
     let (flags, values, short): (&[&str], &[&str], &str) = match listing {
@@ -194,6 +247,10 @@ fn listing_options_safe(listing: Listing, words: &[&str]) -> bool {
         Listing::Projects => (&NO_FLAGS[..], &PROJECT_VALUES[..], PROJECT_SHORT),
         Listing::Contexts => (&CONTEXT_FLAGS[..], &CONTEXT_VALUES[..], CONTEXT_SHORT),
         Listing::Manifest => (&REGISTRY_FLAGS[..], &REGISTRY_VALUES[..], REGISTRY_SHORT),
+        Listing::Volumes => (&VOLUME_FLAGS[..], &VOLUME_VALUES[..], VOLUME_SHORT),
+        Listing::Networks => (&NETWORK_FLAGS[..], &NETWORK_VALUES[..], NETWORK_SHORT),
+        Listing::Disk => (&DISK_FLAGS[..], &DISK_VALUES[..], DISK_SHORT),
+        Listing::Stats => (&STATS_FLAGS[..], &STATS_VALUES[..], STATS_SHORT),
     };
     let mut positionals = 0usize;
     let mut index = 0;
@@ -239,11 +296,17 @@ fn listing_options_safe(listing: Listing, words: &[&str]) -> bool {
     // `docker images <repository[:tag]>` filters by one reference; the
     // container listing takes none. A manifest query names exactly one image.
     match listing {
-        Listing::Containers | Listing::Builders | Listing::Projects | Listing::Contexts => {
-            positionals == 0
-        }
+        Listing::Containers
+        | Listing::Builders
+        | Listing::Projects
+        | Listing::Contexts
+        | Listing::Volumes
+        | Listing::Networks
+        | Listing::Disk => positionals == 0,
         Listing::Images => positionals <= 1,
         Listing::Manifest => positionals == 1,
+        // A stats reading names the containers to count, or all of them.
+        Listing::Stats => true,
     }
 }
 
