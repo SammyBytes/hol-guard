@@ -110,11 +110,9 @@ def test_github_workflow_mutation_trailing_help_reads_as_help(tmp_path: Path) ->
 
 
 def test_github_workflow_mutation_help_behind_an_option_still_reviews(tmp_path: Path) -> None:
-    # Here `--help` is the value `--repo` takes, so gh cancels the run instead
-    # of printing help, and the mutation keeps its review.
-    payload = inspect_command(
-        "gh run cancel 42 --repo --help", cwd=tmp_path, home_dir=tmp_path
-    )
+    # Here `--help` is the value `--job` takes, so gh reruns the run instead of
+    # printing help, and the mutation keeps its review.
+    payload = inspect_command("gh run rerun 42 --job --help", cwd=tmp_path, home_dir=tmp_path)
 
     assert payload["status"] == "review"
     assert payload["classification"]["action_class"] == "GitHub workflow mutation command"

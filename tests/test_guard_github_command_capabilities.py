@@ -53,7 +53,7 @@ GITHUB_CAPABILITY_CASES = (
     (("ssh-key", "delete", "123"), "access_remote", "github.command.access-mutation"),
     (("run", "cancel", "--help"), "read_local", "github.command.local-help"),
     (
-        ("run", "cancel", "42", "--repo", "--help"),
+        ("run", "rerun", "42", "--job", "--help"),
         "workflow_remote",
         "github.command.workflow-mutation",
     ),
@@ -543,7 +543,7 @@ GITHUB_REVIEW_FLOORS: Final[tuple[tuple[str, str], ...]] = (
         (("ssh-key", "delete", "123"), "access_remote", "github.command.access-mutation"),
         (("run", "cancel", "--help"), "read_local", "github.command.local-help"),
         (
-            ("run", "cancel", "42", "--repo", "--help"),
+            ("run", "rerun", "42", "--job", "--help"),
             "workflow_remote",
             "github.command.workflow-mutation",
         ),
