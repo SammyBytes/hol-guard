@@ -758,7 +758,7 @@ fn trailing_help_prints_gh_help(before: &[String]) -> bool {
             // gh is still the one reading the flag.
             return true;
         }
-        if !owned.iter().any(|known| *known == token.as_str()) {
+        if !owned.contains(&token.as_str()) {
             return false;
         }
         let Some((_, group_name, deeper)) = GITHUB_BUILTIN_NESTED_GROUPS
