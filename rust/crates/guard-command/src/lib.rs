@@ -209,6 +209,7 @@ pub mod protection_health;
 mod protection_health_tests;
 pub mod pytest_argv;
 mod read_only_fanout;
+mod read_only_name_fanout;
 pub mod reviewed_invocation_bindings;
 pub mod rich_command_model_api;
 use parser_executables::*;

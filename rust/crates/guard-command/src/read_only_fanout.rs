@@ -59,7 +59,7 @@ pub(crate) struct Xargs<'a> {
 }
 
 /// Trailing `2>&1` only merges the segment's own stderr.
-fn without_stderr_merge(arguments: &[String]) -> &[String] {
+pub(crate) fn without_stderr_merge(arguments: &[String]) -> &[String] {
     let mut end = arguments.len();
     while end > 0 && arguments[end - 1] == "2>&1" {
         end -= 1;
@@ -90,7 +90,7 @@ pub(crate) fn bounded_without_operands(child: &[String]) -> bool {
         return false;
     };
     match executable_basename(name) {
-        "cat" | "head" | "tail" | "wc" | "od" | "ls" | "stat" => true,
+        "cat" | "head" | "tail" | "wc" | "od" | "ls" | "stat" | "echo" => true,
         "grep" => !rest.iter().any(|argument| {
             argument.starts_with("--recursive")
                 || argument.starts_with("--dereference-recursive")
@@ -276,7 +276,7 @@ fn bounded_count(value: &str) -> bool {
 
 /// `xargs [-0] [-r] [-n N] [-P N] CHILD ARGS`: no replacement string, no
 /// prompt, no input file or delimiter options.
-fn xargs_options(arguments: &[String]) -> Option<Xargs<'_>> {
+pub(crate) fn xargs_options(arguments: &[String]) -> Option<Xargs<'_>> {
     let arguments = without_stderr_merge(arguments);
     let mut null_separated = false;
     let mut no_run_if_empty = false;

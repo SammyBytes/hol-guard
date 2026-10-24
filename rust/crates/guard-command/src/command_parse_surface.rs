@@ -2,7 +2,7 @@ use crate::parser_executables::*;
 use crate::parser_segments::*;
 use crate::{
     canonical_command, inline_shell_quoting, parser_wrappers, powershell_command, powershell_reads,
-    read_only_fanout,
+    read_only_fanout, read_only_name_fanout,
 };
 use serde::{Deserialize, Serialize};
 
@@ -328,6 +328,11 @@ pub(crate) fn parse_posix_command(
                     &context,
                     &arguments,
                 ) || read_only_fanout::xargs_follows_object_names(
+                    previous,
+                    raw_segment.pipeline_index,
+                    &context,
+                    &arguments,
+                ) || read_only_name_fanout::xargs_follows_names(
                     previous,
                     raw_segment.pipeline_index,
                     &context,

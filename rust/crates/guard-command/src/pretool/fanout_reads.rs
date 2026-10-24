@@ -28,6 +28,7 @@ use super::safe_reads::{bounded_read_target, verified_path_context};
 use super::segment_proof::exact_safe_segment_with_context;
 use super::PathContext;
 use crate::read_only_fanout::{self as fanout, FindShape};
+use crate::read_only_name_fanout as names;
 use crate::{CanonicalCommandV1, CommandSegmentV1};
 
 /// Source and documentation extensions a content reader may fan out over.
@@ -47,24 +48,33 @@ fn plain_extension_pattern(pattern: &str) -> bool {
     })
 }
 
-fn contained_roots(shape: &FindShape<'_>, context: PathContext<'_>) -> bool {
+/// The verified workspace a fan-out's names have to resolve inside, or
+/// `None` when the session has no workspace boundary to resolve them against.
+fn workspace_root(context: PathContext<'_>) -> Option<std::path::PathBuf> {
     let (Some(home), Some(cwd)) = (context.home_dir, context.cwd) else {
-        return false;
+        return None;
     };
     if !verified_path_context(Some(home), Some(cwd))
         || !std::path::Path::new(cwd).is_absolute()
         || !std::path::Path::new(home).is_absolute()
     {
-        return false;
+        return None;
     }
     let (Ok(workspace), Ok(home_root)) = (std::fs::canonicalize(cwd), std::fs::canonicalize(home))
     else {
-        return false;
+        return None;
     };
     // A session in the home directory, or above it, has no workspace boundary.
-    if home_root.starts_with(&workspace) {
+    (!home_root.starts_with(&workspace)).then_some(workspace)
+}
+
+fn contained_roots(shape: &FindShape<'_>, context: PathContext<'_>) -> bool {
+    let (Some(home), Some(cwd)) = (context.home_dir, context.cwd) else {
         return false;
-    }
+    };
+    let Some(workspace) = workspace_root(context) else {
+        return false;
+    };
     // A root spelled with the workspace's own absolute path names the same
     // directory as the relative spelling. Where it resolves, links and `..`
     // included, is what decides, so an absolute root has to land inside the
@@ -251,6 +261,51 @@ pub(super) fn safe_git_xargs(
         )
         && (xargs.no_run_if_empty
             || child_proven_with(model, segment, xargs.child, None, true, context))
+}
+
+/// `git ls-files ... | xargs CHILD` and `git diff --name-only ... | xargs
+/// CHILD` whose child only reports metadata.
+///
+/// The producer prints names the working tree holds and the operands it takes
+/// cannot leave the directory it prints relative to, so the child's words
+/// resolve inside the verified workspace. Whitespace still splits a crafted
+/// name, which is why `read_only_name_fanout` admits no reader of contents
+/// here: the split discloses a path's metadata, never a byte of it.
+pub(super) fn safe_name_xargs(
+    model: &CanonicalCommandV1,
+    segment: &CommandSegmentV1,
+    context: PathContext<'_>,
+) -> bool {
+    let Some(xargs) = names::xargs_names(&segment.arguments) else {
+        return false;
+    };
+    let Some(previous) = model
+        .segments
+        .iter()
+        .position(|candidate| candidate.span.start == segment.span.start)
+        .and_then(|index| index.checked_sub(1))
+        .map(|index| &model.segments[index])
+    else {
+        return false;
+    };
+    names::xargs_follows_names(
+        previous,
+        segment.pipeline_index,
+        &segment.execution_context,
+        &segment.arguments,
+    ) && plain(segment)
+        && words_as_written(segment)
+        && words_as_written(previous)
+        && workspace_root(context).is_some()
+        && (xargs.no_run_if_empty || fanout::bounded_without_operands(xargs.child))
+        && child_proven_with(
+            model,
+            segment,
+            xargs.child,
+            Some(names::NAME_PLACEHOLDER),
+            false,
+            context,
+        )
 }
 
 fn follows_object_names(model: &CanonicalCommandV1, index: usize) -> bool {
