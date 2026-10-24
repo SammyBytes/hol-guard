@@ -192,6 +192,11 @@ fn marks_complex_shell_forms_uncertain_without_partial_segments() {
         // A closed `[[ ... ]]` pair is not here: the parse surface reads it as
         // the `[` test it asks. An unclosed one is some other shape.
         "[[ -f Cargo.toml",
+        // `[[ ]]` evaluates an arithmetic operand and resolves a bare name
+        // through the value it holds, so `X='a[$(id)]'` runs `id` where the
+        // `[` this would otherwise rewrite to compares two words and stops.
+        "[[ $X -eq 0 ]]",
+        "[[ 1 -gt $LIMIT ]]",
         "echo $\"locale translation\"",
         "xargs rm -rf",
         "find . -exec rm {} ;",

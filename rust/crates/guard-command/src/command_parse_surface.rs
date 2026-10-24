@@ -302,9 +302,14 @@ pub(crate) fn parse_posix_command(
         // Only a complete bracket pair is read that way. A `[[` the segment
         // never closes is some other shape, and so is one `&&` or `||` has
         // already split, because the closing `]]` is then in another segment.
+        // An arithmetic comparison is also left alone: `[[ ]]` evaluates both
+        // of its operands as arithmetic and resolves a bare name through the
+        // value it holds, so `X='a[$(id)]'; [[ $X -eq 0 ]]` runs `id`, which
+        // the `[` this would rewrite to never does.
         if executable_index == 0
             && executable.as_deref() == Some("[[")
             && arguments.last().is_some_and(|last| last == "]]")
+            && !arguments.iter().any(|word| arithmetic_test(word))
         {
             executable = Some("[".to_owned());
             tokens[executable_index] = "[".to_owned();
@@ -427,6 +432,15 @@ pub(crate) fn uncertain(
         parser_profile: "posix-simple-v1".to_owned(),
         security_identity: String::new(),
     }
+}
+
+/// Whether this word is a `[[ ]]` operator whose operands the shell reads as
+/// arithmetic. Arithmetic evaluation resolves a bare name through the value it
+/// holds and keeps evaluating, so an operand can carry a command substitution
+/// the text in front of us never spells. `[` and `test` compare the two words
+/// as integers and stop there.
+fn arithmetic_test(word: &str) -> bool {
+    matches!(word, "-eq" | "-ne" | "-lt" | "-le" | "-gt" | "-ge")
 }
 
 /// The same segment text with its bracket pair written the way `[ ... ]`
