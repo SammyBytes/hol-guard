@@ -86,6 +86,30 @@ fn a_bracketed_host_that_is_not_an_address_is_not_a_remote_host() {
     assert!(!is_remote_url("https://[::1]:8080/items"));
 }
 
+/// `urlsplit` validates the bracket in the hostname, which is what stands
+/// after the last `@`, and allows nothing in front of the bracket or between
+/// its close and the port delimiter. Reading the first bracket anywhere in the
+/// netloc let a name keep an address as its host:
+/// `api.example.com[2606:4700::1111]` answered with the address and earned
+/// remote-network evidence for a URL Python refuses outright.
+#[test]
+fn a_bracket_that_does_not_start_the_hostname_is_not_a_remote_host() {
+    assert!(!is_remote_url(
+        "https://api.example.com[2606:4700::1111]/items"
+    ));
+    assert!(!is_remote_url(
+        "https://user@api.example.com[2606:4700::1111]/items"
+    ));
+    // Only a port delimiter may follow the closing bracket.
+    assert!(!is_remote_url("https://[2606:4700::1111]x:8080/items"));
+    // A bracket standing only in the credentials leaves the hostname
+    // unbracketed, and a name there is not an address.
+    assert!(!is_remote_url("https://user[1]@api.example.com/items"));
+    // The hostname is what stands after the last `@`, so a bracket in the
+    // credentials never decides the one that does.
+    assert!(is_remote_url("https://user[1]@[2606:4700::1111]/items"));
+}
+
 #[test]
 fn a_bare_host_without_a_path_still_reads_as_remote() {
     assert!(is_remote_url("https://api.example.com"));

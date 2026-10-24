@@ -288,9 +288,35 @@ fn url_hostname(value: &str) -> Result<Option<String>, ()> {
     if netloc.contains('[') != netloc.contains(']') {
         return Err(());
     }
-    if let Some(open) = netloc.find('[') {
-        let close = netloc[open + 1..].find(']').ok_or(())?;
-        bracketed_host_is_an_address(&netloc[open + 1..open + 1 + close])?;
+    if netloc.contains('[') && netloc.contains(']') {
+        // The bracket belongs to the hostname, which is what stands after the
+        // last `@`, and nothing may stand in front of it or between its close
+        // and the port delimiter. Reading the first bracket in the whole
+        // netloc instead let `api.example.com[2606:4700::1111]` keep the
+        // address as its host, which `urlsplit` refuses outright.
+        let hostname_and_port = match netloc.rfind('@') {
+            Some(index) => &netloc[index + 1..],
+            None => netloc,
+        };
+        let host = match hostname_and_port.split_once('[') {
+            Some((before, bracketed)) => {
+                if !before.is_empty() {
+                    return Err(());
+                }
+                let (host, port) = bracketed.split_once(']').unwrap_or((bracketed, ""));
+                if !port.is_empty() && !port.starts_with(':') {
+                    return Err(());
+                }
+                host
+            }
+            // A bracket that stands only in the credentials leaves the
+            // hostname unbracketed, and a name there is not an address.
+            None => match hostname_and_port.split_once(':') {
+                Some((host, _)) => host,
+                None => hostname_and_port,
+            },
+        };
+        bracketed_host_is_an_address(host)?;
     }
     let host = match netloc.rfind('@') {
         Some(index) => &netloc[index + 1..],
