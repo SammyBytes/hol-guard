@@ -1,6 +1,9 @@
 import { expect, expectNoErrorBoundary, daemonApi, test } from "./fixtures";
 
-type RuntimeSnapshot = { pending_count: number; receipt_count: number; cloud_state_label: string };
+type RuntimeSnapshot = { pending_count: number; receipt_count: number; cloud_state?: string | null };
+
+// The figure only claims a sync state the daemon reports; anything else reads "Unavailable".
+const SYNC_LABEL: Record<string, string> = { paired_active: "On", paired_waiting: "First sync", local_only: "Off" };
 
 // Every outbound link the About page may show: name -> destination. A change
 // here is a change to what the page sends people to, so review it as one.
@@ -60,22 +63,22 @@ test.describe("About against the live daemon", () => {
     await expect(main.getByRole("button")).toHaveCount(0);
   });
 
-  test("the proof strip shows this daemon's version, sync state, receipts and pending count", async ({ page, state }) => {
+  test("Fig. 1 shows this daemon's version, sync state, receipts and pending count", async ({ page, state }) => {
     const runtime = await daemonApi<RuntimeSnapshot>(state, "/v1/runtime");
     const update = await daemonApi<{ current_version: string }>(state, "/v1/update/status");
     await page.goto("/about");
     await expect(page.getByRole("heading", { level: 1, name: "About HOL Guard" })).toBeVisible();
 
-    // Each proof chip is a label next to a tag, so its text reads label+value.
+    // Each readout on the figure is a label next to its value, so its text reads label+value.
     const chip = (label: string, value: string) => page.getByRole("main").getByText(`${label}${value}`, { exact: true });
     await expect(chip("Guard version", update.current_version)).toBeVisible();
-    await expect(chip("Sync", runtime.cloud_state_label)).toBeVisible();
-    await expect(chip("Receipts", String(runtime.receipt_count))).toBeVisible();
+    await expect(chip("Sync", SYNC_LABEL[runtime.cloud_state ?? ""] ?? "Unavailable")).toBeVisible();
+    await expect(chip("Receipts", new Intl.NumberFormat("en-US").format(runtime.receipt_count))).toBeVisible();
     await expect(
       chip("Local protection", runtime.pending_count > 0 ? `${runtime.pending_count} pending` : "Active"),
     ).toBeVisible();
     // The seeded pages feed real receipts, so an empty count would mean the
-    // strip reads nothing from the daemon.
+    // figure reads nothing from the daemon.
     expect(runtime.receipt_count).toBeGreaterThan(0);
     expect(update.current_version).toMatch(/^\d+\.\d+\.\d+/);
   });
